@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Soccer Live</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚽</text></svg>" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-ball">⚽</span>
+        <span class="brand-name">Soccer<span class="brand-accent">Live</span></span>
+      </div>
+      <nav class="tabs">
+        <button class="tab-btn active" data-view="matches">라이브 스코어</button>
+        <button class="tab-btn" data-view="standings">순위</button>
+      </nav>
+    </header>
+
+    <main class="content">
+      <!-- 라이브 스코어 뷰 -->
+      <section id="view-matches" class="view active">
+        <div class="date-nav">
+          <button id="prev-day" class="date-arrow" aria-label="이전 날짜">‹</button>
+          <div class="date-label" id="current-date-label">오늘</div>
+          <button id="next-day" class="date-arrow" aria-label="다음 날짜">›</button>
+          <button id="refresh-btn" class="refresh-btn" title="새로고침">⟳</button>
+        </div>
+        <div id="matches-list" class="matches-list">
+          <div class="loading">경기 정보를 불러오는 중...</div>
+        </div>
+      </section>
+
+      <!-- 순위 뷰 -->
+      <section id="view-standings" class="view">
+        <div class="competition-picker" id="competition-picker"></div>
+        <div id="standings-table-wrap" class="standings-table-wrap">
+          <div class="loading">순위를 불러오는 중...</div>
+        </div>
+      </section>
+
+      <!-- 경기 상세 뷰 -->
+      <section id="view-detail" class="view">
+        <button id="back-btn" class="back-btn">← 목록으로</button>
+        <div id="match-detail-content" class="match-detail-content">
+          <div class="loading">불러오는 중...</div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      데이터 제공: <a href="https://www.football-data.org" target="_blank" rel="noopener">football-data.org</a>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
