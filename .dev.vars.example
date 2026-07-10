@@ -1,0 +1,5 @@
+FOOTBALL_DATA_API_KEY=발급받은_football-data.org_키
+
+# 선택 사항: 비워두면 공개 테스트 키("3")를 씀(회원가입 불필요, 분당 30회 공유 한도).
+# 운영 배포에서는 https://www.thesportsdb.com/free_sports_api 에서 본인 키를 발급받아 채우는 걸 권장.
+THESPORTSDB_API_KEY=
