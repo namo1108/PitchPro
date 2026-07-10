@@ -16,7 +16,7 @@ export function normalizeMatch(raw) {
 }
 
 function pickTeam(team) {
-  return { id: team.id, name: team.name, shortName: team.shortName, crest: team.crest };
+  return { id: `fd:${team.id}`, name: team.name, shortName: team.shortName, crest: team.crest };
 }
 
 export function normalizeStandings(raw) {

@@ -51,6 +51,10 @@ export const KV_KEYS = {
   matchesKLeague: "matches:kleague:v1",
   standingsKLeague: "standings:kleague:v1",
   standingsFootballDataCursor: "cursor:footballdata-standings",
+  news: "news:v1",
+  pushSubscriptionsIndex: "push:subs:index",
+  pushSubscriptionPrefix: "push:sub:",
+  prevScores: "scores:prev:v1",
   lastRunPrefix: "lastrun:",
   detailPrefix: "detail:",
 };
@@ -61,4 +65,5 @@ export const DETAIL_CACHE_TTL_SECONDS = 300;
 export const REFRESH_INTERVALS_MS = {
   kLeagueMatches: 15 * 60 * 1000,
   kLeagueStandings: 60 * 60 * 1000,
+  news: 20 * 60 * 1000,
 };

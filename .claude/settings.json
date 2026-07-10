@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(curl -s \"http://127.0.0.1:8787/api/teams/kl:138115\" -o \"/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/team-kl.json\")",
+      "Read(//c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/**)",
+      "Bash(curl -s \"https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=Arsenal%20FC\")",
+      "Bash(grep -o '\"squad\":\\\\[.\\\\{0,300\\\\}' \"/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/team-fd57b.json\")",
+      "Bash(curl -s \"http://127.0.0.1:8787/api/head2head?a=fd:57&b=fd:1076\")",
+      "Bash(curl -s \"http://127.0.0.1:8787/api/head2head?a=kl:138115&b=kl:138110\")",
+      "Bash(curl -s \"http://127.0.0.1:8787/api/head2head?a=fd:762&b=fd:788\")",
+      "Bash(pkill -f wrangler)",
+      "Bash(pkill -f workerd)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Read(//c/Program Files \\\\\\(x86\\\\\\)/Microsoft/Edge/Application/**)",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --no-sandbox --hide-scrollbars --window-size=390,844 --screenshot=/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/pitchpro-matches.png http://localhost:8787/)",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --no-sandbox --hide-scrollbars --window-size=390,844 --screenshot=/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/pitchpro-matches2.png http://localhost:8787/)",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --no-sandbox --hide-scrollbars --window-size=800,900 --screenshot=/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/pitchpro-wide.png http://localhost:8787/)",
+      "Bash(curl -s \"http://127.0.0.1:8787/style.css\")",
+      "Bash(rm -rf /c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/edge-profile)",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --no-sandbox --hide-scrollbars --disable-application-cache --incognito --user-data-dir=/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/edge-profile --window-size=390,844 --screenshot=/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/pitchpro-390-fresh.png http://localhost:8787/?cachebust=__CMDSUB_OUTPUT__)",
+      "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --no-sandbox --hide-scrollbars --incognito --user-data-dir=/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/edge-profile2 --window-size=390,844 --screenshot=/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/pitchpro-390-v3.png http://localhost:8787/)",
+      "Bash(curl -s http://127.0.0.1:9334/json)",
+      "Bash(pkill -f msedge)"
+    ]
+  }
+}

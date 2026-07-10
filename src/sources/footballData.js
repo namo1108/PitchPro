@@ -31,3 +31,15 @@ export function getMatch(env, matchId) {
 export function getStandings(env, competitionCode) {
   return request(env, `/competitions/${competitionCode}/standings`);
 }
+
+export function getTeam(env, teamId) {
+  return request(env, `/teams/${teamId}`);
+}
+
+export function getTeamMatches(env, teamId, status, limit) {
+  return request(env, `/teams/${teamId}/matches`, { status, limit });
+}
+
+export function getHeadToHead(env, matchId, limit) {
+  return request(env, `/matches/${matchId}/head2head`, { limit });
+}

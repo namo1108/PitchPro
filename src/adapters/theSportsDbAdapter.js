@@ -44,8 +44,8 @@ export function normalizeEvent(raw, competitionMeta) {
     status: mapStatus(raw),
     matchday: raw.intRound ?? null,
     competition: { code: competitionMeta.code, name: competitionMeta.name },
-    homeTeam: { id: raw.idHomeTeam, name: raw.strHomeTeam, shortName: raw.strHomeTeam, crest: raw.strHomeTeamBadge },
-    awayTeam: { id: raw.idAwayTeam, name: raw.strAwayTeam, shortName: raw.strAwayTeam, crest: raw.strAwayTeamBadge },
+    homeTeam: { id: `kl:${raw.idHomeTeam}`, name: raw.strHomeTeam, shortName: raw.strHomeTeam, crest: raw.strHomeTeamBadge },
+    awayTeam: { id: `kl:${raw.idAwayTeam}`, name: raw.strAwayTeam, shortName: raw.strAwayTeam, crest: raw.strAwayTeamBadge },
     score: {
       fullTime: { home: toInt(raw.intHomeScore), away: toInt(raw.intAwayScore) },
       halfTime: { home: null, away: null },
@@ -64,7 +64,7 @@ export function normalizeStandings(raw) {
         table: rows.map((row) => ({
           position: toInt(row.intRank),
           team: {
-            id: row.idTeam,
+            id: `kl:${row.idTeam}`,
             name: row.strTeam,
             shortName: row.strTeam,
             crest: (row.strBadge || "").replace(/\/tiny$/, ""),

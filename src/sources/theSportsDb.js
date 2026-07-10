@@ -38,3 +38,23 @@ export function getEvent(env, eventId) {
 export function getStandings(env, leagueId, season) {
   return request(env, "/lookuptable.php", { l: leagueId, s: season });
 }
+
+export function searchTeam(env, name) {
+  return request(env, "/searchteams.php", { t: name });
+}
+
+export function lookupTeam(env, teamId) {
+  return request(env, "/lookupteam.php", { id: teamId });
+}
+
+export function getSquad(env, teamId) {
+  return request(env, "/lookup_all_players.php", { id: teamId });
+}
+
+export function getTeamNextEvents(env, teamId) {
+  return request(env, "/eventsnext.php", { id: teamId });
+}
+
+export function getTeamLastEvents(env, teamId) {
+  return request(env, "/eventslast.php", { id: teamId });
+}

@@ -9,5 +9,9 @@
   },
   "devDependencies": {
     "wrangler": "^4"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.9.3",
+    "web-push-browser": "^1.4.2"
   }
 }
