@@ -240,6 +240,7 @@ function renderProfile() {
       </div>
       <div class="profile-level-row">${levelBarHtml(user)}</div>
       <div class="friends-section">
+        <div id="friend-requests-wrap" class="friend-requests-wrap"></div>
         <div class="friends-title">👥 친구</div>
         <div class="team-search-wrap">
           <input type="text" id="friend-nickname-input" placeholder="닉네임으로 친구 검색" autocomplete="off" />
@@ -257,6 +258,57 @@ function renderProfile() {
 
   initFriendSearch();
   loadFriends();
+  loadFriendRequests();
+}
+
+// ---------- 받은 친구 요청 ----------
+
+async function loadFriendRequests() {
+  const wrap = document.getElementById("friend-requests-wrap");
+  if (!wrap) return;
+  try {
+    const data = await authFetch("/friends/requests");
+    renderFriendRequests(data.requests || []);
+  } catch {
+    wrap.innerHTML = "";
+  }
+}
+
+function renderFriendRequests(requests) {
+  const wrap = document.getElementById("friend-requests-wrap");
+  if (!wrap) return;
+  if (!requests.length) {
+    wrap.innerHTML = "";
+    return;
+  }
+  wrap.innerHTML = `
+    <div class="friend-requests-title">받은 친구 요청 (${requests.length})</div>
+    ${requests
+      .map(
+        (r) => `
+      <div class="friend-request-row">
+        <span class="friend-nickname">${r.nickname}<span class="friend-title">${r.progress?.title || ""}</span></span>
+        <button class="friend-request-accept" data-nickname="${r.nickname}">수락</button>
+        <button class="friend-request-decline" data-nickname="${r.nickname}">거절</button>
+      </div>
+    `
+      )
+      .join("")}
+  `;
+
+  wrap.querySelectorAll(".friend-request-accept").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await authFetch(`/friends/requests/${encodeURIComponent(btn.dataset.nickname)}/accept`, { method: "POST", body: {} }).catch(() => {});
+      loadFriendRequests();
+      loadFriends();
+    });
+  });
+  wrap.querySelectorAll(".friend-request-decline").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await authFetch(`/friends/requests/${encodeURIComponent(btn.dataset.nickname)}/decline`, { method: "POST", body: {} }).catch(() => {});
+      loadFriendRequests();
+    });
+  });
 }
 
 // ---------- 친구 검색(가입된 실제 닉네임만 실시간으로 보여줌) ----------
@@ -290,6 +342,13 @@ function initFriendSearch() {
   });
 }
 
+function friendStateBadge(u) {
+  if (u.isFriend) return '<span class="friend-added-badge">✓ 친구</span>';
+  if (u.requestSent) return '<span class="friend-added-badge">요청 보냄</span>';
+  if (u.requestReceived) return '<span class="friend-add-badge">받은 요청 수락하기</span>';
+  return '<span class="friend-add-badge">+ 요청</span>';
+}
+
 function renderFriendSearchResults(users, resultsBox, input) {
   if (!users.length) {
     resultsBox.innerHTML = '<div class="team-search-empty">가입된 사용자 중 일치하는 닉네임이 없습니다.</div>';
@@ -298,10 +357,10 @@ function renderFriendSearchResults(users, resultsBox, input) {
   resultsBox.innerHTML = users
     .map(
       (u) => `
-    <div class="team-search-row ${u.isFriend ? "already-friend" : ""}" data-nickname="${u.nickname}">
+    <div class="team-search-row ${u.isFriend || u.requestSent ? "already-friend" : ""}" data-nickname="${u.nickname}">
       <span class="team-search-name">${u.nickname}</span>
       <span class="team-search-comp">Lv.${u.level}</span>
-      ${u.isFriend ? '<span class="friend-added-badge">✓ 친구</span>' : '<span class="friend-add-badge">+ 추가</span>'}
+      ${friendStateBadge(u)}
     </div>
   `
     )
@@ -312,10 +371,11 @@ function renderFriendSearchResults(users, resultsBox, input) {
       const errorBox = document.getElementById("friends-add-error");
       errorBox.textContent = "";
       try {
-        await authFetch("/friends", { method: "POST", body: { nickname: row.dataset.nickname } });
+        await authFetch("/friends/request", { method: "POST", body: { nickname: row.dataset.nickname } });
         input.value = "";
         resultsBox.innerHTML = "";
         loadFriends();
+        loadFriendRequests();
       } catch (err) {
         errorBox.textContent = err.message;
       }
@@ -336,11 +396,19 @@ const CHECKIN_LABELS = {
   closed: "⏱ 집관인증 시간이 지났어요",
 };
 
-async function renderCheckinSlot(slot, matchId) {
+function checkinDoneMessage(status) {
+  if (status.resolved) {
+    const outcome = status.finalPoints > status.awardedPoints ? " · 승리! 🎉" : status.finalPoints < status.awardedPoints ? " · 패배 😢" : " · 무승부";
+    return `✅ 집관인증 완료 (${status.finalPoints >= 0 ? "+" : ""}${status.finalPoints}P${outcome})`;
+  }
+  return `✅ 집관인증 완료 (+${status.awardedPoints}P · 경기 끝나면 승패 결과로 최종 정산돼요)`;
+}
+
+async function renderCheckinSlot(slot, matchId, teamId) {
   try {
     const status = await authFetch(`/checkin/${matchId}`);
     if (status.alreadyCheckedIn) {
-      slot.innerHTML = `<div class="checkin-done">✅ 집관인증 완료 (+${20}P)</div>`;
+      slot.innerHTML = `<div class="checkin-done">${checkinDoneMessage(status)}</div>`;
       return;
     }
     const disabled = status.state !== "open";
@@ -352,8 +420,8 @@ async function renderCheckinSlot(slot, matchId) {
         btn.disabled = true;
         btn.textContent = "인증 중...";
         try {
-          const result = await authFetch("/checkin", { method: "POST", body: { matchId } });
-          slot.innerHTML = `<div class="checkin-done">✅ 집관인증 완료 (+${result.pointsAwarded}P${result.leveledUp ? " · 레벨업! 🎉" : ""})</div>`;
+          const result = await authFetch("/checkin", { method: "POST", body: { matchId, teamId } });
+          slot.innerHTML = `<div class="checkin-done">✅ 집관인증 완료 (+${result.pointsAwarded}P · 경기 끝나면 승패 결과로 최종 정산돼요${result.leveledUp ? " · 레벨업! 🎉" : ""})</div>`;
           await refreshMe();
         } catch (err) {
           btn.disabled = false;
@@ -404,7 +472,7 @@ export async function loadMyTeam() {
 
   if (isLoggedIn()) {
     el.list.querySelectorAll("[data-checkin-match-id]").forEach((slot) => {
-      renderCheckinSlot(slot, slot.dataset.checkinMatchId);
+      renderCheckinSlot(slot, slot.dataset.checkinMatchId, slot.dataset.checkinTeamId);
     });
   }
 }
@@ -416,7 +484,8 @@ function renderCard(fav, data) {
     : '<div class="myteam-next">예정된 경기 정보 없음</div>';
 
   const form = formBadgesHtml(data?.recentMatches, fav.id, 5);
-  const checkinHtml = next && isLoggedIn() ? `<div class="checkin-slot" data-checkin-match-id="${next.id}"><div class="loading">·</div></div>` : "";
+  const checkinHtml =
+    next && isLoggedIn() ? `<div class="checkin-slot" data-checkin-match-id="${next.id}" data-checkin-team-id="${fav.id}"><div class="loading">·</div></div>` : "";
 
   return `
     <div class="myteam-card" data-team-id="${fav.id}">

@@ -72,6 +72,7 @@ export const KV_KEYS = {
   transferMarket: "transfers:market:v1",
   pushSubscriptionsIndex: "push:subs:index",
   pushSubscriptionPrefix: "push:sub:",
+  pushUsernameIndexPrefix: "push:byusername:",
   prevScores: "scores:prev:v1",
   lastRunPrefix: "lastrun:",
   detailPrefix: "detail:",
@@ -92,17 +93,20 @@ export const REFRESH_INTERVALS_MS = {
   transferMarketTick: 5 * 60 * 1000,
 };
 
-// 집관인증(선택 기능): 킥오프 -30분 ~ +30분 사이에만 인증 가능, 1회당 20포인트.
-// 로그인 세션은 30일 유지(재로그인 없이도 앱을 계속 쓸 수 있게 넉넉히).
+// 집관인증(선택 기능): 킥오프 -30분 ~ +30분 사이에만 인증 가능.
+// 인증하는 시점엔 경기가 막 시작하거나 시작 전이라 승패를 알 수 없으므로, 우선 참여 포인트(5점)만 주고
+// 경기가 끝나면(resolveCheckinOutcomes) 승리(10점)/무승부(5점 유지)/패배(-5점)로 최종 정산한다.
 export const CHECKIN_WINDOW_MINUTES_BEFORE = 30;
 export const CHECKIN_WINDOW_MINUTES_AFTER = 30;
-export const POINTS_PER_CHECKIN = 20;
+export const POINTS_CHECKIN_BASE = 5;
+export const POINTS_CHECKIN_WIN = 10;
+export const POINTS_CHECKIN_LOSS = -5;
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const LEADERBOARD_CACHE_TTL_SECONDS = 300;
 export const LEADERBOARD_SIZE = 100;
 
 // 여기 적은 아이디(소문자)는 포인트와 상관없이 레벨 99 "나 개발자(Goat)"로 고정 표시된다(운영자 이스터에그).
-export const GOAT_USERNAMES = [];
+export const GOAT_USERNAMES = ["bongmars"];
 
 function monthDayNumber(date) {
   return (date.getUTCMonth() + 1) * 100 + date.getUTCDate();

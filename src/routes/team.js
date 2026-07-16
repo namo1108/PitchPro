@@ -16,6 +16,7 @@ import {
   getKLeagueCoachPhotoMap,
   lookupKLeagueCoachPhoto,
 } from "../lib/kleaguePlayerPhotos.js";
+import { findKLeagueVenue } from "../lib/kleagueVenues.js";
 
 const TEAM_CACHE_TTL_SECONDS = 600;
 const TEAM_STALE_KEY_PREFIX = "team:stale:";
@@ -58,18 +59,21 @@ async function buildTeam(env, teamId) {
 export async function handleTeamDetail(request, env, id) {
   const cacheKey = `team:${id}`;
   const staleKey = `${TEAM_STALE_KEY_PREFIX}${id}`;
+  // 경기장/티켓 정보는 API-Football 응답이 아니라 정적 설정(kleagueVenues.js)이라, 캐시된 팀 데이터에
+  // 얼려 넣지 않고 응답 직전에 항상 최신 값을 덧붙인다(K리그가 아닌 팀은 그냥 null).
+  const venue = findKLeagueVenue(id);
 
   const cached = await getJSON(env, cacheKey);
-  if (cached) return json(cached);
+  if (cached) return json({ ...cached, venue });
 
   try {
     const result = await buildTeam(env, id);
     await putJSON(env, cacheKey, result, { expirationTtl: TEAM_CACHE_TTL_SECONDS });
     await putJSON(env, staleKey, result); // TTL 없이 마지막 성공 응답을 보관 -> 업스트림 장애/레이트리밋 시 대체용
-    return json(result);
+    return json({ ...result, venue });
   } catch (err) {
     const stale = await getJSON(env, staleKey);
-    if (stale) return json({ ...stale, stale: true });
+    if (stale) return json({ ...stale, venue, stale: true });
     return json({ detail: String(err.message || err) }, 502);
   }
 }

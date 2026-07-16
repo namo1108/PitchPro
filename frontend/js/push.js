@@ -1,5 +1,6 @@
 import { fetchJSON } from "./api.js";
 import { listFavorites } from "./favorites.js";
+import { getToken } from "./auth.js";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -95,10 +96,26 @@ window.addEventListener("favorites-changed", async () => {
   await fetchJSONPost("/push/subscribe", { subscription: existing.toJSON(), teamIds }).catch(() => {});
 });
 
+// 이미 골 알림을 켜둔 채로 로그인/로그아웃하면, 그 구독을 이 계정과 다시 연결(또는 해제)해야
+// 친구 요청/수락 알림을 이 계정 기준으로 보낼 수 있다.
+window.addEventListener("auth-changed", async () => {
+  const reg = await getRegistration();
+  if (!reg) return;
+  const existing = await reg.pushManager.getSubscription();
+  if (!existing) return;
+
+  const teamIds = listFavorites().map((t) => t.id);
+  await fetchJSONPost("/push/subscribe", { subscription: existing.toJSON(), teamIds }).catch(() => {});
+});
+
+// 로그인 상태면 Authorization 헤더를 실어 보내서, 서버가 이 구독을 계정과 연결할 수 있게 한다.
 async function fetchJSONPost(path, body) {
+  const token = getToken();
+  const headers = { "content-type": "application/json" };
+  if (token) headers.authorization = `Bearer ${token}`;
   const res = await fetch(`/api${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
   return res.json();

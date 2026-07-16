@@ -48,6 +48,8 @@ export async function handleSignup(request, env) {
     points: 0,
     level: 1,
     friends: [],
+    friendRequestsIncoming: [],
+    friendRequestsOutgoing: [],
     createdAt: new Date().toISOString(),
   };
 

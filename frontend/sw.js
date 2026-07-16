@@ -19,11 +19,12 @@ self.addEventListener("push", (event) => {
 
   const isGoal = payload.type === "goal";
   const isLineup = payload.type === "lineup";
+  const isFriend = payload.type === "friend_request" || payload.type === "friend_accept";
 
   let icon = "/img/goal-icon-96.png";
   let badge = "/img/badge-icon-96.png";
   if (isGoal) icon = "/img/goal-icon-192.png";
-  if (isLineup) {
+  if (isLineup || isFriend) {
     icon = "/img/pitch-icon-192.png";
     badge = "/img/pitch-badge-96.png";
   }

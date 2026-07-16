@@ -17,7 +17,14 @@ import { handleAnalysis } from "./routes/analysis.js";
 import { handleVapidPublicKey, handleSubscribe, handleUnsubscribe, handleWatchMatch } from "./routes/push.js";
 import { handleSignup, handleLogin, handleLogout, handleMe } from "./routes/auth.js";
 import { handleCheckin, handleCheckinStatus } from "./routes/checkin.js";
-import { handleAddFriend, handleRemoveFriend, handleListFriends } from "./routes/friends.js";
+import {
+  handleSendFriendRequest,
+  handleRemoveFriend,
+  handleListFriends,
+  handleListFriendRequests,
+  handleAcceptFriendRequest,
+  handleDeclineFriendRequest,
+} from "./routes/friends.js";
 import { handleUserSearch } from "./routes/userSearch.js";
 import { handleLeaderboard } from "./routes/leaderboard.js";
 import { scrapeK3K4TopScorers } from "./scheduled/scrapeK3K4TopScorers.js";
@@ -112,8 +119,17 @@ export async function routeApiRequest(request, env, ctx) {
   if (segments[1] === "friends" && segments.length === 2 && request.method === "GET") {
     return handleListFriends(request, env);
   }
-  if (segments[1] === "friends" && segments.length === 2 && request.method === "POST") {
-    return handleAddFriend(request, env);
+  if (segments[1] === "friends" && segments[2] === "request" && segments.length === 3 && request.method === "POST") {
+    return handleSendFriendRequest(request, env);
+  }
+  if (segments[1] === "friends" && segments[2] === "requests" && segments.length === 3 && request.method === "GET") {
+    return handleListFriendRequests(request, env);
+  }
+  if (segments[1] === "friends" && segments[2] === "requests" && segments.length === 5 && segments[4] === "accept" && request.method === "POST") {
+    return handleAcceptFriendRequest(request, env, segments[3]);
+  }
+  if (segments[1] === "friends" && segments[2] === "requests" && segments.length === 5 && segments[4] === "decline" && request.method === "POST") {
+    return handleDeclineFriendRequest(request, env, segments[3]);
   }
   if (segments[1] === "friends" && segments.length === 3 && request.method === "DELETE") {
     return handleRemoveFriend(request, env, segments[2]);

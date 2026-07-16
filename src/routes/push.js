@@ -1,5 +1,6 @@
 import { json } from "../lib/http.js";
 import { KV_KEYS } from "../lib/config.js";
+import { getAuthedUser } from "../lib/auth.js";
 
 async function hashEndpoint(endpoint) {
   const data = new TextEncoder().encode(endpoint);
@@ -22,6 +23,10 @@ export async function handleSubscribe(request, env) {
   const existingRaw = await env.CACHE.get(key);
   const existing = existingRaw ? JSON.parse(existingRaw) : null;
 
+  // 로그인한 상태로 구독하면(Authorization 헤더 있음) username -> 구독 색인도 같이 남겨서,
+  // 친구 요청/수락 등 "이 계정에게" 보내는 알림을 나중에 찾을 수 있게 한다.
+  const user = await getAuthedUser(request, env);
+
   try {
     await env.CACHE.put(
       key,
@@ -29,9 +34,11 @@ export async function handleSubscribe(request, env) {
         subscription: body.subscription,
         teamIds: body.teamIds || [],
         matchIds: existing?.matchIds || [],
+        username: user?.username || existing?.username || null,
         updatedAt: new Date().toISOString(),
       })
     );
+    if (user) await env.CACHE.put(`${KV_KEYS.pushUsernameIndexPrefix}${user.username}`, key);
   } catch (err) {
     console.error("push subscribe write failed:", err);
     return json({ detail: "일시적으로 알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요." }, 503);
@@ -44,7 +51,12 @@ export async function handleUnsubscribe(request, env) {
   if (!body?.endpoint) return json({ detail: "endpoint가 필요합니다." }, 400);
 
   const id = await hashEndpoint(body.endpoint);
-  await env.CACHE.delete(`${KV_KEYS.pushSubscriptionPrefix}${id}`);
+  const key = `${KV_KEYS.pushSubscriptionPrefix}${id}`;
+  const raw = await env.CACHE.get(key);
+  const existing = raw ? JSON.parse(raw) : null;
+  if (existing?.username) await env.CACHE.delete(`${KV_KEYS.pushUsernameIndexPrefix}${existing.username}`);
+
+  await env.CACHE.delete(key);
   return json({ status: "ok" });
 }
 

@@ -1,31 +1,61 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange } from "../router.js";
 import { fadeIn, skeletonList } from "../format.js";
-import { getCurrentUser, onAuthChange } from "../auth.js";
+import { authFetch, isLoggedIn, getToken, onAuthChange } from "../auth.js";
 
 const el = { list: document.getElementById("hof-list") };
 
 const MEDAL = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
+// 로그인 여부와 무관하게 볼 수 있는 화면이지만, 로그인 중이면 토큰을 같이 보내야 서버가
+// 나와 각 순위의 친구 관계(isFriend/requestSent 등)를 계산해서 돌려준다.
 async function loadLeaderboard() {
   el.list.innerHTML = skeletonList(8);
   try {
-    const data = await fetchJSON("/leaderboard");
+    const data = await fetchJSON("/leaderboard", { token: getToken() });
     renderLeaderboard(data.entries || [], data.me);
   } catch (err) {
     el.list.innerHTML = `<div class="error-state">명예의 전당을 불러오지 못했습니다.<br>${err.message}</div>`;
   }
 }
 
-function rowHtml(entry, isMe) {
+function friendStateBadge(entry) {
+  if (entry.isFriend) return '<span class="hof-friend-badge">친구</span>';
+  if (entry.requestSent) return '<span class="hof-friend-badge pending">요청함</span>';
+  if (entry.requestReceived) return '<span class="hof-friend-badge pending">요청 받음 · 눌러서 수락</span>';
+  return "";
+}
+
+// 로그인 상태에서 나 자신이 아니고 이미 친구도 아닌 닉네임은 눌러서 친구 요청(또는 받은 요청 수락)을 보낼 수 있다.
+function isClickable(entry) {
+  return isLoggedIn() && !entry.isMe && !entry.isFriend;
+}
+
+function rowHtml(entry) {
+  const clickable = isClickable(entry);
   return `
-    <div class="hof-row ${isMe ? "me" : ""}">
+    <div class="hof-row ${entry.isMe ? "me" : ""} ${clickable ? "clickable" : ""}" ${clickable ? `data-nickname="${entry.nickname}" data-request-received="${entry.requestReceived}"` : ""}>
       <span class="hof-rank">${MEDAL[entry.rank] || entry.rank}</span>
-      <span class="hof-nickname">${entry.nickname}${isMe ? " (나)" : ""}<span class="hof-title">${entry.title || ""}</span></span>
+      <span class="hof-nickname">${entry.nickname}${entry.isMe ? " (나)" : ""}${friendStateBadge(entry)}<span class="hof-title">${entry.title || ""}</span></span>
       <span class="hof-level">Lv.${entry.level}</span>
       <span class="hof-points">${entry.points.toLocaleString()}P</span>
     </div>
   `;
+}
+
+async function handleRowClick(row) {
+  const nickname = row.dataset.nickname;
+  const isAccept = row.dataset.requestReceived === "true";
+  try {
+    if (isAccept) {
+      await authFetch(`/friends/requests/${encodeURIComponent(nickname)}/accept`, { method: "POST", body: {} });
+    } else {
+      await authFetch("/friends/request", { method: "POST", body: { nickname } });
+    }
+    loadLeaderboard();
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 function renderLeaderboard(entries, me) {
@@ -34,7 +64,6 @@ function renderLeaderboard(entries, me) {
     return;
   }
 
-  const myNickname = getCurrentUser()?.nickname;
   const meOutsideTop = me && me.rank === null;
 
   el.list.innerHTML = `
@@ -44,15 +73,18 @@ function renderLeaderboard(entries, me) {
       <span class="hof-level">레벨</span>
       <span class="hof-points">포인트</span>
     </div>
-    ${entries.map((e) => rowHtml(e, e.nickname === myNickname)).join("")}
+    ${entries.map(rowHtml).join("")}
     ${
       meOutsideTop
-        ? `<div class="hof-my-rank-note">아직 TOP 100 밖이에요 (${me.points.toLocaleString()}P · Lv.${me.level}) - 집관인증으로 순위를 올려보세요!</div>`
+        ? `<div class="hof-my-rank-note">아직 TOP 100 밖이에요 (${me.points.toLocaleString()}P · Lv.${me.progress?.level}) - 집관인증으로 순위를 올려보세요!</div>`
         : ""
     }
   `;
 
   fadeIn(el.list);
+  el.list.querySelectorAll(".hof-row.clickable").forEach((row) => {
+    row.addEventListener("click", () => handleRowClick(row));
+  });
 }
 
 onTabChange("hof", loadLeaderboard);

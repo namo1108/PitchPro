@@ -22,11 +22,20 @@ export async function handleUserSearch(request, env, url) {
   const users = await Promise.all(usernames.filter(Boolean).map((u) => getJSON(env, userKey(u))));
 
   const friendSet = new Set(me.friends || []);
+  const outgoingSet = new Set(me.friendRequestsOutgoing || []);
+  const incomingSet = new Set(me.friendRequestsIncoming || []);
   const results = users
     .filter(Boolean)
     .filter((u) => u.username !== me.username)
     .slice(0, MAX_RESULTS)
-    .map((u) => ({ nickname: u.nickname, level: levelProgress(u.points || 0, u.username).level, points: u.points || 0, isFriend: friendSet.has(u.username) }));
+    .map((u) => ({
+      nickname: u.nickname,
+      level: levelProgress(u.points || 0, u.username).level,
+      points: u.points || 0,
+      isFriend: friendSet.has(u.username),
+      requestSent: outgoingSet.has(u.username),
+      requestReceived: incomingSet.has(u.username),
+    }));
 
   return json({ users: results });
 }

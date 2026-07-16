@@ -1,5 +1,5 @@
 import { getJSON, putJSON } from "./kv.js";
-import { KV_KEYS, POINTS_PER_CHECKIN, SESSION_TTL_SECONDS, GOAT_USERNAMES } from "./config.js";
+import { KV_KEYS, POINTS_CHECKIN_BASE, SESSION_TTL_SECONDS, GOAT_USERNAMES } from "./config.js";
 
 // 로그인은 선택 기능(집관인증/레벨/친구/명예의 전당 전용)이라 기존 익명 사용자 흐름(즐겨찾기,
 // 골 알림)은 전혀 건드리지 않는다. 비번은 Workers 런타임이 지원하는 WebCrypto PBKDF2로 해싱한다
@@ -86,7 +86,7 @@ export async function getAuthedUser(request, env) {
 }
 
 // FM 스타일 곡선: 레벨 L에 도달하는 데 필요한 누적 포인트 = 50 * L * (L-1) (레벨 1은 0점부터).
-// 1회 집관인증(POINTS_PER_CHECKIN)마다 조금씩 쌓여서, 레벨2는 5회, 레벨3은 15회, 레벨4는 30회 필요한 정도의 곡선이다.
+// 레벨이 오를수록 다음 레벨까지 필요한 포인트가 늘어나(100 -> 200 -> 300 -> ...) 처음엔 쉽고 갈수록 어려워진다.
 export function pointsForLevel(level) {
   return 50 * level * (level - 1);
 }
@@ -124,8 +124,8 @@ export function levelProgress(points, username = null) {
   return { level, floor, ceil, percent, title: levelTitle(level) };
 }
 
-// 사용자에게 포인트를 더하고 레벨업 여부까지 계산해 저장한다(집관인증 등에서 공통으로 사용).
-export async function awardPoints(env, user, points = POINTS_PER_CHECKIN) {
+// 사용자에게 포인트를 더하고(음수면 차감) 레벨업 여부까지 계산해 저장한다(집관인증 등에서 공통으로 사용).
+export async function awardPoints(env, user, points = POINTS_CHECKIN_BASE) {
   const prevLevel = levelForPoints(user.points || 0);
   const nextPoints = (user.points || 0) + points;
   const nextLevel = levelForPoints(nextPoints);
@@ -144,5 +144,6 @@ export function publicProfile(user) {
     points: user.points || 0,
     level: user.level || 1,
     friends: user.friends || [],
+    friendRequestsIncomingCount: (user.friendRequestsIncoming || []).length,
   };
 }

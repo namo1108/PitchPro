@@ -126,6 +126,34 @@ function renderSquadTab(squad, coach, teamId) {
   return `${coachHtml}${groupsHtml}`;
 }
 
+// K리그 팀만 venue(구장/티켓 정보)가 붙어 온다(kleagueVenues.js). 예매 링크는 새 탭으로 바로 열고,
+// "가는 방법"은 브라우저 위치 정보로 사용자 현재 위치 -> 경기장 주소까지 길찾기 링크를 만든다
+// (정확한 위경도 데이터가 없어 도착지는 주소 문자열로 넘기고 구글이 지오코딩하게 한다).
+function renderVenueActions(venue) {
+  if (!venue) return "";
+  return `
+    <div class="venue-actions">
+      <a class="venue-action-btn" href="${venue.ticketUrl}" target="_blank" rel="noopener">🎟 예매하기</a>
+      <button class="venue-action-btn" id="venue-directions-btn">📍 ${venue.stadium} 가는 길</button>
+    </div>
+  `;
+}
+
+function openDirections(venue) {
+  const destination = encodeURIComponent(`${venue.stadium} ${venue.address}`);
+  const withOrigin = (origin) => `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ""}&destination=${destination}&travelmode=transit`;
+
+  if (!navigator.geolocation) {
+    window.open(withOrigin(null), "_blank");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => window.open(withOrigin(`${pos.coords.latitude},${pos.coords.longitude}`), "_blank"),
+    () => window.open(withOrigin(null), "_blank"), // 위치 권한 거부/실패 시 목적지만이라도 열어준다
+    { timeout: 5000 }
+  );
+}
+
 function renderTeamInfoStrip(team) {
   const items = [];
   if (team.founded) items.push({ label: "창단", value: `${team.founded}년` });
@@ -158,6 +186,7 @@ function renderTeamDetail(teamId, data) {
         ${favorite ? "★ 즐겨찾기됨" : "☆ 즐겨찾기"}
       </button>
       ${renderTeamInfoStrip(team)}
+      ${renderVenueActions(data.venue)}
     </div>
 
     <div class="team-tabs">
@@ -185,6 +214,10 @@ function renderTeamDetail(teamId, data) {
       </div>
     </div>
   `;
+
+  if (data.venue) {
+    document.getElementById("venue-directions-btn").addEventListener("click", () => openDirections(data.venue));
+  }
 
   document.getElementById("favorite-toggle").addEventListener("click", (e) => {
     const nowFavorite = toggleFavorite({ id: teamId, name: team.name, crest: team.crest });
