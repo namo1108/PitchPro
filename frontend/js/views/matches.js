@@ -538,7 +538,10 @@ function renderMatchRow(m) {
       ${crestImg(m.awayTeam, "team-crest")}
       <span class="team-name">${m.awayTeam.shortName || m.awayTeam.name}</span>
     </div>
-    ${watchBellHtml(m.id)}
+    <div class="match-row-actions">
+      ${m.ticketUrl ? `<a class="match-ticket-btn" href="${m.ticketUrl}" target="_blank" rel="noopener" title="티켓 예매하기" onclick="event.stopPropagation()">🎟</a>` : ""}
+      ${watchBellHtml(m.id)}
+    </div>
   `;
 
   row.querySelectorAll("[data-team-id]").forEach((teamEl) => {

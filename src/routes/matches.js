@@ -1,6 +1,7 @@
 import { json } from "../lib/http.js";
 import { getJSON } from "../lib/kv.js";
 import { KV_KEYS } from "../lib/config.js";
+import { findKLeagueVenue } from "../lib/kleagueVenues.js";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -14,7 +15,13 @@ export async function handleMatches(request, env, url) {
   const date = url.searchParams.get("date") || toKstDateString(new Date().toISOString());
 
   const blob = await getJSON(env, KV_KEYS.matches);
-  const matches = (blob?.matches || []).filter((m) => toKstDateString(m.utcDate) === date);
+  const matches = (blob?.matches || [])
+    .filter((m) => toKstDateString(m.utcDate) === date)
+    // 티켓은 홈구장(홈팀 기준)에서 예매하는 거라, K리그 홈팀이면 예매 링크를 같이 붙여준다.
+    .map((m) => {
+      const venue = findKLeagueVenue(m.homeTeam.id);
+      return venue ? { ...m, ticketUrl: venue.ticketUrl } : m;
+    });
 
   return json({ matches });
 }

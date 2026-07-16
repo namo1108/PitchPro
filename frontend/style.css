@@ -602,13 +602,37 @@ body {
 
 .match-row {
   display: grid;
-  grid-template-columns: 56px 1fr auto 1fr 24px;
+  grid-template-columns: 56px 1fr auto 1fr auto;
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.2s var(--ease);
+}
+
+.match-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.match-ticket-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  text-decoration: none;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  flex-shrink: 0;
+  transition: transform 0.2s var(--ease);
+}
+
+.match-ticket-btn:hover {
+  transform: translateY(-1px) scale(1.05);
 }
 
 .match-row:last-child {
@@ -2845,6 +2869,21 @@ table.standings-table {
   background: var(--accent-soft);
 }
 
+.hof-row.goat {
+  border-color: var(--gold);
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.16), var(--bg-elevated));
+  margin-bottom: 12px;
+}
+
+.hof-row.goat .hof-rank {
+  font-size: 20px;
+}
+
+.hof-row.goat .hof-level {
+  color: var(--gold);
+  font-weight: 800;
+}
+
 .hof-rank {
   font-weight: 800;
   text-align: center;
@@ -3581,7 +3620,7 @@ table.standings-table {
 /* ---------- Responsive ---------- */
 @media (max-width: 480px) {
   .match-row {
-    grid-template-columns: 44px 1fr auto 1fr 20px;
+    grid-template-columns: 44px 1fr auto 1fr auto;
     gap: 6px;
     padding: 10px 12px;
   }

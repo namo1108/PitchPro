@@ -13,7 +13,7 @@ async function loadLeaderboard() {
   el.list.innerHTML = skeletonList(8);
   try {
     const data = await fetchJSON("/leaderboard", { token: getToken() });
-    renderLeaderboard(data.entries || [], data.me);
+    renderLeaderboard(data.entries || [], data.goats || [], data.me);
   } catch (err) {
     el.list.innerHTML = `<div class="error-state">명예의 전당을 불러오지 못했습니다.<br>${err.message}</div>`;
   }
@@ -43,6 +43,19 @@ function rowHtml(entry) {
   `;
 }
 
+// GOAT_USERNAMES(운영자 이스터에그)는 순위 경쟁에서 빼고 맨 위에 염소 아이콘과 함께 고정으로 보여준다.
+function goatRowHtml(entry) {
+  const clickable = isClickable(entry);
+  return `
+    <div class="hof-row goat ${entry.isMe ? "me" : ""} ${clickable ? "clickable" : ""}" ${clickable ? `data-nickname="${entry.nickname}" data-request-received="${entry.requestReceived}"` : ""}>
+      <span class="hof-rank">🐐</span>
+      <span class="hof-nickname">${entry.nickname}${entry.isMe ? " (나)" : ""}${friendStateBadge(entry)}<span class="hof-title">${entry.title || ""}</span></span>
+      <span class="hof-level">GOAT</span>
+      <span class="hof-points">${entry.points.toLocaleString()}P</span>
+    </div>
+  `;
+}
+
 async function handleRowClick(row) {
   const nickname = row.dataset.nickname;
   const isAccept = row.dataset.requestReceived === "true";
@@ -58,8 +71,8 @@ async function handleRowClick(row) {
   }
 }
 
-function renderLeaderboard(entries, me) {
-  if (!entries.length) {
+function renderLeaderboard(entries, goats, me) {
+  if (!entries.length && !goats.length) {
     el.list.innerHTML = '<div class="empty-state">아직 집관인증한 사용자가 없습니다. 로그인하고 첫 주인공이 되어보세요!</div>';
     return;
   }
@@ -67,6 +80,7 @@ function renderLeaderboard(entries, me) {
   const meOutsideTop = me && me.rank === null;
 
   el.list.innerHTML = `
+    ${goats.map(goatRowHtml).join("")}
     <div class="hof-list-header">
       <span class="hof-rank">순위</span>
       <span class="hof-nickname">닉네임</span>
