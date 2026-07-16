@@ -10,6 +10,35 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+  <!-- 로그인 게이트: 로그인 전엔 이 화면만 보이고 뒤의 앱 내용은 막혀 있다 -->
+  <div id="auth-gate" class="auth-gate">
+    <div class="auth-gate-card">
+      <div class="auth-gate-brand">
+        <span class="brand-mark">P</span>
+        <span class="brand-name">PITCH<span class="brand-accent">PRO</span></span>
+      </div>
+      <div class="auth-gate-desc">로그인하면 우리팀 집관인증으로 포인트를 모으고, 친구와 경쟁하고, 축구교실에서 기초부터 배울 수 있어요.</div>
+      <div class="auth-gate-tabs">
+        <button type="button" class="auth-gate-tab active" data-mode="login">로그인</button>
+        <button type="button" class="auth-gate-tab" data-mode="signup">회원가입</button>
+      </div>
+      <form id="auth-gate-form">
+        <input type="text" id="gate-username" placeholder="아이디 (영문 소문자/숫자, 3~20자)" autocomplete="username" required />
+        <input type="password" id="gate-password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password" required />
+        <div id="gate-signup-fields" style="display: none;">
+          <input type="text" id="gate-nickname" placeholder="닉네임 (2~12자, 친구가 찾을 이름)" />
+          <div class="team-search-wrap">
+            <input type="text" id="gate-team-search" placeholder="최애팀 검색 (선택사항)" autocomplete="off" />
+            <div id="gate-team-results" class="team-search-results"></div>
+          </div>
+          <div id="gate-team-picked" class="team-picked-chip" style="display: none;"></div>
+        </div>
+        <button type="submit" id="gate-submit-btn" class="auth-submit-btn">로그인</button>
+        <div id="gate-error" class="auth-error"></div>
+      </form>
+    </div>
+  </div>
+
   <div class="app">
     <header class="topbar">
       <div class="brand">
@@ -171,6 +200,21 @@
         <button class="back-btn" data-back-to="matches">← 목록으로</button>
         <div id="player-detail-content" class="player-detail-content">
           <div class="loading">불러오는 중...</div>
+        </div>
+      </section>
+
+      <!-- 축알못의 축구교실 -->
+      <section id="view-soccerschool" class="view">
+        <button class="back-btn" data-back-to="matches">← 목록으로</button>
+        <div id="soccerschool-content" class="soccerschool-content">
+          <h2 class="section-title">⚽ 축알못의 축구교실</h2>
+          <div class="school-tabs">
+            <button class="school-tab-btn active" data-tab="rules">기초 규칙</button>
+            <button class="school-tab-btn" data-tab="positions">포지션</button>
+            <button class="school-tab-btn" data-tab="formations">포메이션</button>
+            <button class="school-tab-btn" data-tab="terms">경기 용어</button>
+          </div>
+          <div id="school-tab-body" class="school-tab-body"></div>
         </div>
       </section>
       <footer class="app-footer">

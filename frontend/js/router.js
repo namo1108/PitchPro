@@ -13,7 +13,7 @@ const els = {
   backButtons: document.querySelectorAll(".back-btn"),
 };
 
-PRIMARY_VIEWS.concat(["detail", "team", "player"]).forEach((name) => {
+PRIMARY_VIEWS.concat(["detail", "team", "player", "soccerschool"]).forEach((name) => {
   els.views[name] = document.getElementById(`view-${name}`);
 });
 

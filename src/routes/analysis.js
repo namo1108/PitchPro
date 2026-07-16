@@ -4,8 +4,9 @@ import { KV_KEYS, COMPETITIONS, findCompetition } from "../lib/config.js";
 import * as apiFootball from "../sources/apiFootball.js";
 import { normalizeFixture, normalizeInjuries, normalizeOdds } from "../adapters/apiFootballAdapter.js";
 import { buildMatchAnalysis } from "../lib/analysis.js";
+import { getAdidasPointsByCode, findTeamAdidasPoint } from "../lib/kleagueAdidasPoints.js";
 
-const ANALYSIS_CACHE_KEY = "analysis:v7";
+const ANALYSIS_CACHE_KEY = "analysis:v8";
 const ANALYSIS_CACHE_TTL_SECONDS = 1200; // 20분
 const MAX_CARDS = 8;
 const MAX_LINK_ONLY = 12;
@@ -127,6 +128,27 @@ export async function handleAnalysis(request, env) {
   cards.forEach((card, i) => {
     card.odds = oddsList[i];
   });
+
+  // K리그 매치는 kleague.com 공식 파워랭킹(ADIDAS Point)을 곁들여서, 순위/최근폼 같은 범용 지표보다
+  // 한 단계 더 정밀한(리그 공식) 근거를 하나 더 얹는다. 스크랩 데이터가 아직 없으면 조용히 생략.
+  const adidasPointCache = new Map();
+  for (const card of cards) {
+    const code = card.competition.code;
+    if (code !== "KL1" && code !== "KL2") continue;
+    if (!adidasPointCache.has(code)) adidasPointCache.set(code, await getAdidasPointsByCode(env, code));
+    const players = adidasPointCache.get(code);
+    if (!players) continue;
+
+    const homeTop = findTeamAdidasPoint(players, card.homeTeam);
+    const awayTop = findTeamAdidasPoint(players, card.awayTeam);
+    const officialNotes = [homeTop, awayTop]
+      .filter(Boolean)
+      .map(
+        (p) =>
+          `⚡ ${p.club} ${p.player}(${p.positionLabel})이(가) K리그 공식 파워랭킹(ADIDAS Point) ${p.point.toLocaleString()}점으로 최근 폼이 좋은 편입니다.`
+      );
+    if (officialNotes.length) card.officialNotes = officialNotes;
+  }
 
   const result = { analysis: cards, linkOnly };
   await putJSON(env, ANALYSIS_CACHE_KEY, result, { expirationTtl: ANALYSIS_CACHE_TTL_SECONDS });

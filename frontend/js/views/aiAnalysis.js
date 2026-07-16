@@ -117,6 +117,7 @@ function renderAnalysis(cards) {
         <span class="ai-card-vs">vs</span>
         <div class="ai-card-team" data-team-id="${c.awayTeam.id}">${crestImg(c.awayTeam, "team-crest")}<span>${c.awayTeam.shortName || c.awayTeam.name}</span></div>
       </div>
+      ${noteList("K리그 공식 파워랭킹", "🏆", c.officialNotes)}
       ${noteList("최근 폼", "📈", c.formNotes)}
       ${noteList("순위", "📊", c.standingsNotes)}
       ${noteList("결장 이슈", "⚕", c.injuryNotes)}

@@ -69,11 +69,21 @@ export const TEAM_KOREAN_ALIASES = [
   { en: "portugal", ko: ["포르투갈"] },
 ];
 
+// "포항 스틸러스" vs "포항스틸러스", "수원FC" vs "수원fc"처럼 소스마다 띄어쓰기·영문 대소문자가 달라서
+// (kleague.com 스크랩 데이터에서 실제로 팀마다 들쭉날쭉하게 확인됨), 둘 다 정규화해야 매칭이 안 깨진다.
+function normalizeKo(s) {
+  return s.replace(/\s+/g, "").toLowerCase();
+}
+
 // 팀 이름(name/shortName, 영문)이 한글 검색어와 별칭으로 연결되는지 확인한다.
 export function matchesKoreanAlias(query, ...names) {
   const lowerNames = names.filter(Boolean).map((n) => n.toLowerCase());
+  const q = normalizeKo(query);
   return TEAM_KOREAN_ALIASES.some(({ en, ko }) => {
     if (!lowerNames.some((n) => n.includes(en))) return false;
-    return ko.some((alias) => alias.includes(query) || query.includes(alias));
+    return ko.some((alias) => {
+      const a = normalizeKo(alias);
+      return a.includes(q) || q.includes(a);
+    });
   });
 }

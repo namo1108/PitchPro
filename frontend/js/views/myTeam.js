@@ -3,6 +3,7 @@ import { onTabChange } from "../router.js";
 import { crestImg, formatKickoff, formBadgesHtml } from "../format.js";
 import { listFavorites, toggleFavorite } from "../favorites.js";
 import { goToTeam } from "./teamDetail.js";
+import { openSoccerSchool } from "./soccerSchool.js";
 import { GOAL_SOUNDS, getGoalSound, setGoalSound, previewGoalSound } from "./matches.js";
 import { getCurrentUser, isLoggedIn, signup, login, logout, refreshMe, onAuthChange, authFetch } from "../auth.js";
 
@@ -239,6 +240,7 @@ function renderProfile() {
         <button id="logout-btn" class="logout-btn">로그아웃</button>
       </div>
       <div class="profile-level-row">${levelBarHtml(user)}</div>
+      <button id="soccer-school-btn" class="soccer-school-btn">⚽ 축알못의 축구교실 <span class="soccer-school-btn-sub">축구 기초부터 쉽게 배우기</span></button>
       <div class="friends-section">
         <div id="friend-requests-wrap" class="friend-requests-wrap"></div>
         <div class="friends-title">👥 친구</div>
@@ -255,6 +257,8 @@ function renderProfile() {
   document.getElementById("logout-btn").addEventListener("click", async () => {
     await logout();
   });
+
+  document.getElementById("soccer-school-btn").addEventListener("click", () => openSoccerSchool());
 
   initFriendSearch();
   loadFriends();

@@ -10,6 +10,7 @@ import { scrapeKLeagueCoachPhotos } from "./scrapeKLeagueCoachPhotos.js";
 import { detectTransfersAndNotify } from "./detectTransfersAndNotify.js";
 import { refreshTransferMarket } from "./refreshTransferMarket.js";
 import { resolveCheckinOutcomes } from "./resolveCheckinOutcomes.js";
+import { scrapeKLeagueAdidasPoints } from "./scrapeKLeagueAdidasPoints.js";
 import { shouldRun } from "../lib/kv.js";
 import { KV_KEYS, REFRESH_INTERVALS_MS } from "../lib/config.js";
 
@@ -31,6 +32,11 @@ export async function runScheduledTasks(env) {
   // 이적시장 탭 데이터: 리그별 팀을 몇 개씩 순환 조회하는 무거운 작업이라 5분마다 다 돌리지 않는다.
   if (await shouldRun(env, `${KV_KEYS.lastRunPrefix}transfermarket-tick`, REFRESH_INTERVALS_MS.transferMarketTick)) {
     tasks.push(["transfer market", () => refreshTransferMarket(env)]);
+  }
+
+  // K리그 공식 파워랭킹(ADIDAS Point) - AI 분석에 곁들일 공식 데이터라, 매 라운드 정도 갱신되면 충분해서 6시간마다.
+  if (await shouldRun(env, `${KV_KEYS.lastRunPrefix}kleagueadidaspoints`, 6 * 60 * 60 * 1000)) {
+    tasks.push(["k리그 adidas point scrape", () => scrapeKLeagueAdidasPoints(env)]);
   }
 
   // 항상 마지막에 실행 -> 이번 tick에 갱신된(혹은 최소한 최신) 스코어를 기준으로 골 발생 여부를 비교

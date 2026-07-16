@@ -82,6 +82,7 @@ export const KV_KEYS = {
   sessionPrefix: "session:",
   checkinPrefix: "checkin:",
   leaderboardCache: "leaderboard:v1",
+  kleagueAdidasPoints: "kleague:adidaspoint:v1",
 };
 
 export const DETAIL_CACHE_TTL_SECONDS = 300;
