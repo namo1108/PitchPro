@@ -393,12 +393,17 @@ export function normalizePlayerDetail(raw) {
 
 // 이적시장 탭에 보여줄 "최근" 이적만 남긴다 - /transfers?team=은 그 팀의 이적 역사 전체를 주기 때문에
 // 옛날 이적까지 다 보이면 "지금 이적시장" 느낌이 안 나고 응답도 쓸데없이 커진다.
-const TRANSFER_MARKET_RECENCY_DAYS = 120;
+// 날짜 기준 rolling window(예: 최근 120일) 대신 "올해(달력 연도)"만 남기는 게 사용자가 기대하는
+// "지금 이적시장" 개념과 더 맞아서(연초엔 겨울 이적시장, 여름엔 여름 이적시장 전부 포함), 연도로 직접 자른다.
+function isThisYear(dateStr) {
+  const t = new Date(dateStr);
+  if (Number.isNaN(t.getTime())) return false;
+  return t.getUTCFullYear() === new Date().getUTCFullYear();
+}
 
 // player 하나가 여러 시즌에 걸쳐 여러 번 이적했을 수 있어 response 배열 전체를 순회하며,
 // 그 팀이 "in"(영입) 또는 "out"(방출)으로 관여한 이적만 골라 방향을 붙인다.
 export function normalizeTeamTransfers(rawResponse, teamId) {
-  const cutoff = Date.now() - TRANSFER_MARKET_RECENCY_DAYS * 24 * 60 * 60 * 1000;
   const results = [];
 
   for (const entry of rawResponse || []) {
@@ -406,9 +411,7 @@ export function normalizeTeamTransfers(rawResponse, teamId) {
     if (!player?.id) continue;
 
     for (const t of entry.transfers || []) {
-      if (!t.date) continue;
-      const transferTime = new Date(t.date).getTime();
-      if (Number.isNaN(transferTime) || transferTime < cutoff) continue;
+      if (!t.date || !isThisYear(t.date)) continue;
 
       const inTeam = t.teams?.in;
       const outTeam = t.teams?.out;

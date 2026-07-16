@@ -3,7 +3,8 @@ import { getJSON, putJSON } from "../lib/kv.js";
 import { getAuthedUser, findUserByNickname, normalizeNickname, userKey, levelProgress } from "../lib/auth.js";
 
 function friendSummary(user) {
-  return { nickname: user.nickname, points: user.points || 0, level: user.level || 1, progress: levelProgress(user.points || 0) };
+  const progress = levelProgress(user.points || 0, user.username);
+  return { nickname: user.nickname, points: user.points || 0, level: progress.level, progress };
 }
 
 // 친구 추가는 승인 없이 즉시 등록(트위터 팔로우와 비슷한 단방향) - 서로 추가하면 자연히 맞팔 관계가 된다.

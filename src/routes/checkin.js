@@ -58,5 +58,5 @@ export async function handleCheckin(request, env) {
 
   await env.CACHE.put(key, "1", { expirationTtl: 60 * 24 * 60 * 60 });
   const result = await awardPoints(env, user, POINTS_PER_CHECKIN);
-  return json({ status: "ok", ...result, progress: levelProgress(result.points), pointsAwarded: POINTS_PER_CHECKIN });
+  return json({ status: "ok", ...result, progress: levelProgress(result.points, user.username), pointsAwarded: POINTS_PER_CHECKIN });
 }

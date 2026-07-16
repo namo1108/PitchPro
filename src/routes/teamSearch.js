@@ -1,6 +1,7 @@
 import { json } from "../lib/http.js";
 import { getJSON } from "../lib/kv.js";
 import { KV_KEYS, findCompetition } from "../lib/config.js";
+import { matchesKoreanAlias } from "../lib/teamAliases.js";
 
 const MAX_RESULTS = 20;
 
@@ -22,7 +23,8 @@ export async function handleTeamSearch(request, env, url) {
         if (!team || seen.has(team.id)) continue;
         const name = (team.name || "").toLowerCase();
         const shortName = (team.shortName || "").toLowerCase();
-        if (!name.includes(q) && !shortName.includes(q)) continue;
+        const matches = name.includes(q) || shortName.includes(q) || matchesKoreanAlias(q, team.name, team.shortName);
+        if (!matches) continue;
         seen.set(team.id, {
           id: team.id,
           name: team.name,

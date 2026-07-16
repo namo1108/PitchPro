@@ -55,7 +55,7 @@ export async function handleSignup(request, env) {
   await env.CACHE.put(nicknameIndexKey(nickname), username);
 
   const token = await createSession(env, username);
-  return json({ token, user: { ...publicProfile(user), progress: levelProgress(user.points) } });
+  return json({ token, user: { ...publicProfile(user), progress: levelProgress(user.points, user.username) } });
 }
 
 export async function handleLogin(request, env) {
@@ -69,7 +69,7 @@ export async function handleLogin(request, env) {
   }
 
   const token = await createSession(env, username);
-  return json({ token, user: { ...publicProfile(user), progress: levelProgress(user.points) } });
+  return json({ token, user: { ...publicProfile(user), progress: levelProgress(user.points, user.username) } });
 }
 
 export async function handleLogout(request, env) {
@@ -82,5 +82,5 @@ export async function handleLogout(request, env) {
 export async function handleMe(request, env) {
   const user = await getAuthedUser(request, env);
   if (!user) return json({ detail: "로그인이 필요합니다." }, 401);
-  return json({ user: { ...publicProfile(user), progress: levelProgress(user.points) } });
+  return json({ user: { ...publicProfile(user), progress: levelProgress(user.points, user.username) } });
 }

@@ -18,6 +18,7 @@ import { handleVapidPublicKey, handleSubscribe, handleUnsubscribe, handleWatchMa
 import { handleSignup, handleLogin, handleLogout, handleMe } from "./routes/auth.js";
 import { handleCheckin, handleCheckinStatus } from "./routes/checkin.js";
 import { handleAddFriend, handleRemoveFriend, handleListFriends } from "./routes/friends.js";
+import { handleUserSearch } from "./routes/userSearch.js";
 import { handleLeaderboard } from "./routes/leaderboard.js";
 import { scrapeK3K4TopScorers } from "./scheduled/scrapeK3K4TopScorers.js";
 import { scrapeKLeagueTopPlayers } from "./scheduled/scrapeKLeagueTopPlayers.js";
@@ -116,6 +117,9 @@ export async function routeApiRequest(request, env, ctx) {
   }
   if (segments[1] === "friends" && segments.length === 3 && request.method === "DELETE") {
     return handleRemoveFriend(request, env, segments[2]);
+  }
+  if (segments[1] === "users" && segments[2] === "search" && segments.length === 3) {
+    return handleUserSearch(request, env, url);
   }
   if (segments[1] === "leaderboard" && segments.length === 2) {
     return handleLeaderboard(request, env);

@@ -1,5 +1,5 @@
 import { getJSON, putJSON } from "./kv.js";
-import { KV_KEYS, POINTS_PER_CHECKIN, SESSION_TTL_SECONDS } from "./config.js";
+import { KV_KEYS, POINTS_PER_CHECKIN, SESSION_TTL_SECONDS, GOAT_USERNAMES } from "./config.js";
 
 // 로그인은 선택 기능(집관인증/레벨/친구/명예의 전당 전용)이라 기존 익명 사용자 흐름(즐겨찾기,
 // 골 알림)은 전혀 건드리지 않는다. 비번은 Workers 런타임이 지원하는 WebCrypto PBKDF2로 해싱한다
@@ -96,13 +96,32 @@ export function levelForPoints(points) {
   return Math.max(1, level);
 }
 
-export function levelProgress(points) {
+// 레벨 1~4는 각자 이름이 있고, 5부터는(포인트가 계속 쌓여도) 전부 "축구에 미친자"로 묶는다.
+const LEVEL_TITLES = [
+  { level: 1, title: "축구 입문자" },
+  { level: 2, title: "이적설 레이더" },
+  { level: 3, title: "전술 분석가" },
+  { level: 4, title: "방구석 스카우터" },
+  { level: 5, title: "축구에 미친자" },
+];
+
+export function levelTitle(level) {
+  return LEVEL_TITLES.find((t) => t.level === level)?.title || LEVEL_TITLES[LEVEL_TITLES.length - 1].title;
+}
+
+// username이 GOAT_USERNAMES(config.js, 운영자 전용 이스터에그)에 있으면 포인트와 무관하게
+// 레벨 99 "나 개발자(Goat)"로 고정해서 보여준다.
+export function levelProgress(points, username = null) {
+  if (username && GOAT_USERNAMES.includes(normalizeUsername(username))) {
+    return { level: 99, floor: 0, ceil: 0, percent: 100, title: "나 개발자(Goat)" };
+  }
+
   const level = levelForPoints(points);
   const floor = pointsForLevel(level);
   const ceil = pointsForLevel(level + 1);
   // 반올림 때문에 아직 레벨업 전인데 100%로 보이는 걸 막기 위해 599/1%p 오차는 99로 눌러둔다.
   const percent = ceil > floor ? Math.min(99, Math.round(((points - floor) / (ceil - floor)) * 100)) : 100;
-  return { level, floor, ceil, percent };
+  return { level, floor, ceil, percent, title: levelTitle(level) };
 }
 
 // 사용자에게 포인트를 더하고 레벨업 여부까지 계산해 저장한다(집관인증 등에서 공통으로 사용).

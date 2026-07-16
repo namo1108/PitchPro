@@ -21,7 +21,7 @@ function rowHtml(entry, isMe) {
   return `
     <div class="hof-row ${isMe ? "me" : ""}">
       <span class="hof-rank">${MEDAL[entry.rank] || entry.rank}</span>
-      <span class="hof-nickname">${entry.nickname}${isMe ? " (나)" : ""}</span>
+      <span class="hof-nickname">${entry.nickname}${isMe ? " (나)" : ""}<span class="hof-title">${entry.title || ""}</span></span>
       <span class="hof-level">Lv.${entry.level}</span>
       <span class="hof-points">${entry.points.toLocaleString()}P</span>
     </div>

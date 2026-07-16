@@ -65,21 +65,26 @@ function setAuthMode(mode) {
 // ---------- 최애팀 검색(회원가입 전용) ----------
 
 let teamSearchTimer = null;
+let teamSearchRequestId = 0;
 
 el.teamSearchInput?.addEventListener("input", () => {
   const q = el.teamSearchInput.value.trim();
   clearTimeout(teamSearchTimer);
   if (q.length < 1) {
+    teamSearchRequestId++; // 진행 중이던 이전 요청 결과는 무시하게 만든다.
     el.teamResultsBox.innerHTML = "";
     return;
   }
   // 타이핑마다 바로 요청하지 않고 살짝 기다렸다가 검색(디바운스)해서 불필요한 호출을 줄인다.
+  const requestId = ++teamSearchRequestId;
   teamSearchTimer = setTimeout(async () => {
     try {
       const data = await fetchJSON(`/teams/search?q=${encodeURIComponent(q)}`);
+      // 느린 응답이 나중에 도착해 더 최신 검색 결과를 덮어쓰지 않도록, 그사이 새 요청이 있었으면 버린다.
+      if (requestId !== teamSearchRequestId) return;
       renderTeamResults(data.teams || []);
     } catch {
-      el.teamResultsBox.innerHTML = "";
+      if (requestId === teamSearchRequestId) el.teamResultsBox.innerHTML = "";
     }
   }, 300);
 });
@@ -160,12 +165,17 @@ el.form?.addEventListener("submit", async (e) => {
 // ---------- 프로필/레벨/친구 ----------
 
 function levelBarHtml(user) {
-  const p = user.progress || { level: user.level, floor: 0, ceil: 100, percent: 0 };
+  const p = user.progress || { level: user.level, floor: 0, ceil: 100, percent: 0, title: "" };
+  const isMaxTier = p.level >= 99;
+  const bottomLabel = isMaxTier
+    ? `${user.points.toLocaleString()}P · 최고 등급`
+    : `${user.points.toLocaleString()}P · 다음 레벨까지 ${(p.ceil - user.points).toLocaleString()}P`;
   return `
     <div class="level-badge">Lv.${p.level}</div>
     <div class="level-bar-wrap">
+      <div class="level-title">${p.title}</div>
       <div class="level-bar"><div class="level-bar-fill" style="width:${p.percent}%"></div></div>
-      <div class="level-bar-label">${user.points.toLocaleString()}P · 다음 레벨까지 ${(p.ceil - user.points).toLocaleString()}P</div>
+      <div class="level-bar-label">${bottomLabel}</div>
     </div>
   `;
 }
@@ -193,7 +203,7 @@ function renderFriends(friends) {
     .map(
       (f) => `
     <div class="friend-row">
-      <span class="friend-nickname">${f.nickname}</span>
+      <span class="friend-nickname">${f.nickname}<span class="friend-title">${f.progress?.title || ""}</span></span>
       <span class="friend-level">Lv.${f.level}</span>
       <span class="friend-points">${f.points.toLocaleString()}P</span>
       <button class="friend-remove" data-nickname="${f.nickname}" title="친구 삭제">✕</button>
@@ -214,6 +224,8 @@ function renderProfile() {
   if (!user) {
     el.profileWrap.style.display = "none";
     el.profileWrap.innerHTML = "";
+    // 로그아웃 등으로 로그인 상태가 풀리면(로그인 폼이 열려있는 중이 아닌 한) 로그인 유도 카드를 다시 보여준다.
+    if (el.formWrap.style.display === "none") el.guestWrap.style.display = "block";
     return;
   }
 
@@ -229,10 +241,10 @@ function renderProfile() {
       <div class="profile-level-row">${levelBarHtml(user)}</div>
       <div class="friends-section">
         <div class="friends-title">👥 친구</div>
-        <form id="friend-add-form" class="friend-add-form">
-          <input type="text" id="friend-nickname-input" placeholder="친구 닉네임으로 추가" />
-          <button type="submit">추가</button>
-        </form>
+        <div class="team-search-wrap">
+          <input type="text" id="friend-nickname-input" placeholder="닉네임으로 친구 검색" autocomplete="off" />
+          <div id="friend-search-results" class="team-search-results"></div>
+        </div>
         <div id="friends-add-error" class="auth-error"></div>
         <div id="friends-list-wrap" class="friends-list-wrap"></div>
       </div>
@@ -243,21 +255,72 @@ function renderProfile() {
     await logout();
   });
 
-  document.getElementById("friend-add-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const input = document.getElementById("friend-nickname-input");
-    const errorBox = document.getElementById("friends-add-error");
-    errorBox.textContent = "";
-    try {
-      await authFetch("/friends", { method: "POST", body: { nickname: input.value.trim() } });
-      input.value = "";
-      loadFriends();
-    } catch (err) {
-      errorBox.textContent = err.message;
-    }
-  });
-
+  initFriendSearch();
   loadFriends();
+}
+
+// ---------- 친구 검색(가입된 실제 닉네임만 실시간으로 보여줌) ----------
+
+let friendSearchTimer = null;
+let friendSearchRequestId = 0;
+
+function initFriendSearch() {
+  const input = document.getElementById("friend-nickname-input");
+  const resultsBox = document.getElementById("friend-search-results");
+  if (!input || !resultsBox) return;
+
+  input.addEventListener("input", () => {
+    const q = input.value.trim();
+    clearTimeout(friendSearchTimer);
+    if (q.length < 1) {
+      friendSearchRequestId++;
+      resultsBox.innerHTML = "";
+      return;
+    }
+    const requestId = ++friendSearchRequestId;
+    friendSearchTimer = setTimeout(async () => {
+      try {
+        const data = await authFetch(`/users/search?q=${encodeURIComponent(q)}`);
+        if (requestId !== friendSearchRequestId) return;
+        renderFriendSearchResults(data.users || [], resultsBox, input);
+      } catch {
+        if (requestId === friendSearchRequestId) resultsBox.innerHTML = "";
+      }
+    }, 300);
+  });
+}
+
+function renderFriendSearchResults(users, resultsBox, input) {
+  if (!users.length) {
+    resultsBox.innerHTML = '<div class="team-search-empty">가입된 사용자 중 일치하는 닉네임이 없습니다.</div>';
+    return;
+  }
+  resultsBox.innerHTML = users
+    .map(
+      (u) => `
+    <div class="team-search-row ${u.isFriend ? "already-friend" : ""}" data-nickname="${u.nickname}">
+      <span class="team-search-name">${u.nickname}</span>
+      <span class="team-search-comp">Lv.${u.level}</span>
+      ${u.isFriend ? '<span class="friend-added-badge">✓ 친구</span>' : '<span class="friend-add-badge">+ 추가</span>'}
+    </div>
+  `
+    )
+    .join("");
+
+  resultsBox.querySelectorAll("[data-nickname]:not(.already-friend)").forEach((row) => {
+    row.addEventListener("click", async () => {
+      const errorBox = document.getElementById("friends-add-error");
+      errorBox.textContent = "";
+      try {
+        await authFetch("/friends", { method: "POST", body: { nickname: row.dataset.nickname } });
+        input.value = "";
+        resultsBox.innerHTML = "";
+        loadFriends();
+      } catch (err) {
+        errorBox.textContent = err.message;
+      }
+    });
+  });
 }
 
 onAuthChange(() => {

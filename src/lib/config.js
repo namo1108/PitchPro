@@ -101,6 +101,9 @@ export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const LEADERBOARD_CACHE_TTL_SECONDS = 300;
 export const LEADERBOARD_SIZE = 100;
 
+// 여기 적은 아이디(소문자)는 포인트와 상관없이 레벨 99 "나 개발자(Goat)"로 고정 표시된다(운영자 이스터에그).
+export const GOAT_USERNAMES = [];
+
 function monthDayNumber(date) {
   return (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
 }

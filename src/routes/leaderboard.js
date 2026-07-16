@@ -12,7 +12,10 @@ async function computeLeaderboard(env) {
     .filter(Boolean)
     .sort((a, b) => (b.points || 0) - (a.points || 0))
     .slice(0, LEADERBOARD_SIZE)
-    .map((u, i) => ({ rank: i + 1, nickname: u.nickname, points: u.points || 0, level: u.level || 1 }));
+    .map((u, i) => {
+      const progress = levelProgress(u.points || 0, u.username);
+      return { rank: i + 1, nickname: u.nickname, points: u.points || 0, level: progress.level, title: progress.title };
+    });
 }
 
 export async function handleLeaderboard(request, env) {
@@ -24,7 +27,10 @@ export async function handleLeaderboard(request, env) {
   }
 
   const user = await getAuthedUser(request, env);
-  const me = user ? entries.find((e) => e.nickname === user.nickname) || { nickname: user.nickname, points: user.points || 0, level: user.level || 1, rank: null } : null;
+  const meProgress = user ? levelProgress(user.points || 0, user.username) : null;
+  const me = user
+    ? entries.find((e) => e.nickname === user.nickname) || { nickname: user.nickname, points: user.points || 0, level: meProgress.level, title: meProgress.title, rank: null }
+    : null;
 
-  return json({ entries, me: me ? { ...me, progress: levelProgress(me.points) } : null });
+  return json({ entries, me: me ? { ...me, progress: user ? levelProgress(me.points, user.username) : null } : null });
 }
