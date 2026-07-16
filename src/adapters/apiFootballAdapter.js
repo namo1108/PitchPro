@@ -1,0 +1,512 @@
+import { findCompetitionByLeagueId } from "../lib/config.js";
+
+const STATUS_MAP = {
+  NS: "SCHEDULED",
+  // 친선경기는 킥오프 시각이 확정되기 전(TBD)에 API-Football이 임시 시각(대개 00:00)을 채워서 주는 경우가
+  // 많아, 이걸 그대로 SCHEDULED로 표시하면 실제와 다른 킥오프 시간이 확정된 것처럼 보인다.
+  // 별도 상태로 구분해서 프론트에서 "시간 미정"으로 보여주고 확정 시각은 표시하지 않는다.
+  TBD: "TIME_TBD",
+  "1H": "IN_PLAY",
+  "2H": "IN_PLAY",
+  ET: "IN_PLAY",
+  BT: "IN_PLAY",
+  P: "IN_PLAY",
+  LIVE: "IN_PLAY",
+  HT: "PAUSED",
+  FT: "FINISHED",
+  AET: "FINISHED",
+  PEN: "FINISHED",
+  WO: "FINISHED",
+  AWD: "FINISHED",
+  PST: "POSTPONED",
+  CANC: "CANCELLED",
+  ABD: "CANCELLED",
+  SUSP: "SUSPENDED",
+  INT: "SUSPENDED",
+};
+
+function mapStatus(shortStatus) {
+  return STATUS_MAP[shortStatus] || "SCHEDULED";
+}
+
+// API-Football가 일부 K리그2 구단은 엠블럼이 없거나(플레이스홀더 PNG, 요청 자체는 200이라 onerror
+// 폴백이 안 걸림) 실제와 다른(옛 로고 등) 이미지를 줘서, 확인된 팀은 우리가 받은 실제 엠블럼으로 덮어쓴다.
+const CREST_OVERRIDES = {
+  7087: "/img/emblems/화성.png", // Hwaseong FC
+  7098: "/img/emblems/파주.png", // Paju Frontier FC
+  7076: "/img/emblems/김해.png", // Gimhae FC
+  9171: "/img/emblems/용인.png", // Yongin FC
+  7078: "/img/emblems/김포.png", // Gimpo Citizen FC
+  2760: "/img/emblems/전남.png", // Jeonnam Dragons
+  7060: "/img/emblems/천안.png", // Cheonan City FC
+  25719: "/img/emblems/gijang utd.jpg", // Gijang United (K4)
+  25720: "/img/emblems/sejong.png", // Sejong SA (K4)
+  27863: "/img/emblems/jincheon.png", // Jincheon (K4)
+  7075: "/img/emblems/gangneung.png", // Gangneung City (K3)
+  7111: "/img/emblems/yangpyeong.png", // Yangpyeong (K3)
+  2748: "/img/emblems/anyang.png", // FC Anyang (K리그1) - API-Football이 옛 LG시절 로고를 씀
+  23089: "/img/emblems/namyangju.png", // Namyangju FC (K4)
+};
+
+function safeCrest(teamId, logo) {
+  const override = CREST_OVERRIDES[String(teamId)];
+  return override || logo || null;
+}
+
+function pickTeam(team) {
+  return { id: String(team.id), name: team.name, shortName: team.name, crest: safeCrest(team.id, team.logo) };
+}
+
+// 목록(fixtures?league=)에는 이미 league 정보가 들어있어 그걸 그대로 쓰고,
+// 우리 자체 대회 코드(競 code)가 필요할 때만 findCompetitionByLeagueId로 보강한다.
+export function normalizeFixture(raw) {
+  const comp = findCompetitionByLeagueId(raw.league.id);
+  return {
+    id: String(raw.fixture.id),
+    utcDate: raw.fixture.date,
+    status: mapStatus(raw.fixture.status.short),
+    elapsed: raw.fixture.status.elapsed ?? null,
+    matchday: raw.league.round || null,
+    competition: {
+      code: comp?.code || String(raw.league.id),
+      name: comp?.name || raw.league.name,
+      emblem: comp?.emblem || raw.league.logo || null,
+    },
+    homeTeam: pickTeam(raw.teams.home),
+    awayTeam: pickTeam(raw.teams.away),
+    score: {
+      fullTime: { home: raw.goals.home ?? null, away: raw.goals.away ?? null },
+      halfTime: { home: raw.score.halftime?.home ?? null, away: raw.score.halftime?.away ?? null },
+    },
+    venue: raw.fixture.venue?.name || null,
+    referees: raw.fixture.referee ? [{ name: raw.fixture.referee }] : [],
+  };
+}
+
+// 자주 나오는 포메이션에 대한 짧은 스타일 설명(간단한 전술 코멘트용).
+const FORMATION_STYLES = {
+  "4-3-3": "미드필더 3명이 폭넓게 커버하고 양쪽 윙어가 넓게 벌려 공격하는 균형 잡힌 포메이션",
+  "4-2-3-1": "수비형 미드필더 2명이 안정감을 주고, 처진 공격형 미드필더 3명이 창의적인 플레이를 담당하는 포메이션",
+  "4-4-2": "투톱이 함께 움직이는 전통적인 포메이션, 측면 크로스 위주의 공격이 특징",
+  "4-4-1-1": "투톱 대신 세컨드 스트라이커를 두어 좀 더 유기적인 공격을 만드는 포메이션",
+  "3-4-2-1": "3백으로 수비 안정감을 확보하고 윙백이 측면을 오르내리며 폭을 만드는 포메이션",
+  "3-4-3": "공격적인 3백 포메이션, 윙백이 사실상 윙어 역할까지 겸함",
+  "3-5-2": "중원 숫자 우위를 가져가며 윙백이 공수 양면에서 활발히 움직이는 포메이션",
+  "4-1-4-1": "홀딩 미드필더 1명이 수비를 커버하고 나머지가 압박과 점유를 담당하는 포메이션",
+  "4-5-1": "미드필드를 두텁게 채워 수비적으로 안정적인 포메이션",
+  "5-3-2": "5백으로 수비를 단단히 하고 역습 위주로 운영하는 포메이션",
+  "5-4-1": "매우 수비적인 포메이션, 실점을 최소화하는 데 집중",
+};
+
+function describeFormation(formation) {
+  if (!formation) return null;
+  return FORMATION_STYLES[formation] || `${formation} 포메이션`;
+}
+
+export function normalizeLineups(rawList) {
+  return (rawList || []).map((entry) => ({
+    teamId: String(entry.team.id),
+    formation: entry.formation || null,
+    formationStyle: describeFormation(entry.formation),
+    colors: {
+      player: entry.team.colors?.player?.primary ? `#${entry.team.colors.player.primary}` : null,
+      goalkeeper: entry.team.colors?.goalkeeper?.primary ? `#${entry.team.colors.goalkeeper.primary}` : null,
+    },
+    startXI: (entry.startXI || []).map((p) => ({
+      id: String(p.player.id),
+      name: p.player.name,
+      number: p.player.number,
+      position: p.player.pos,
+      grid: p.player.grid || null,
+    })),
+    substitutes: (entry.substitutes || []).map((p) => ({
+      id: String(p.player.id),
+      name: p.player.name,
+      number: p.player.number,
+      position: p.player.pos,
+      grid: null,
+    })),
+    coach: entry.coach?.name || null,
+  }));
+}
+
+// 홈/원정 포메이션이 모두 있으면 각각 스타일을 한 줄씩 붙여 짧은 전술 코멘트를 만든다.
+export function buildTacticalNote(lineups, homeTeamId, homeTeamName, awayTeamName) {
+  if (!lineups || lineups.length < 2) return null;
+  const home = lineups.find((l) => l.teamId === homeTeamId) || lineups[0];
+  const away = lineups.find((l) => l.teamId !== homeTeamId) || lineups[1];
+  if (!home?.formation && !away?.formation) return null;
+
+  const parts = [];
+  if (home?.formation) parts.push(`${homeTeamName}은(는) ${home.formation} — ${home.formationStyle}.`);
+  if (away?.formation) parts.push(`${awayTeamName}은(는) ${away.formation} — ${away.formationStyle}.`);
+  return parts.join(" ");
+}
+
+const STAT_KEY_MAP = {
+  "Shots on Goal": "shotsOnGoal",
+  "Total Shots": "shotsTotal",
+  "Ball Possession": "possession",
+  "Corner Kicks": "corners",
+  Fouls: "fouls",
+  "Yellow Cards": "yellowCards",
+  "Red Cards": "redCards",
+  "Goalkeeper Saves": "saves",
+  "Passes %": "passAccuracy",
+  expected_goals: "xg",
+};
+
+export function normalizeStatistics(rawList) {
+  return (rawList || []).map((entry) => {
+    const stats = {};
+    for (const s of entry.statistics || []) {
+      const key = STAT_KEY_MAP[s.type];
+      if (key) stats[key] = s.value ?? null;
+    }
+    return { teamId: String(entry.team.id), stats };
+  });
+}
+
+// 45+3', 90+4'처럼 정식 축구 표기(90분제 + 추가시간)로 보이도록 elapsed/extra를 합치지 않고 포맷한다.
+function formatMinute(time) {
+  if (!time) return "";
+  return time.extra ? `${time.elapsed}+${time.extra}` : `${time.elapsed}`;
+}
+
+export function normalizeGoalEvents(events) {
+  return (events || [])
+    .filter((e) => e.type === "Goal")
+    .map((e) => ({
+      minute: formatMinute(e.time),
+      teamId: String(e.team.id),
+      scorer: e.player?.name || "알 수 없음",
+      assist: e.assist?.name || null,
+      ownGoal: e.detail === "Own Goal",
+      penalty: e.detail === "Penalty",
+    }));
+}
+
+// subst 이벤트는 player가 교체되어 나가는 선수, assist가 들어오는 선수(API-Football 관례).
+export function normalizeSubstitutionEvents(events) {
+  return (events || [])
+    .filter((e) => e.type === "subst")
+    .map((e) => ({
+      minute: formatMinute(e.time),
+      teamId: String(e.team.id),
+      playerOut: e.player?.name || "알 수 없음",
+      playerIn: e.assist?.name || "알 수 없음",
+    }));
+}
+
+// /fixtures/players는 팀별로 선수 배열을 주는데, 우리는 라인업 카드에 평점만 얹으면 되니까
+// 선수 id -> {rating, minutes, substitute} 맵으로 평탄화한다. K3/K4처럼 커버리지가 약한 대회는
+// rating이 "0"으로 오는 경우가 많아 그런 값은 걸러서 null로 둔다(뱃지 자체를 안 보여주기 위함).
+export function normalizePlayerRatings(rawResponse) {
+  const map = {};
+  for (const team of rawResponse || []) {
+    for (const p of team.players || []) {
+      const stats = p.statistics?.[0];
+      const ratingNum = parseFloat(stats?.games?.rating);
+      map[String(p.player.id)] = {
+        rating: ratingNum > 0 ? ratingNum : null,
+        minutes: stats?.games?.minutes ?? null,
+      };
+    }
+  }
+  return map;
+}
+
+function buildStandingsTable(rows) {
+  return rows.map((row) => ({
+    position: row.rank,
+    team: { id: String(row.team.id), name: row.team.name, shortName: row.team.name, crest: safeCrest(row.team.id, row.team.logo) },
+    playedGames: row.all.played,
+    won: row.all.win,
+    draw: row.all.draw,
+    lost: row.all.lose,
+    points: row.points,
+    goalDifference: row.goalsDiff,
+  }));
+}
+
+// API-Football는 리그가 그룹(조)으로 나뉘어 있으면 raw.league.standings에 그룹별로 별도 배열을 준다
+// (예: MLS는 [0]=서부 컨퍼런스, [1]=동부 컨퍼런스). 예전엔 [0]만 써서 MLS 동부 컨퍼런스 팀 전체가
+// 순위표/이적시장 팀 목록에서 통째로 빠지는 문제가 있었다 -> 그룹이 여럿이면 그룹별로 각각 테이블을 만든다.
+// (K리그/5대 리그 등 절대다수는 그룹이 하나뿐이라 기존과 동일하게 "TOTAL" 하나로 나간다.)
+export function normalizeStandings(raw) {
+  const groups = raw?.league?.standings || [];
+  if (groups.length <= 1) {
+    return { standings: [{ type: "TOTAL", table: buildStandingsTable(groups[0] || []) }] };
+  }
+  return {
+    standings: groups.map((rows) => ({
+      type: rows[0]?.group || "GROUP",
+      table: buildStandingsTable(rows),
+    })),
+  };
+}
+
+// statKey: "goals"(득점왕) 또는 "assists"(도움왕) — topscorers/topassists 둘 다 같은 모양이라 공유한다.
+// 하위 리그(K3/K4, 시즌 초반 K리그2 등)는 API-Football 쪽 통계 집계가 비어서 0골/0도움 선수가
+// "랭킹"으로 잡히는 경우가 있어, 실제 기록이 없는(값 0) 항목은 걸러낸다.
+export function normalizeTopPlayers(rawList, statKey) {
+  return (rawList || [])
+    .map((entry) => {
+      const stats = entry.statistics?.[0];
+      return {
+        id: String(entry.player.id),
+        name: entry.player.name,
+        photo: entry.player.photo || null,
+        team: stats?.team?.name || null,
+        teamCrest: stats?.team?.logo || null,
+        value: stats?.goals?.[statKey] ?? 0,
+        appearances: stats?.games?.appearences ?? null,
+      };
+    })
+    .filter((p) => p.value > 0);
+}
+
+export function normalizeTeam(raw) {
+  return {
+    id: String(raw.team.id),
+    name: raw.team.name,
+    shortName: raw.team.name,
+    crest: safeCrest(raw.team.id, raw.team.logo),
+    country: raw.team.country || null,
+    founded: raw.team.founded || null,
+    venue: raw.venue?.name || null,
+    venueCity: raw.venue?.city || null,
+    venueCapacity: raw.venue?.capacity || null,
+  };
+}
+
+// API-Football 사진이 깨진 실루엣 플레이스홀더인 선수를 개별적으로 보정한다(확인일 2026-07-13).
+const PLAYER_PHOTO_OVERRIDES = {
+  534373: "/img/player/petrov-hwaseong.png", // S. Petrov(화성) - 최근 영입이라 API-Football 사진 미반영
+};
+
+export function applyPlayerPhotoOverride(photo, playerId) {
+  return PLAYER_PHOTO_OVERRIDES[String(playerId)] || photo;
+}
+
+// lookup_all_players 10명 제한(TheSportsDB 무료 티어) 없이 전체 스쿼드가 온다.
+export function normalizeSquadPlayer(raw) {
+  return {
+    id: String(raw.id),
+    name: raw.name,
+    position: raw.position || null,
+    nationality: null, // squads 엔드포인트는 국적을 안 줌(선수 상세에서 보강)
+    number: raw.number ?? null,
+    age: raw.age ?? null,
+    photo: applyPlayerPhotoOverride(raw.photo || null, raw.id),
+  };
+}
+
+// /coachs?team= 는 그 팀을 거쳐간 감독들을 배열로 다 주고, response[0]이 "현재 감독"이라는 보장이 없다
+// (심지어 같은 사람이 이름 표기만 다르게 중복 등록된 사례도 있었음: "Cha Du-Ri"/"Du-Ri Cha").
+// 그래서 각 감독의 "이 팀" 재임 기록 중 end가 없는(현재진행) 것을 우선하고, 그중 start가 가장 최근인 사람을 고른다.
+export function selectCurrentCoach(rawList, teamId) {
+  if (!rawList || !rawList.length) return null;
+
+  const withTenure = rawList
+    .map((coach) => {
+      const stints = (coach.career || []).filter((c) => String(c.team?.id) === String(teamId));
+      const latestStint = stints.sort((a, b) => new Date(b.start || 0) - new Date(a.start || 0))[0];
+      return latestStint ? { coach, stint: latestStint } : null;
+    })
+    .filter(Boolean);
+
+  if (!withTenure.length) return rawList[0];
+
+  const ongoing = withTenure.filter((w) => !w.stint.end);
+  const pool = ongoing.length ? ongoing : withTenure;
+  pool.sort((a, b) => new Date(b.stint.start || 0) - new Date(a.stint.start || 0));
+
+  return pool[0].coach;
+}
+
+export function normalizeCoach(raw) {
+  if (!raw) return null;
+  return {
+    id: String(raw.id),
+    name: raw.name,
+    nationality: raw.nationality || null,
+    age: raw.age ?? null,
+    photo: raw.photo || null,
+  };
+}
+
+// API-Football 자체 DB가 아직 못 따라간(웹 검색으로 사실 확인된) 감독/이적 건만 최소한으로 수동 보정한다.
+// 전체 이적시장을 다 검증할 수는 없어서, 사용자가 즐겨찾는 팀 등 확인된 건만 등록.
+const COACH_OVERRIDES = {
+  // Chelsea: Xabi Alonso, 2026-07-01 부임(4년 계약) - API-Football coachs 엔드포인트 미반영(확인일 2026-07-12)
+  49: { id: "override-alonso", name: "Xabi Alonso", nationality: "Spain", age: null, photo: null },
+};
+
+// 이름/재임 정보는 API-Football이 맞게 주는데 사진만 깨진 방패 아이콘 플레이스홀더인 경우(확인일 2026-07-13).
+// 전체 감독 정보를 덮어쓸 필요는 없어서 사진만 별도로 교체한다.
+const COACH_PHOTO_OVERRIDES = {
+  7061: "/img/coaches/rui-quinta.jpg", // 충북청주 - 루이 퀸타
+  7098: "/img/coaches/gerard-nus.jpg", // 파주 시민축구단 - 제라드 누스
+};
+
+export function applyCoachOverride(coach, teamId) {
+  if (COACH_OVERRIDES[String(teamId)]) return COACH_OVERRIDES[String(teamId)];
+  const photoOverride = COACH_PHOTO_OVERRIDES[String(teamId)];
+  return photoOverride && coach ? { ...coach, photo: photoOverride } : coach;
+}
+
+// 이적이 확정됐는데도 스쿼드 목록에서 아직 안 빠진 선수를 수동으로 제거한다(구단 발표/보도로 확인된 건만).
+const SQUAD_REMOVALS = {
+  // Chelsea -> Real Madrid, 2026-06-15 공식 발표(Real Madrid 스쿼드에는 이미 반영됨, Chelsea 쪽만 안 빠짐)
+  49: ["47380"], // Marc Cucurella
+};
+
+export function applySquadRemovals(players, teamId) {
+  const removals = SQUAD_REMOVALS[String(teamId)];
+  if (!removals || !removals.length) return players;
+  return players.filter((p) => !removals.includes(p.id));
+}
+
+// 일부 선수는 raw.height/weight에 단위가 이미 붙어 오고(예: "185 cm"), 일부는 숫자만 온다(예: "183") ->
+// 이미 단위가 있으면 그대로 쓰고, 없으면 붙인다.
+function withUnit(value, unit) {
+  if (!value) return null;
+  return String(value).toLowerCase().includes(unit) ? String(value) : `${value} ${unit}`;
+}
+
+export function normalizePlayerDetail(raw) {
+  return {
+    id: String(raw.id),
+    name: raw.name,
+    position: raw.position || null,
+    nationality: raw.nationality || null,
+    number: raw.number ?? null,
+    team: null,
+    dateBorn: raw.birth?.date || null,
+    height: withUnit(raw.height, "cm"),
+    weight: withUnit(raw.weight, "kg"),
+    photo: raw.photo || null,
+    description: null,
+  };
+}
+
+// 이적시장 탭에 보여줄 "최근" 이적만 남긴다 - /transfers?team=은 그 팀의 이적 역사 전체를 주기 때문에
+// 옛날 이적까지 다 보이면 "지금 이적시장" 느낌이 안 나고 응답도 쓸데없이 커진다.
+const TRANSFER_MARKET_RECENCY_DAYS = 120;
+
+// player 하나가 여러 시즌에 걸쳐 여러 번 이적했을 수 있어 response 배열 전체를 순회하며,
+// 그 팀이 "in"(영입) 또는 "out"(방출)으로 관여한 이적만 골라 방향을 붙인다.
+export function normalizeTeamTransfers(rawResponse, teamId) {
+  const cutoff = Date.now() - TRANSFER_MARKET_RECENCY_DAYS * 24 * 60 * 60 * 1000;
+  const results = [];
+
+  for (const entry of rawResponse || []) {
+    const player = entry.player;
+    if (!player?.id) continue;
+
+    for (const t of entry.transfers || []) {
+      if (!t.date) continue;
+      const transferTime = new Date(t.date).getTime();
+      if (Number.isNaN(transferTime) || transferTime < cutoff) continue;
+
+      const inTeam = t.teams?.in;
+      const outTeam = t.teams?.out;
+      const isIncoming = String(inTeam?.id) === String(teamId);
+      const isOutgoing = String(outTeam?.id) === String(teamId);
+      if (!isIncoming && !isOutgoing) continue;
+
+      results.push({
+        playerId: String(player.id),
+        playerName: player.name,
+        playerPhoto: player.photo || null,
+        fromTeam: outTeam?.name || "알 수 없음",
+        fromCrest: outTeam?.logo || null,
+        toTeam: inTeam?.name || "알 수 없음",
+        toCrest: inTeam?.logo || null,
+        date: t.date,
+        moveType: t.type || null,
+        direction: isIncoming ? "in" : "out",
+      });
+    }
+  }
+
+  return results;
+}
+
+export function normalizeTransfer(raw) {
+  return {
+    team: raw.teams?.in?.name || "알 수 없음",
+    crest: raw.teams?.in?.logo || null,
+    joined: raw.date || null,
+    departed: null,
+    moveType: raw.type || null,
+  };
+}
+
+// /injuries는 시즌 전체의 "결장 이력"을 주기 때문에(현재 부상 여부 플래그가 아님),
+// 최근 30일 이내 + 선수별 최신 1건만 남겨서 "지금 결장 중일 가능성이 높은 선수" 목록으로 근사한다.
+const INJURY_RECENCY_DAYS = 30;
+
+export function normalizeInjuries(rawList) {
+  const cutoff = Date.now() - INJURY_RECENCY_DAYS * 24 * 60 * 60 * 1000;
+  const byPlayer = new Map();
+
+  for (const entry of rawList || []) {
+    const fixtureDate = entry.fixture?.date ? new Date(entry.fixture.date).getTime() : null;
+    if (!fixtureDate || fixtureDate < cutoff) continue;
+
+    const name = entry.player?.name;
+    if (!name) continue;
+
+    const existing = byPlayer.get(name);
+    if (!existing || fixtureDate > existing.date) {
+      byPlayer.set(name, { name, reason: entry.player?.reason || null, date: fixtureDate });
+    }
+  }
+
+  return Array.from(byPlayer.values())
+    .sort((a, b) => b.date - a.date)
+    .slice(0, 3)
+    .map(({ name, reason }) => ({ name, reason }));
+}
+
+// 국내(Betman/토토) 배당률은 API-Football에 없어서 제공 못 하고, 해외 북메이커(Bet365 우선, 없으면 첫 번째)의
+// "승/무/패"(Match Winner) 배당만 참고용으로 보여준다 - 프론트에서도 "해외 북메이커 기준"이라고 명시한다.
+const PREFERRED_BOOKMAKER_ID = 8; // Bet365
+
+export function normalizeOdds(raw) {
+  const entry = raw?.[0];
+  const bookmaker = entry?.bookmakers?.find((b) => b.id === PREFERRED_BOOKMAKER_ID) || entry?.bookmakers?.[0];
+  if (!bookmaker) return null;
+
+  const market = bookmaker.bets?.find((b) => b.name === "Match Winner");
+  if (!market) return null;
+
+  const valueFor = (name) => {
+    const found = market.values?.find((v) => v.value === name);
+    return found ? Number(found.odd) : null;
+  };
+
+  const home = valueFor("Home");
+  const draw = valueFor("Draw");
+  const away = valueFor("Away");
+  if (home === null && draw === null && away === null) return null;
+
+  return { bookmaker: bookmaker.name, home, draw, away };
+}
+
+export function normalizePlayerSeasonStats(statisticsList) {
+  return (statisticsList || [])
+    .filter((s) => s.games?.appearences)
+    .map((s) => ({
+      season: `${s.league.season}`,
+      competition: s.league.name,
+      competitionBadge: s.league.logo || null,
+      team: s.team?.name || null,
+      appearances: s.games?.appearences ?? null,
+      goals: s.goals?.total ?? null,
+      assists: s.goals?.assists ?? null,
+      minutes: s.games?.minutes ?? null,
+    }));
+}

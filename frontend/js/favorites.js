@@ -30,5 +30,6 @@ export function toggleFavorite(team) {
     all.push(team);
   }
   writeAll(all);
+  window.dispatchEvent(new Event("favorites-changed"));
   return idx < 0;
 }

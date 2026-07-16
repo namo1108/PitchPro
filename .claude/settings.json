@@ -23,7 +23,11 @@
       "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --no-sandbox --hide-scrollbars --disable-application-cache --incognito --user-data-dir=/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/edge-profile --window-size=390,844 --screenshot=/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/pitchpro-390-fresh.png http://localhost:8787/?cachebust=__CMDSUB_OUTPUT__)",
       "Bash('/c/Program Files \\(x86\\)/Microsoft/Edge/Application/msedge.exe' --headless=new --disable-gpu --no-sandbox --hide-scrollbars --incognito --user-data-dir=/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/edge-profile2 --window-size=390,844 --screenshot=/c/Users/EST/AppData/Local/Temp/claude/c--Users-EST-Desktop----/8ba73587-444c-4fd4-afe2-3ce86eb8fbe9/scratchpad/pitchpro-390-v3.png http://localhost:8787/)",
       "Bash(curl -s http://127.0.0.1:9334/json)",
-      "Bash(pkill -f msedge)"
+      "Bash(pkill -f msedge)",
+      "Bash(curl -s -o /dev/null -w \"index: %{http_code}\\\\n\" https://soccer-live.skagh662.workers.dev/)",
+      "Bash(curl -s -o /dev/null -w \"js/app.js: %{http_code}\\\\n\" https://soccer-live.skagh662.workers.dev/js/app.js)",
+      "Bash(curl -s https://soccer-live.skagh662.workers.dev/api/competitions)",
+      "Bash(curl -s https://soccer-live.skagh662.workers.dev/api/news)"
     ]
   }
 }

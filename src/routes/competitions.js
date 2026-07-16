@@ -1,7 +1,12 @@
 import { json } from "../lib/http.js";
-import { ALL_COMPETITIONS } from "../lib/config.js";
+import { COMPETITIONS } from "../lib/config.js";
 
 export async function handleCompetitions() {
-  const competitions = ALL_COMPETITIONS.map(({ code, name, emblem }) => ({ code, name, emblem }));
+  const competitions = COMPETITIONS.filter((c) => !c.hideFromLeagueTab).map(({ code, name, emblem, hasBracket }) => ({
+    code,
+    name,
+    emblem,
+    hasBracket: !!hasBracket,
+  }));
   return json({ competitions });
 }

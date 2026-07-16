@@ -16,6 +16,7 @@
         <span class="brand-mark">P</span>
         <span class="brand-name">PITCH<span class="brand-accent">PRO</span></span>
       </div>
+      <span class="kst-badge" title="이 앱의 모든 시간은 한국시간(KST) 기준으로 표시됩니다">🇰🇷 KST</span>
     </header>
 
     <main class="content">
@@ -25,6 +26,8 @@
           <button id="prev-day" class="date-arrow" aria-label="이전 날짜">‹</button>
           <div class="date-label" id="current-date-label">오늘</div>
           <button id="next-day" class="date-arrow" aria-label="다음 날짜">›</button>
+          <button id="date-picker-btn" class="date-arrow" aria-label="날짜 선택" title="날짜 선택">📅</button>
+          <input type="date" id="date-picker-input" class="date-picker-input" aria-hidden="true" tabindex="-1" />
           <button id="refresh-btn" class="refresh-btn" title="새로고침">⟳</button>
         </div>
         <div id="matches-list" class="matches-list">
@@ -42,9 +45,31 @@
 
       <!-- 리그(순위) -->
       <section id="view-leagues" class="view">
-        <div class="competition-picker" id="competition-picker"></div>
-        <div id="standings-table-wrap" class="standings-table-wrap">
-          <div class="loading">순위를 불러오는 중...</div>
+        <input type="text" id="league-search-input" class="league-search-input" placeholder="🔍 리그 검색 (예: 프리미어, K리그)" autocomplete="off" />
+        <div id="league-list" class="league-list">
+          <div class="loading">리그 목록을 불러오는 중...</div>
+        </div>
+        <div id="league-detail-wrap" class="league-detail-wrap" style="display: none;">
+          <button class="league-back-btn" id="league-back-btn">← 리그 목록</button>
+          <div class="league-detail-header" id="league-detail-header"></div>
+          <div id="bracket-wrap" class="bracket-wrap" style="display: none;"></div>
+          <div id="standings-table-wrap" class="standings-table-wrap">
+            <div class="loading">순위를 불러오는 중...</div>
+          </div>
+          <div id="top-players-wrap" class="top-players-wrap"></div>
+        </div>
+      </section>
+
+      <!-- 이적시장 -->
+      <section id="view-transfers" class="view">
+        <h2 class="section-title">이적시장</h2>
+        <div id="transfers-list" class="league-list">
+          <div class="loading">이적 소식을 불러오는 중...</div>
+        </div>
+        <div id="transfers-detail-wrap" class="league-detail-wrap" style="display: none;">
+          <button class="league-back-btn" id="transfers-back-btn">← 리그 목록</button>
+          <div class="league-detail-header" id="transfers-detail-header"></div>
+          <div id="transfers-teams-wrap" class="transfer-teams-wrap"></div>
         </div>
       </section>
 
@@ -54,14 +79,62 @@
         <div id="ai-list" class="ai-list">
           <div class="loading">분석을 불러오는 중...</div>
         </div>
+        <div id="ai-link-only-wrap" class="ai-link-only-wrap"></div>
       </section>
 
       <!-- 나의 팀 -->
       <section id="view-myteam" class="view">
         <h2 class="section-title">나의 팀</h2>
+
+        <!-- 로그인 전: 로그인/회원가입 유도 카드 -->
+        <div id="auth-guest-wrap" class="auth-guest-wrap">
+          <div class="auth-guest-card">
+            <div class="auth-guest-title">🏆 집관인증하고 레벨업하기</div>
+            <div class="auth-guest-desc">로그인하면 우리팀 경기 집관인증으로 포인트를 모으고, 친구와 경쟁하고, 명예의 전당에 이름을 올릴 수 있어요. (로그인 없이도 경기/뉴스/즐겨찾기는 그대로 사용 가능)</div>
+            <button id="auth-open-btn" class="auth-open-btn">로그인 / 회원가입</button>
+          </div>
+        </div>
+
+        <!-- 로그인 폼(모달형 인라인 카드) -->
+        <div id="auth-form-wrap" class="auth-form-wrap" style="display: none;">
+          <div class="auth-form-card">
+            <div class="auth-form-tabs">
+              <button class="auth-form-tab active" data-mode="login">로그인</button>
+              <button class="auth-form-tab" data-mode="signup">회원가입</button>
+              <button class="auth-form-close" id="auth-form-close">✕</button>
+            </div>
+            <form id="auth-form">
+              <input type="text" id="auth-username" placeholder="아이디 (영문 소문자/숫자, 3~20자)" autocomplete="username" required />
+              <input type="password" id="auth-password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password" required />
+              <div id="auth-signup-fields" style="display: none;">
+                <input type="text" id="auth-nickname" placeholder="닉네임 (2~12자, 친구가 찾을 이름)" />
+                <select id="auth-favorite-team"><option value="">최애팀 선택 (선택사항)</option></select>
+              </div>
+              <button type="submit" id="auth-submit-btn" class="auth-submit-btn">로그인</button>
+              <div id="auth-error" class="auth-error"></div>
+            </form>
+          </div>
+        </div>
+
+        <!-- 로그인 후: 프로필/레벨/친구 카드 -->
+        <div id="profile-wrap" class="profile-wrap" style="display: none;"></div>
+
         <button id="notify-btn" class="notify-btn">🔔 골 알림 받기</button>
+        <div class="goal-sound-picker">
+          <label for="goal-sound-select">골 알림음</label>
+          <select id="goal-sound-select"></select>
+          <button id="goal-sound-preview" class="goal-sound-preview-btn" title="미리듣기">▶ 미리듣기</button>
+        </div>
         <div id="myteam-list" class="myteam-list">
           <div class="empty-state">팀 상세 화면에서 ★를 눌러 즐겨찾기하세요.</div>
+        </div>
+      </section>
+
+      <!-- 명예의 전당 -->
+      <section id="view-hof" class="view">
+        <h2 class="section-title">🏆 명예의 전당</h2>
+        <div id="hof-list" class="hof-list">
+          <div class="loading">불러오는 중...</div>
         </div>
       </section>
 
@@ -80,9 +153,16 @@
           <div class="loading">불러오는 중...</div>
         </div>
       </section>
+
+      <!-- 선수 상세 -->
+      <section id="view-player" class="view">
+        <button class="back-btn" data-back-to="matches">← 목록으로</button>
+        <div id="player-detail-content" class="player-detail-content">
+          <div class="loading">불러오는 중...</div>
+        </div>
+      </section>
       <footer class="app-footer">
-        데이터 제공: <a href="https://www.football-data.org" target="_blank" rel="noopener">football-data.org</a>,
-        <a href="https://www.thesportsdb.com" target="_blank" rel="noopener">TheSportsDB</a>,
+        데이터 제공: <a href="https://www.api-football.com" target="_blank" rel="noopener">API-Football</a>,
         <a href="https://www.bbc.co.uk/sport/football" target="_blank" rel="noopener">BBC Sport</a>
       </footer>
     </main>
@@ -100,6 +180,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8M12 17v4"/><path d="M6 4h12v4a6 6 0 0 1-12 0z"/><path d="M6 6H3v1a4 4 0 0 0 3 3.87M18 6h3v1a4 4 0 0 1-3 3.87"/></svg>
         <span>리그</span>
       </button>
+      <button class="nav-btn" data-view="transfers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 7h11M18 7l-3-3M18 7l-3 3"/><path d="M17 17H6M6 17l3 3M6 17l3-3"/></svg>
+        <span>이적시장</span>
+      </button>
       <button class="nav-btn" data-view="ai">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.6 4.2L18 9l-4.4 1.8L12 15l-1.6-4.2L6 9l4.4-1.8z"/><path d="M19 15l.7 1.8L21.5 17.5l-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>
         <span>AI 분석</span>
@@ -107,6 +191,10 @@
       <button class="nav-btn" data-view="myteam">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>
         <span>나의 팀</span>
+      </button>
+      <button class="nav-btn" data-view="hof">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4h12v3a6 6 0 0 1-12 0z"/><path d="M6 5H3v1a4 4 0 0 0 3 3.87M18 5h3v1a4 4 0 0 1-3 3.87"/><path d="M12 13v4M9 21h6M9.5 21c0-2 .8-3 2.5-3s2.5 1 2.5 3"/></svg>
+        <span>명예의전당</span>
       </button>
     </nav>
   </div>

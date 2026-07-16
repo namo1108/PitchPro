@@ -16,10 +16,26 @@ export async function handleSubscribe(request, env) {
   if (!body?.subscription?.endpoint) return json({ detail: "subscription이 필요합니다." }, 400);
 
   const id = await hashEndpoint(body.subscription.endpoint);
-  await env.CACHE.put(
-    `${KV_KEYS.pushSubscriptionPrefix}${id}`,
-    JSON.stringify({ subscription: body.subscription, teamIds: body.teamIds || [], updatedAt: new Date().toISOString() })
-  );
+  const key = `${KV_KEYS.pushSubscriptionPrefix}${id}`;
+  // 즐겨찾기 변경 시 teamIds만 다시 보내오는 경우가 있어(마이팀 동기화),
+  // 이미 등록된 경기별 알림(matchIds)을 덮어써서 지우지 않도록 기존 레코드와 합친다.
+  const existingRaw = await env.CACHE.get(key);
+  const existing = existingRaw ? JSON.parse(existingRaw) : null;
+
+  try {
+    await env.CACHE.put(
+      key,
+      JSON.stringify({
+        subscription: body.subscription,
+        teamIds: body.teamIds || [],
+        matchIds: existing?.matchIds || [],
+        updatedAt: new Date().toISOString(),
+      })
+    );
+  } catch (err) {
+    console.error("push subscribe write failed:", err);
+    return json({ detail: "일시적으로 알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요." }, 503);
+  }
   return json({ status: "ok" });
 }
 
@@ -30,4 +46,31 @@ export async function handleUnsubscribe(request, env) {
   const id = await hashEndpoint(body.endpoint);
   await env.CACHE.delete(`${KV_KEYS.pushSubscriptionPrefix}${id}`);
   return json({ status: "ok" });
+}
+
+// 즐겨찾기 팀과 무관하게 특정 경기 하나만 골 알림 대상으로 켜거나 끈다.
+export async function handleWatchMatch(request, env) {
+  const body = await request.json();
+  if (!body?.endpoint || !body?.matchId) return json({ detail: "endpoint, matchId가 필요합니다." }, 400);
+
+  const id = await hashEndpoint(body.endpoint);
+  const key = `${KV_KEYS.pushSubscriptionPrefix}${id}`;
+  const raw = await env.CACHE.get(key);
+  if (!raw) return json({ detail: "구독 정보가 없습니다." }, 404);
+
+  const record = JSON.parse(raw);
+  const matchIds = new Set(record.matchIds || []);
+  if (body.watch) matchIds.add(body.matchId);
+  else matchIds.delete(body.matchId);
+
+  record.matchIds = [...matchIds];
+  record.updatedAt = new Date().toISOString();
+
+  try {
+    await env.CACHE.put(key, JSON.stringify(record));
+  } catch (err) {
+    console.error("watch-match write failed:", err);
+    return json({ detail: "일시적으로 알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요." }, 503);
+  }
+  return json({ status: "ok", matchIds: record.matchIds });
 }

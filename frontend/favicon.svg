@@ -1,11 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#24e583"/>
-      <stop offset="100%" stop-color="#12a35c"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3dfca0"/>
+      <stop offset="100%" stop-color="#0e8a4d"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="16" fill="#0a1410"/>
-  <rect x="3" y="3" width="58" height="58" rx="14" fill="url(#g)"/>
-  <text x="32" y="46" font-family="Georgia, 'Times New Roman', serif" font-size="40" font-weight="700" fill="#06140d" text-anchor="middle">P</text>
+
+  <rect width="64" height="64" rx="16" fill="url(#bg)"/>
+
+  <g stroke="#ffffff" stroke-opacity="0.5" stroke-width="3.2" stroke-linecap="round">
+    <line x1="8" y1="48" x2="17" y2="40"/>
+    <line x1="12" y1="54" x2="23" y2="45"/>
+    <line x1="17" y1="59" x2="29" y2="49"/>
+  </g>
+
+  <text x="12" y="46" font-family="'Segoe UI', Arial, Helvetica, sans-serif" font-size="38" font-weight="800" fill="#ffffff">P</text>
+
+  <circle cx="45" cy="43" r="9.5" fill="#ffffff"/>
+  <g fill="none" stroke="#0a1410" stroke-width="1.2" stroke-linejoin="round">
+    <path d="M45 36 L49.9 39.7 L48 45.4 L42 45.4 L40.1 39.7 Z"/>
+    <path d="M45 36 L45 32.7"/>
+    <path d="M49.9 39.7 L53 37.5"/>
+    <path d="M48 45.4 L49.3 48.6"/>
+    <path d="M42 45.4 L40.7 48.6"/>
+    <path d="M40.1 39.7 L37 37.5"/>
+  </g>
 </svg>
