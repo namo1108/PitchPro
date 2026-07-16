@@ -18,7 +18,9 @@ const el = {
   passwordInput: document.getElementById("auth-password"),
   signupFields: document.getElementById("auth-signup-fields"),
   nicknameInput: document.getElementById("auth-nickname"),
-  favoriteTeamSelect: document.getElementById("auth-favorite-team"),
+  teamSearchInput: document.getElementById("auth-team-search"),
+  teamResultsBox: document.getElementById("auth-team-results"),
+  teamPickedChip: document.getElementById("auth-team-picked"),
   submitBtn: document.getElementById("auth-submit-btn"),
   errorBox: document.getElementById("auth-error"),
   tabs: document.querySelectorAll(".auth-form-tab"),
@@ -44,6 +46,7 @@ initGoalSoundPicker();
 // ---------- 로그인/회원가입 ----------
 
 let authMode = "login";
+let pickedTeam = null;
 
 function setAuthMode(mode) {
   authMode = mode;
@@ -52,10 +55,65 @@ function setAuthMode(mode) {
   el.submitBtn.textContent = mode === "signup" ? "회원가입" : "로그인";
   el.errorBox.textContent = "";
   if (mode === "signup") {
-    const favorites = listFavorites();
-    el.favoriteTeamSelect.innerHTML =
-      '<option value="">최애팀 선택 (선택사항)</option>' + favorites.map((f) => `<option value="${f.id}" data-name="${f.name}" data-crest="${f.crest || ""}">${f.name}</option>`).join("");
+    pickedTeam = null;
+    el.teamSearchInput.value = "";
+    el.teamResultsBox.innerHTML = "";
+    el.teamPickedChip.style.display = "none";
   }
+}
+
+// ---------- 최애팀 검색(회원가입 전용) ----------
+
+let teamSearchTimer = null;
+
+el.teamSearchInput?.addEventListener("input", () => {
+  const q = el.teamSearchInput.value.trim();
+  clearTimeout(teamSearchTimer);
+  if (q.length < 1) {
+    el.teamResultsBox.innerHTML = "";
+    return;
+  }
+  // 타이핑마다 바로 요청하지 않고 살짝 기다렸다가 검색(디바운스)해서 불필요한 호출을 줄인다.
+  teamSearchTimer = setTimeout(async () => {
+    try {
+      const data = await fetchJSON(`/teams/search?q=${encodeURIComponent(q)}`);
+      renderTeamResults(data.teams || []);
+    } catch {
+      el.teamResultsBox.innerHTML = "";
+    }
+  }, 300);
+});
+
+function renderTeamResults(teams) {
+  if (!teams.length) {
+    el.teamResultsBox.innerHTML = '<div class="team-search-empty">검색 결과가 없습니다.</div>';
+    return;
+  }
+  el.teamResultsBox.innerHTML = teams
+    .map(
+      (t) => `
+    <div class="team-search-row" data-team-id="${t.id}" data-name="${t.name}" data-crest="${t.crest || ""}">
+      ${crestImg(t, "team-search-crest")}
+      <span class="team-search-name">${t.name}</span>
+      <span class="team-search-comp">${t.competitionName}</span>
+    </div>
+  `
+    )
+    .join("");
+
+  el.teamResultsBox.querySelectorAll("[data-team-id]").forEach((row) => {
+    row.addEventListener("click", () => {
+      pickedTeam = { id: row.dataset.teamId, name: row.dataset.name, crest: row.dataset.crest || null };
+      el.teamSearchInput.value = "";
+      el.teamResultsBox.innerHTML = "";
+      el.teamPickedChip.style.display = "flex";
+      el.teamPickedChip.innerHTML = `${crestImg(pickedTeam, "team-picked-crest")}<span>${pickedTeam.name}</span><button type="button" id="team-picked-clear">✕</button>`;
+      document.getElementById("team-picked-clear").addEventListener("click", () => {
+        pickedTeam = null;
+        el.teamPickedChip.style.display = "none";
+      });
+    });
+  });
 }
 
 el.openBtn?.addEventListener("click", () => {
@@ -77,20 +135,21 @@ el.form?.addEventListener("submit", async (e) => {
   el.submitBtn.disabled = true;
   try {
     if (authMode === "signup") {
-      const opt = el.favoriteTeamSelect.selectedOptions[0];
       await signup({
         username: el.usernameInput.value.trim(),
         password: el.passwordInput.value,
         nickname: el.nicknameInput.value.trim(),
-        favoriteTeamId: opt?.value || null,
-        favoriteTeamName: opt?.dataset.name || null,
-        favoriteTeamCrest: opt?.dataset.crest || null,
+        favoriteTeamId: pickedTeam?.id || null,
+        favoriteTeamName: pickedTeam?.name || null,
+        favoriteTeamCrest: pickedTeam?.crest || null,
       });
     } else {
       await login({ username: el.usernameInput.value.trim(), password: el.passwordInput.value });
     }
     el.form.reset();
     el.formWrap.style.display = "none";
+    pickedTeam = null;
+    el.teamPickedChip.style.display = "none";
   } catch (err) {
     el.errorBox.textContent = err.message;
   } finally {

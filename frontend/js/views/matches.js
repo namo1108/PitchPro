@@ -386,18 +386,34 @@ function renderMatches(matches) {
     groups.get(key).matches.push(m);
   });
 
-  groups.forEach((group) => {
+  // 친선경기는 대회가 아니라 부가적인 목록이라, 순서와 상관없이 항상 맨 아래로 보낸다.
+  const orderedGroups = [...groups.values()].sort((a, b) => {
+    const aFriendly = a.info.code === "FRIENDLY" ? 1 : 0;
+    const bFriendly = b.info.code === "FRIENDLY" ? 1 : 0;
+    return aFriendly - bFriendly;
+  });
+
+  orderedGroups.forEach((group) => {
     const groupEl = document.createElement("div");
     groupEl.className = "competition-group";
 
     const header = document.createElement("div");
     header.className = "competition-header";
-    header.innerHTML = `${emblemImg(group.info, "competition-emblem")}<span>${group.info.name}</span>`;
+    header.innerHTML = `${emblemImg(group.info, "competition-emblem")}<span class="competition-header-name">${group.info.name}</span><span class="competition-header-count">${group.matches.length}</span><span class="competition-header-arrow">▾</span>`;
     groupEl.appendChild(header);
 
+    const body = document.createElement("div");
+    body.className = "competition-body";
     group.matches
       .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
-      .forEach((m) => groupEl.appendChild(renderMatchRow(m)));
+      .forEach((m) => body.appendChild(renderMatchRow(m)));
+    groupEl.appendChild(body);
+
+    // 대회 헤더를 눌러서 그 안의 경기 목록을 접었다 펼 수 있게(리그 많은 날 스크롤 부담을 줄임).
+    header.addEventListener("click", () => {
+      const collapsed = groupEl.classList.toggle("collapsed");
+      body.style.display = collapsed ? "none" : "";
+    });
 
     el.matchesList.appendChild(groupEl);
   });

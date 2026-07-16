@@ -7,6 +7,7 @@ import { handleStandings } from "./routes/standings.js";
 import { handleLeagueTopPlayers } from "./routes/leagueTopPlayers.js";
 import { handleLeagueBracket } from "./routes/leagueBracket.js";
 import { handleTeamDetail } from "./routes/team.js";
+import { handleTeamSearch } from "./routes/teamSearch.js";
 import { handlePlayerDetail } from "./routes/player.js";
 import { handlePlayerPhotos } from "./routes/playerPhotos.js";
 import { handleHeadToHead } from "./routes/headToHead.js";
@@ -50,6 +51,10 @@ export async function routeApiRequest(request, env, ctx) {
   }
   if (segments[1] === "leagues" && segments.length === 4 && segments[3] === "bracket") {
     return handleLeagueBracket(request, env, segments[2]);
+  }
+  // /teams/search는 /teams/:id 패턴과 겹치니 그 앞에서 먼저 확인한다.
+  if (segments[1] === "teams" && segments[2] === "search" && segments.length === 3) {
+    return handleTeamSearch(request, env, url);
   }
   if (segments[1] === "teams" && segments.length === 3) {
     return handleTeamDetail(request, env, segments[2]);

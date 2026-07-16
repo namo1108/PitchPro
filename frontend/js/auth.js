@@ -37,20 +37,21 @@ export function isLoggedIn() {
   return !!getToken();
 }
 
-// 로그인은 선택 기능이라, 회원가입 시 고른 최애팀은 편의상 기존 즐겨찾기(나의 팀)에도 자동으로 넣어준다.
-function syncFavoriteTeam(user) {
-  if (!user.favoriteTeamId) return;
-  const team = { id: user.favoriteTeamId, name: user.favoriteTeamName || user.favoriteTeamId, crest: user.favoriteTeamCrest || null };
-  if (!isFavorite(team.id)) toggleFavorite(team);
-}
-
 export async function signup({ username, password, nickname, favoriteTeamId, favoriteTeamName, favoriteTeamCrest }) {
   const data = await fetchJSON("/auth/signup", {
     method: "POST",
     body: { username, password, nickname, favoriteTeamId, favoriteTeamName, favoriteTeamCrest },
   });
+
+  // 회원가입 시 고른 최애팀은 편의상 기존 즐겨찾기(나의 팀)에도 자동으로 넣어준다.
+  // writeSession이 'auth-changed'를 쏘면 나의 팀 화면이 그 자리에서 바로 다시 그려지므로,
+  // 즐겨찾기 반영을 먼저 끝내야 새로고림 시점에 최애팀이 누락되지 않는다.
+  // 서버가 돌려주는 프로필(publicProfile)에는 팀 이름/엠블럼이 없어 여기 원본 인자를 그대로 쓴다.
+  if (favoriteTeamId && !isFavorite(favoriteTeamId)) {
+    toggleFavorite({ id: favoriteTeamId, name: favoriteTeamName || favoriteTeamId, crest: favoriteTeamCrest || null });
+  }
+
   writeSession(data.token, data.user);
-  syncFavoriteTeam(data.user);
   return data.user;
 }
 

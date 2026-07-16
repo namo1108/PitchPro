@@ -460,6 +460,38 @@ body {
   font-weight: 700;
   font-size: 13.5px;
   color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.competition-header-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.competition-header-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.competition-header-arrow {
+  color: var(--text-muted);
+  transition: transform 0.2s var(--ease);
+}
+
+.competition-group.collapsed .competition-header-arrow {
+  transform: rotate(-90deg);
+}
+
+.competition-group.collapsed .competition-header {
+  border-bottom: none;
 }
 
 .competition-emblem {
@@ -2197,6 +2229,117 @@ table.standings-table {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.team-search-wrap {
+  position: relative;
+}
+
+.team-search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+.team-search-results:empty {
+  display: none;
+}
+
+.team-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+
+.team-search-row:last-child {
+  border-bottom: none;
+}
+
+.team-search-row:hover {
+  background: var(--bg-card-hover);
+}
+
+.team-search-crest {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #eef2ef;
+  padding: 2px;
+}
+
+.team-search-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.team-search-comp {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.team-search-empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.team-picked-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.team-picked-chip span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-picked-crest {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 50%;
+  background: #eef2ef;
+  padding: 2px;
+  flex-shrink: 0;
+}
+
+.team-picked-chip button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
 }
 
 .auth-error {

@@ -108,7 +108,11 @@
               <input type="password" id="auth-password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password" required />
               <div id="auth-signup-fields" style="display: none;">
                 <input type="text" id="auth-nickname" placeholder="닉네임 (2~12자, 친구가 찾을 이름)" />
-                <select id="auth-favorite-team"><option value="">최애팀 선택 (선택사항)</option></select>
+                <div class="team-search-wrap">
+                  <input type="text" id="auth-team-search" placeholder="최애팀 검색 (선택사항)" autocomplete="off" />
+                  <div id="auth-team-results" class="team-search-results"></div>
+                </div>
+                <div id="auth-team-picked" class="team-picked-chip" style="display: none;"></div>
               </div>
               <button type="submit" id="auth-submit-btn" class="auth-submit-btn">로그인</button>
               <div id="auth-error" class="auth-error"></div>
