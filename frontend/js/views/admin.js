@@ -1,10 +1,9 @@
 // 관리자(GOAT 계정, level===99) 전용 페이지 - 알림 테스트/사용 통계/신고 대기함/데이터 백업이
 // 예전엔 설정 탭 안에 전부 나열돼 있어서 스크롤이 계속 늘어나고 일반 설정과 섞여 보기 나빴다.
 // 그래서 설정 탭에는 진입 버튼 하나만 남기고, 실제 내용은 별도 화면(#view-admin)으로 뺐다.
-import { fetchJSON } from "../api.js";
 import { pushDetail } from "../router.js";
 import { escapeHtml } from "../format.js";
-import { getCurrentUser, onAuthChange, getToken } from "../auth.js";
+import { getCurrentUser, onAuthChange, getToken, authFetch } from "../auth.js";
 
 const SAMPLE_TEAM_A = { name: "토트넘", crest: "https://media.api-sports.io/football/teams/47.png" };
 const SAMPLE_TEAM_B = { name: "첼시", crest: "https://media.api-sports.io/football/teams/49.png" };
@@ -78,7 +77,7 @@ document.getElementById("admin-test-send-btn")?.addEventListener("click", async 
   resultBox.className = "auth-find-result";
   resultBox.textContent = "보내는 중...";
   try {
-    await fetchJSON("/admin/test-push", { method: "POST", body: { username, ...buildTestPayload(type) } });
+    await authFetch("/admin/test-push", { method: "POST", body: { username, ...buildTestPayload(type) } });
     resultBox.className = "auth-find-result ok";
     resultBox.textContent = `"${username}" 계정으로 보냈어요. 폰에서 확인해보세요.`;
   } catch (err) {
@@ -98,7 +97,10 @@ document.getElementById("admin-backup-btn")?.addEventListener("click", async (e)
   resultBox.textContent = "백업 만드는 중...";
   try {
     const res = await fetch("/api/admin/backup-export", { headers: { authorization: `Bearer ${getToken()}` } });
-    if (!res.ok) throw new Error(`백업 실패 (${res.status})`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      throw new Error(body?.detail || `백업 실패 (${res.status})`);
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -124,7 +126,7 @@ async function loadAdminReports() {
   if (!body) return;
   body.textContent = "불러오는 중...";
   try {
-    const data = await fetchJSON("/admin/reports");
+    const data = await authFetch("/admin/reports");
     if (!data.reports?.length) {
       body.textContent = "대기 중인 신고가 없습니다.";
       return;
@@ -153,7 +155,7 @@ async function loadAdminReports() {
         const action = btn.dataset.reportAction;
         btn.disabled = true;
         try {
-          await fetchJSON(`/admin/reports/${reportId}/resolve`, { method: "POST", body: { action } });
+          await authFetch(`/admin/reports/${reportId}/resolve`, { method: "POST", body: { action } });
           row.remove();
           if (!document.querySelector("[data-report-id]")) body.textContent = "대기 중인 신고가 없습니다.";
         } catch (err) {
@@ -188,7 +190,7 @@ async function loadAdminAnalytics() {
   if (!body) return;
   body.textContent = "불러오는 중...";
   try {
-    const data = await fetchJSON("/admin/analytics?days=7");
+    const data = await authFetch("/admin/analytics?days=7");
     if (!data.days?.length) {
       body.textContent = "데이터가 없습니다.";
       return;
