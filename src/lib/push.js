@@ -13,12 +13,21 @@ async function getKeyPair(env) {
   return cachedKeyPair;
 }
 
+// web-push-browser의 sendPushNotification은 email 인자 앞에 자기가 "mailto:"를 붙인다. 근데
+// VAPID_SUBJECT는 관례상(.dev.vars도 그렇고) 이미 "mailto:"가 붙은 값으로 넣어두는 경우가 많아서,
+// 그대로 넘기면 sub 클레임이 "mailto:mailto:..."로 두 번 붙어 나간다 - FCM(크롬/안드로이드)은 이런
+// 손상된 값도 대충 받아주지만 Apple의 web.push.apple.com은 RFC 8292를 엄격히 검사해서 조용히
+// 거부한다(아이폰에서만 알림이 안 오던 원인). 여기서 접두사를 벗겨 항상 순수 이메일만 넘긴다.
+function vapidEmail(subject) {
+  return (subject || "admin@example.com").replace(/^mailto:/i, "");
+}
+
 export async function sendGoalPush(env, subscription, payload) {
   const keyPair = await getKeyPair(env);
   return sendPushNotification(
     keyPair,
     { endpoint: subscription.endpoint, keys: subscription.keys },
-    env.VAPID_SUBJECT || "mailto:admin@example.com",
+    vapidEmail(env.VAPID_SUBJECT),
     JSON.stringify(payload)
   );
 }
@@ -31,7 +40,11 @@ export async function sendPushToUsername(env, username, payload) {
   const record = await getJSON(env, subKey);
   if (!record?.subscription) return false;
   try {
-    await sendGoalPush(env, record.subscription, payload);
+    const res = await sendGoalPush(env, record.subscription, payload);
+    if (!res.ok) {
+      console.error(`push to username ${username} failed: ${res.status} ${await res.text().catch(() => "")}`);
+      return false;
+    }
     return true;
   } catch (err) {
     console.error(`push to username ${username} failed:`, err);

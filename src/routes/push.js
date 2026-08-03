@@ -151,6 +151,6 @@ export async function handleTestPush(request, env) {
     ...(body.image ? { image: body.image } : {}),
   });
 
-  if (!sent) return json({ detail: "이 계정으로 등록된 알림 구독을 찾을 수 없습니다." }, 404);
+  if (!sent) return json({ detail: "구독을 찾을 수 없거나 발송에 실패했습니다 (자세한 사유는 wrangler tail 로그 참고)." }, 404);
   return json({ status: "ok" });
 }
