@@ -1,5 +1,11 @@
 import { getJSON, putJSON } from "../lib/kv.js";
-import { KV_KEYS, POINTS_CHECKIN_WIN, POINTS_CHECKIN_LOSS } from "../lib/config.js";
+import {
+  KV_KEYS,
+  POINTS_CHECKIN_WIN,
+  POINTS_CHECKIN_LOSS,
+  POINTS_CHECKIN_SHOOTOUT_WIN,
+  POINTS_CHECKIN_SHOOTOUT_LOSS,
+} from "../lib/config.js";
 import { awardPoints, userKey } from "../lib/auth.js";
 
 // 집관인증 시점엔 참여 포인트만 주고(checkin.js), 경기가 끝나면(FINISHED) 여기서 승/무/패에 따라
@@ -26,12 +32,37 @@ export async function resolveCheckinOutcomes(env) {
       const isHome = String(match.homeTeam.id) === String(record.teamId);
       const myGoals = isHome ? home : away;
       const oppGoals = isHome ? away : home;
-      const finalPoints = myGoals > oppGoals ? POINTS_CHECKIN_WIN : myGoals < oppGoals ? POINTS_CHECKIN_LOSS : record.awardedPoints;
+      const cheeredTeamName = isHome ? match.homeTeam.shortName || match.homeTeam.name : match.awayTeam.shortName || match.awayTeam.name;
+
+      let finalPoints;
+      let reason;
+      if (myGoals > oppGoals) {
+        finalPoints = POINTS_CHECKIN_WIN;
+        reason = `${cheeredTeamName} 경기 승리`;
+      } else if (myGoals < oppGoals) {
+        finalPoints = POINTS_CHECKIN_LOSS;
+        reason = `${cheeredTeamName} 경기 패배`;
+      } else {
+        // 정규시간(+연장) 무승부 - 컵대회처럼 승부차기까지 갔으면 무승부 취급(참여 포인트 유지) 대신
+        // 승부차기 승패로 정산한다. 승부차기 스코어가 없으면(리그 경기 등) 그냥 무승부로 유지.
+        const penHome = match.score?.penalty?.home;
+        const penAway = match.score?.penalty?.away;
+        const hasShootout = penHome !== null && penHome !== undefined && penAway !== null && penAway !== undefined;
+        if (hasShootout) {
+          const myPens = isHome ? penHome : penAway;
+          const oppPens = isHome ? penAway : penHome;
+          finalPoints = myPens > oppPens ? POINTS_CHECKIN_SHOOTOUT_WIN : POINTS_CHECKIN_SHOOTOUT_LOSS;
+          reason = myPens > oppPens ? `${cheeredTeamName} 승부차기 승리` : `${cheeredTeamName} 승부차기 패배`;
+        } else {
+          finalPoints = record.awardedPoints;
+          reason = null;
+        }
+      }
 
       const delta = finalPoints - record.awardedPoints;
       if (delta !== 0) {
         const user = await getJSON(env, userKey(record.username));
-        if (user) await awardPoints(env, user, delta);
+        if (user) await awardPoints(env, user, delta, reason);
       }
 
       await putJSON(env, key.name, { ...record, resolved: true, finalPoints }, { expirationTtl: 60 * 24 * 60 * 60 });

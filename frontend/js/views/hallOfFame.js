@@ -9,13 +9,18 @@ const MEDAL = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
 // 로그인 여부와 무관하게 볼 수 있는 화면이지만, 로그인 중이면 토큰을 같이 보내야 서버가
 // 나와 각 순위의 친구 관계(isFriend/requestSent 등)를 계산해서 돌려준다.
+// 이번 세션에 한 번 그려본 뒤로는 탭을 다시 눌러도 스켈레톤으로 비우지 않고 화면에 남겨둔 채
+// 조용히 새로 받아와서 갈아끼운다 - 매번 탭 전환마다 깜빡이며 로딩되는 느낌을 없앤다.
+let loadedOnce = false;
+
 async function loadLeaderboard() {
-  el.list.innerHTML = skeletonList(8);
+  if (!loadedOnce) el.list.innerHTML = skeletonList(8);
   try {
     const data = await fetchJSON("/leaderboard", { token: getToken() });
-    renderLeaderboard(data.entries || [], data.goats || [], data.me);
+    renderLeaderboard(data.entries || [], data.goats || [], data.me, !loadedOnce);
+    loadedOnce = true;
   } catch (err) {
-    el.list.innerHTML = `<div class="error-state">명예의 전당을 불러오지 못했습니다.<br>${err.message}</div>`;
+    if (!loadedOnce) el.list.innerHTML = `<div class="error-state">명예의 전당을 불러오지 못했습니다.<br>${err.message}</div>`;
   }
 }
 
@@ -71,7 +76,7 @@ async function handleRowClick(row) {
   }
 }
 
-function renderLeaderboard(entries, goats, me) {
+function renderLeaderboard(entries, goats, me, animate) {
   if (!entries.length && !goats.length) {
     el.list.innerHTML = '<div class="empty-state">아직 집관인증한 사용자가 없습니다. 로그인하고 첫 주인공이 되어보세요!</div>';
     return;
@@ -95,7 +100,7 @@ function renderLeaderboard(entries, goats, me) {
     }
   `;
 
-  fadeIn(el.list);
+  if (animate) fadeIn(el.list);
   el.list.querySelectorAll(".hof-row.clickable").forEach((row) => {
     row.addEventListener("click", () => handleRowClick(row));
   });

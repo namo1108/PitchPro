@@ -68,7 +68,8 @@ export async function handleCheckin(request, env) {
     return json({ detail: "이미 이 경기에 집관인증했습니다." }, 409);
   }
 
-  const result = await awardPoints(env, user, POINTS_CHECKIN_BASE);
+  const cheeredTeam = String(match.homeTeam.id) === teamId ? match.homeTeam : match.awayTeam;
+  const result = await awardPoints(env, user, POINTS_CHECKIN_BASE, `${cheeredTeam.shortName || cheeredTeam.name} 집관인증 참여`);
   await putJSON(
     env,
     key,

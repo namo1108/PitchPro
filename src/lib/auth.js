@@ -1,5 +1,5 @@
 import { getJSON, putJSON } from "./kv.js";
-import { KV_KEYS, POINTS_CHECKIN_BASE, SESSION_TTL_SECONDS, GOAT_USERNAMES } from "./config.js";
+import { KV_KEYS, POINTS_CHECKIN_BASE, POINTS_LOG_MAX_ENTRIES, SESSION_TTL_SECONDS, GOAT_USERNAMES } from "./config.js";
 
 // 로그인은 선택 기능(집관인증/레벨/친구/명예의 전당 전용)이라 기존 익명 사용자 흐름(즐겨찾기,
 // 골 알림)은 전혀 건드리지 않는다. 비번은 Workers 런타임이 지원하는 WebCrypto PBKDF2로 해싱한다
@@ -37,6 +37,13 @@ export async function verifyPassword(password, stored) {
   if (!saltHex || !hashHex) return false;
   const hash = await pbkdf2(password, fromHex(saltHex));
   return hash === hashHex;
+}
+
+// 비밀번호 찾기용 보안 답변은 대소문자/앞뒤 공백 차이로 틀렸다고 나오면 답답하니 비교 전에 정규화한다
+// (해싱 자체는 hashPassword/verifyPassword를 그대로 재사용 - 문자열을 salt+PBKDF2로 해싱하는 로직은
+// 비밀번호든 보안 답변이든 동일해서 별도 구현이 필요 없다).
+export function normalizeSecurityAnswer(answer) {
+  return String(answer || "").trim().toLowerCase();
 }
 
 export function normalizeUsername(username) {
@@ -124,14 +131,33 @@ export function levelProgress(points, username = null) {
   return { level, floor, ceil, percent, title: levelTitle(level) };
 }
 
+function pointsLogKey(username) {
+  return `${KV_KEYS.pointsLogPrefix}${normalizeUsername(username)}`;
+}
+
+async function appendPointsLog(env, username, entry) {
+  const key = pointsLogKey(username);
+  const log = (await getJSON(env, key)) || [];
+  log.unshift(entry);
+  if (log.length > POINTS_LOG_MAX_ENTRIES) log.length = POINTS_LOG_MAX_ENTRIES;
+  await putJSON(env, key, log);
+}
+
+// 나의 팀 프로필에서 "포인트 내역"으로 보여줄 최근 기록(최신순, 최대 POINTS_LOG_MAX_ENTRIES개).
+export async function getPointsLog(env, username) {
+  return (await getJSON(env, pointsLogKey(username))) || [];
+}
+
 // 사용자에게 포인트를 더하고(음수면 차감) 레벨업 여부까지 계산해 저장한다(집관인증 등에서 공통으로 사용).
-export async function awardPoints(env, user, points = POINTS_CHECKIN_BASE) {
+// reason은 "포인트 내역" 화면에 그대로 노출되는 짧은 설명(예: "집관인증 참여", "경기 승리").
+export async function awardPoints(env, user, points = POINTS_CHECKIN_BASE, reason = "") {
   const prevLevel = levelForPoints(user.points || 0);
   const nextPoints = (user.points || 0) + points;
   const nextLevel = levelForPoints(nextPoints);
   user.points = nextPoints;
   user.level = nextLevel;
   await putJSON(env, userKey(user.username), user);
+  await appendPointsLog(env, user.username, { delta: points, reason, balance: nextPoints, at: new Date().toISOString() });
   return { points: nextPoints, level: nextLevel, leveledUp: nextLevel > prevLevel };
 }
 

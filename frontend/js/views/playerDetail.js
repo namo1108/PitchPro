@@ -24,13 +24,18 @@ async function loadPlayerDetail(playerId) {
   }
 }
 
+// dateBorn은 시각 없는 순수 날짜 문자열이라 new Date()로 파싱하면 UTC 자정 기준이 된다 -> 로컬(기기)
+// 시간대 getter와 섞어 비교하면 기기 시간대에 따라 생일 근처에서 하루 오차가 생길 수 있어 getUTC*로 통일한다.
 function calcAge(dateBorn) {
   if (!dateBorn) return null;
   const birth = new Date(dateBorn);
   if (Number.isNaN(birth.getTime())) return null;
   const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) {
+  let age = now.getUTCFullYear() - birth.getUTCFullYear();
+  if (
+    now.getUTCMonth() < birth.getUTCMonth() ||
+    (now.getUTCMonth() === birth.getUTCMonth() && now.getUTCDate() < birth.getUTCDate())
+  ) {
     age -= 1;
   }
   return age;

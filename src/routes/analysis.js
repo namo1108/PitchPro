@@ -5,10 +5,16 @@ import * as apiFootball from "../sources/apiFootball.js";
 import { normalizeFixture, normalizeInjuries, normalizeOdds } from "../adapters/apiFootballAdapter.js";
 import { buildMatchAnalysis } from "../lib/analysis.js";
 import { getAdidasPointsByCode, findTeamAdidasPoint } from "../lib/kleagueAdidasPoints.js";
+import { fetchTeamRank, KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID } from "../scheduled/refreshKLeagueResults.js";
 
-const ANALYSIS_CACHE_KEY = "analysis:v8";
-const ANALYSIS_CACHE_TTL_SECONDS = 1200; // 20분
-const MAX_CARDS = 8;
+const ANALYSIS_CACHE_KEY = "analysis:v10";
+// 사전 갱신 크론이 1시간 주기라(scheduled/index.js), 그 전에 캐시가 만료돼 사용자 요청이 직접
+// 무거운 계산(최대 36콜)을 떠맡는 일이 없도록 TTL을 넉넉하게 잡는다 - 80분이었는데, 쿼터가 빡빡해서
+// 사전 갱신 틱이 한 번 건너뛰어져도(isQuotaTight) 다음 틱 전에 캐시가 만료되지 않도록 120분으로 늘림
+// (사용자 제보: "AI 분석 열 때 딜레이가 있다" - 콜드캐시로 직접 계산을 떠맡는 순간이 그 지연이다).
+const ANALYSIS_CACHE_TTL_SECONDS = 7200; // 120분
+// 2026-07-26 쿼터 소진 재발 이후 8 -> 6으로 한 번 더 줄임(카드당 최대 6콜 x 6장 = 36콜/갱신).
+const MAX_CARDS = 6;
 const MAX_LINK_ONLY = 12;
 const CONCURRENCY = 6;
 
@@ -43,9 +49,11 @@ async function mapLimit(items, limit, worker) {
   return results;
 }
 
+// 예전엔 최근 5경기만 봐서 표본이 얕았다("최근 폼 좋음"이 사실 2연승 우연일 수 있음) - 10경기로 늘려
+// 훨씬 안정적인 폼 판단이 되게 한다(lib/analysis.js의 어조 판정도 절대 횟수가 아니라 승률 기준으로 맞춰둠).
 async function fetchTeamContext(env, teamId, season) {
   const [recentRaw, injuriesRaw] = await Promise.all([
-    apiFootball.getTeamRecentFixtures(env, teamId, 5).catch(() => null),
+    apiFootball.getTeamRecentFixtures(env, teamId, 10).catch(() => null),
     apiFootball.getTeamInjuries(env, teamId, season).catch(() => null),
   ]);
   return {
@@ -54,10 +62,87 @@ async function fetchTeamContext(env, teamId, season) {
   };
 }
 
-export async function handleAnalysis(request, env) {
-  const cached = await getJSON(env, ANALYSIS_CACHE_KEY);
-  if (cached) return json(cached);
+async function fetchH2H(env, homeTeamId, awayTeamId) {
+  const raw = await apiFootball.getHeadToHead(env, homeTeamId, awayTeamId, 5).catch(() => null);
+  return (raw?.response || []).map(normalizeFixture);
+}
 
+// K리그 공식 사이트(kleague.com)의 팀 순위 데이터에는 최근 6경기 승/무/패(game01=최근)가 그대로
+// 들어있다 - API-Football 표본(최근 10경기)과 별개로, 사용자가 실제 홈페이지에서 보는 것과 동일한
+// "공식" 최근 폼을 한 번 더 보여줘서 신뢰도를 높인다. 코드/원문은 refreshKLeagueResults.js와 공유.
+const KLEAGUE_FORM_ICON = { 승: "🟢", 무: "⚪", 패: "🔴" };
+const KLEAGUE_RESULT_LETTER = { 승: "W", 무: "D", 패: "L" };
+
+// K리그 매치(KL1/KL2)가 하나라도 있으면 그 대회들의 kleague.com 팀 순위표를 한 번씩만 받아
+// {code -> {apiFootballId -> row}} 형태로 캐싱한다 - 아래 두 용도(보조 문구용 아이콘 노트, 폼 데이터가
+// 아예 비었을 때의 대체 어조 판정)가 같은 fetch 결과를 나눠 쓰게 해서 중복 호출을 없앤다.
+async function fetchKleagueRankMaps(codes) {
+  const now = new Date();
+  const rankByCode = new Map();
+  for (const code of codes) {
+    const leagueId = code === "KL1" ? 1 : 2;
+    try {
+      const teamRank = await fetchTeamRank(leagueId, now.getUTCFullYear());
+      const byApiFootballId = new Map();
+      for (const r of teamRank) {
+        const apiFootballId = KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID[r.teamId];
+        if (apiFootballId) byApiFootballId.set(apiFootballId, r);
+      }
+      rankByCode.set(code, byApiFootballId);
+    } catch (err) {
+      console.error(`kleague teamRank fetch failed for ${code}(분석용):`, err);
+    }
+  }
+  return rankByCode;
+}
+
+// API-Football의 최근 10경기 조회가 신생 팀 id 매핑/시즌 초반 등의 이유로 비어서 "최근 경기 기록이
+// 확인되지 않습니다"만 나오던 걸, kleague.com 공식 최근 6경기 승/무/패로 대신 판단하게 한다. 이
+// 소스는 경기별 득점 정보가 없어(팀 순위표엔 시즌 누적 득실차만 있음) goalsFor/goalsAgainst는 0으로
+// 채워둔다 - lib/analysis.js의 kleagueFormPhrase 템플릿은 애초에 그 값을 문장에 안 쓴다.
+function kleagueFormFromRankRow(row) {
+  if (!row) return null;
+  const letters = ["game01", "game02", "game03", "game04", "game05", "game06"]
+    .map((k) => row[k])
+    .filter(Boolean)
+    .map((g) => KLEAGUE_RESULT_LETTER[g])
+    .filter(Boolean)
+    .reverse(); // game01이 최근이라, teamForm()과 같은 "과거 -> 최근" 순서로 맞춘다(배열 끝이 최근).
+  if (!letters.length) return null;
+  return {
+    wins: letters.filter((l) => l === "W").length,
+    draws: letters.filter((l) => l === "D").length,
+    losses: letters.filter((l) => l === "L").length,
+    letters,
+    goalsFor: 0,
+    goalsAgainst: 0,
+  };
+}
+
+function buildKleagueOfficialFormNotes(cards, rankByCode) {
+  const kleagueCards = cards.filter((c) => c.competition.code === "KL1" || c.competition.code === "KL2");
+  if (!kleagueCards.length) return;
+
+  const formNoteFor = (team, byApiFootballId) => {
+    const r = byApiFootballId?.get(String(team.id));
+    const games = ["game01", "game02", "game03", "game04", "game05", "game06"].map((k) => r?.[k]).filter(Boolean);
+    if (!games.length) return null;
+    const icons = games.map((g) => KLEAGUE_FORM_ICON[g] || g).join(" ");
+    return `${team.shortName || team.name} K리그 공식 최근 ${games.length}경기(최근순): ${icons}`;
+  };
+
+  for (const card of kleagueCards) {
+    const byApiFootballId = rankByCode.get(card.competition.code);
+    if (!byApiFootballId) continue;
+    const notes = [formNoteFor(card.homeTeam, byApiFootballId), formNoteFor(card.awayTeam, byApiFootballId)].filter(Boolean);
+    if (notes.length) card.kleagueOfficialNotes = notes;
+  }
+}
+
+// 실제 사용자 요청이 이 무거운 계산(팀당 2콜 + 카드당 H2H/배당 각 1콜 + K리그면 kleague.com 스크랩까지)을
+// 직접 기다리지 않도록, scheduled/refreshAnalysis.js가 캐시 만료 전에 미리 이 함수를 불러 채워둔다.
+// handleAnalysis는 캐시를 못 찾은 경우(배포 직후 등)에만 최후 수단으로 직접 계산한다.
+export async function buildAnalysis(env) {
   const [matchesBlob, standingsBlob] = await Promise.all([
     getJSON(env, KV_KEYS.matches),
     getJSON(env, KV_KEYS.standings),
@@ -100,7 +185,21 @@ export async function handleAnalysis(request, env) {
   }
   const teamIds = Array.from(teamSeasons.keys());
 
-  const contexts = await mapLimit(teamIds, CONCURRENCY, (teamId) => fetchTeamContext(env, teamId, teamSeasons.get(teamId)));
+  // 팀 컨텍스트(최근폼/부상)·상대전적(H2H)·배당률은 서로 결과를 필요로 하지 않는 독립적인 조회라,
+  // 예전엔 이걸 순서대로(하나 끝나면 다음 시작) 기다려서 냉캐시일 때 응답이 9초 가까이 걸렸다.
+  // 셋 다 동시에 돌려서 가장 오래 걸리는 것 하나만큼만 기다리면 되게 바꿨다.
+  const [contexts, h2hList, oddsList] = await Promise.all([
+    mapLimit(teamIds, CONCURRENCY, (teamId) => fetchTeamContext(env, teamId, teamSeasons.get(teamId))),
+    // 상대전적(H2H)도 카드마다(팀 하나가 아니라 이번 매치업 자체가 기준) 조회해서 예측 근거에 포함시킨다.
+    mapLimit(upcoming, CONCURRENCY, (match) => fetchH2H(env, match.homeTeam.id, match.awayTeam.id)),
+    // 배당률은 경기당 1회 호출(북메이커 미제공 시 조용히 null).
+    mapLimit(upcoming, CONCURRENCY, (match) =>
+      apiFootball
+        .getOdds(env, match.id)
+        .then((raw) => normalizeOdds(raw.response))
+        .catch(() => null)
+    ),
+  ]);
 
   const teamRecents = {};
   const teamInjuries = {};
@@ -109,24 +208,27 @@ export async function handleAnalysis(request, env) {
     teamInjuries[teamId] = contexts[i].injuries;
   });
 
-  const cards = upcoming.map((match) => {
+  // K리그 매치가 있으면 kleague.com 팀 순위표를 먼저 받아둔다 - API-Football 최근폼이 비어있는 팀의
+  // 대체 어조 판정(buildMatchAnalysis)과, 아래 보조 "공식 최근 6경기" 노트가 이 결과를 같이 쓴다.
+  const kleagueCodes = new Set(upcoming.filter((m) => m.competition.code === "KL1" || m.competition.code === "KL2").map((m) => m.competition.code));
+  const kleagueRankByCode = kleagueCodes.size ? await fetchKleagueRankMaps(kleagueCodes) : new Map();
+
+  const cards = upcoming.map((match, i) => {
     const tables = standingsBlob?.byCode?.[match.competition.code]?.standings || [];
     // MLS(동/서부 컨퍼런스)처럼 그룹이 나뉜 리그는 두 팀이 서로 다른 그룹 표에 있을 수 있어
     // "TOTAL" 하나를 가정하지 않고, 팀별로 실제 그 팀이 들어있는 그룹 표를 찾는다.
     const findTeamTable = (teamId) => tables.find((t) => t.table?.some((r) => r.team.id === teamId)) || null;
     const standingsTables = { home: findTeamTable(match.homeTeam.id), away: findTeamTable(match.awayTeam.id) };
-    return buildMatchAnalysis(match, teamRecents, standingsTables, teamInjuries);
-  });
-
-  // 배당률은 경기당 1회 호출이라 카드 목록과 별도로 동시성 제한을 걸어 조회한다(북메이커 미제공 시 조용히 null).
-  const oddsList = await mapLimit(upcoming, CONCURRENCY, (match) =>
-    apiFootball
-      .getOdds(env, match.id)
-      .then((raw) => normalizeOdds(raw.response))
-      .catch(() => null)
-  );
-  cards.forEach((card, i) => {
+    const byApiFootballId = kleagueRankByCode.get(match.competition.code);
+    const kleagueForms = byApiFootballId
+      ? {
+          home: kleagueFormFromRankRow(byApiFootballId.get(String(match.homeTeam.id))),
+          away: kleagueFormFromRankRow(byApiFootballId.get(String(match.awayTeam.id))),
+        }
+      : {};
+    const card = buildMatchAnalysis(match, teamRecents, standingsTables, teamInjuries, h2hList[i], kleagueForms);
     card.odds = oddsList[i];
+    return card;
   });
 
   // K리그 매치는 kleague.com 공식 파워랭킹(ADIDAS Point)을 곁들여서, 순위/최근폼 같은 범용 지표보다
@@ -150,7 +252,21 @@ export async function handleAnalysis(request, env) {
     if (officialNotes.length) card.officialNotes = officialNotes;
   }
 
+  // K리그 카드에는 공식 사이트(kleague.com)의 최근 6경기 승/무/패 기록도 곁들인다(사용자가 실제
+  // K리그 홈페이지에서 보는 것과 동일한 데이터라 신뢰도가 높다). 위에서 이미 받아둔 순위표를 그대로 쓴다.
+  buildKleagueOfficialFormNotes(cards, kleagueRankByCode);
+
   const result = { analysis: cards, linkOnly };
   await putJSON(env, ANALYSIS_CACHE_KEY, result, { expirationTtl: ANALYSIS_CACHE_TTL_SECONDS });
+  return result;
+}
+
+export async function handleAnalysis(request, env) {
+  const cached = await getJSON(env, ANALYSIS_CACHE_KEY);
+  if (cached) return json(cached);
+
+  // 캐시가 없으면(배포 직후, 혹은 예정된 사전 갱신 크론이 아직 한 번도 안 돈 경우) 최후 수단으로
+  // 지금 이 요청이 직접 계산한다 - 평소엔 scheduled/refreshAnalysis.js가 미리 채워둬서 여기까지 안 온다.
+  const result = await buildAnalysis(env);
   return json(result);
 }

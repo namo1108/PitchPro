@@ -3,42 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#0a1410" />
+  <meta name="theme-color" content="#0a1410" id="theme-color-meta" />
   <title>PITCH PRO</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="stylesheet" href="/style.css" />
+  <script>
+    // 라이트/다크 선택은 스타일시트가 그려지기 전에 적용해야 화면이 잠깐 다크로 번쩍였다가
+    // 라이트로 바뀌는 깜빡임이 없다 - 그래서 별도 모듈이 아니라 여기 인라인으로 최대한 일찍 실행한다.
+    try {
+      if (localStorage.getItem("pitchpro.theme") === "light") {
+        document.documentElement.dataset.theme = "light";
+        document.getElementById("theme-color-meta")?.setAttribute("content", "#f4f8f5");
+      }
+    } catch {
+      // 무시(시크릿 모드 등에서 localStorage 접근이 막혀도 기본 다크로 그냥 진행)
+    }
+  </script>
 </head>
 <body>
-  <!-- 로그인 게이트: 로그인 전엔 이 화면만 보이고 뒤의 앱 내용은 막혀 있다 -->
-  <div id="auth-gate" class="auth-gate">
-    <div class="auth-gate-card">
-      <div class="auth-gate-brand">
-        <span class="brand-mark">P</span>
-        <span class="brand-name">PITCH<span class="brand-accent">PRO</span></span>
-      </div>
-      <div class="auth-gate-desc">로그인하면 우리팀 집관인증으로 포인트를 모으고, 친구와 경쟁하고, 축구교실에서 기초부터 배울 수 있어요.</div>
-      <div class="auth-gate-tabs">
-        <button type="button" class="auth-gate-tab active" data-mode="login">로그인</button>
-        <button type="button" class="auth-gate-tab" data-mode="signup">회원가입</button>
-      </div>
-      <form id="auth-gate-form">
-        <input type="text" id="gate-username" placeholder="아이디 (영문 소문자/숫자, 3~20자)" autocomplete="username" required />
-        <input type="password" id="gate-password" placeholder="비밀번호 (6자 이상)" autocomplete="current-password" required />
-        <div id="gate-signup-fields" style="display: none;">
-          <input type="text" id="gate-nickname" placeholder="닉네임 (2~12자, 친구가 찾을 이름)" />
-          <div class="team-search-wrap">
-            <input type="text" id="gate-team-search" placeholder="최애팀 검색 (선택사항)" autocomplete="off" />
-            <div id="gate-team-results" class="team-search-results"></div>
-          </div>
-          <div id="gate-team-picked" class="team-picked-chip" style="display: none;"></div>
-        </div>
-        <button type="submit" id="gate-submit-btn" class="auth-submit-btn">로그인</button>
-        <div id="gate-error" class="auth-error"></div>
-      </form>
-    </div>
-  </div>
-
   <div class="app">
     <header class="topbar">
       <div class="brand">
@@ -74,7 +57,10 @@
 
       <!-- 리그(순위) -->
       <section id="view-leagues" class="view">
-        <input type="text" id="league-search-input" class="league-search-input" placeholder="🔍 리그 검색 (예: 프리미어, K리그)" autocomplete="off" />
+        <div class="team-search-wrap">
+          <input type="text" id="league-search-input" class="league-search-input" placeholder="🔍 리그/팀 검색 (예: 프리미어, 토트넘, 대한민국)" autocomplete="off" />
+          <div id="league-team-results" class="team-search-results"></div>
+        </div>
         <div id="league-list" class="league-list">
           <div class="loading">리그 목록을 불러오는 중...</div>
         </div>
@@ -150,22 +136,53 @@
                   <div id="auth-team-results" class="team-search-results"></div>
                 </div>
                 <div id="auth-team-picked" class="team-picked-chip" style="display: none;"></div>
+                <input type="text" id="auth-security-answer" placeholder="가장 좋아하는(응원하는) 축구선수는? (비번 찾기용, 선택)" />
+                <p class="auth-security-hint">나중에 비밀번호를 잃어버렸을 때 본인 확인용이에요. 안 넣으면 비번을 잃어버렸을 때 자가 복구가 안 돼요.</p>
+                <label class="auth-agree-row">
+                  <input type="checkbox" id="auth-agree-terms" class="auth-agree-checkbox" required />
+                  <span><a href="/terms.html" target="_blank" rel="noopener">이용약관</a> 및 <a href="/privacy.html" target="_blank" rel="noopener">개인정보처리방침</a>에 동의합니다.</span>
+                </label>
               </div>
               <button type="submit" id="auth-submit-btn" class="auth-submit-btn">로그인</button>
               <div id="auth-error" class="auth-error"></div>
+              <button type="button" id="auth-find-toggle" class="auth-find-toggle">아이디 / 비밀번호를 잊으셨나요?</button>
             </form>
+
+            <!-- 아이디/비밀번호 찾기 패널 - 로그인 폼과 같은 카드 안에서 토글로 전환된다. -->
+            <div id="auth-find-wrap" class="auth-find-wrap" style="display: none;">
+              <div class="auth-form-tabs">
+                <button type="button" class="auth-form-tab active" data-find-mode="username">아이디 찾기</button>
+                <button type="button" class="auth-form-tab" data-find-mode="password">비밀번호 찾기</button>
+                <button type="button" class="auth-form-close" id="auth-find-close">✕</button>
+              </div>
+
+              <div id="auth-find-username-panel">
+                <input type="text" id="find-username-nickname" placeholder="가입할 때 쓴 닉네임" />
+                <button type="button" id="find-username-submit" class="auth-submit-btn">아이디 찾기</button>
+                <div id="find-username-result" class="auth-find-result"></div>
+              </div>
+
+              <div id="auth-find-password-panel" style="display: none;">
+                <input type="text" id="find-password-username" placeholder="아이디" />
+                <button type="button" id="find-password-check" class="auth-submit-btn">확인</button>
+                <div id="find-password-question-wrap" style="display: none;">
+                  <p class="auth-security-hint" id="find-password-question-text"></p>
+                  <input type="text" id="find-password-answer" placeholder="답변" />
+                  <input type="password" id="find-password-new" placeholder="새 비밀번호 (6자 이상)" />
+                  <button type="button" id="find-password-submit" class="auth-submit-btn">비밀번호 변경</button>
+                </div>
+                <div id="find-password-result" class="auth-find-result"></div>
+              </div>
+            </div>
           </div>
         </div>
 
         <!-- 로그인 후: 프로필/레벨/친구 카드 -->
         <div id="profile-wrap" class="profile-wrap" style="display: none;"></div>
 
-        <button id="notify-btn" class="notify-btn">🔔 골 알림 받기</button>
-        <div class="goal-sound-picker">
-          <label for="goal-sound-select">골 알림음</label>
-          <select id="goal-sound-select"></select>
-          <button id="goal-sound-preview" class="goal-sound-preview-btn" title="미리듣기">▶ 미리듣기</button>
-        </div>
+        <!-- 축구교실은 순수 정적 콘텐츠라 로그인 여부와 무관하게 항상 진입 가능해야 한다 -->
+        <button id="soccer-school-btn" class="soccer-school-btn">⚽ 축알못의 축구교실 <span class="soccer-school-btn-sub">축구 기초부터 쉽게 배우기</span></button>
+
         <div id="myteam-list" class="myteam-list">
           <div class="empty-state">팀 상세 화면에서 ★를 눌러 즐겨찾기하세요.</div>
         </div>
@@ -176,6 +193,159 @@
         <h2 class="section-title">🏆 명예의 전당</h2>
         <div id="hof-list" class="hof-list">
           <div class="loading">불러오는 중...</div>
+        </div>
+      </section>
+
+      <!-- 팬 커뮤니티 -->
+      <section id="view-community" class="view">
+        <div id="community-list-wrap">
+          <div class="community-header">
+            <h2 class="section-title">💬 팬 커뮤니티</h2>
+            <button id="community-write-btn" class="community-write-btn">✏️ 글쓰기</button>
+          </div>
+          <div class="school-tabs community-category-tabs" id="community-category-tabs">
+            <button class="school-tab-btn active" data-category="국축">🇰🇷 국내축구</button>
+            <button class="school-tab-btn" data-category="해축">🌍 해외축구</button>
+          </div>
+          <div class="community-filter-row">
+            <div class="team-search-wrap">
+              <input type="text" id="community-filter-input" class="community-title-input" placeholder="🔍 팀으로 모아보기 (예: 토트넘, 대한민국)" autocomplete="off" />
+              <div id="community-filter-results" class="team-search-results"></div>
+            </div>
+            <div id="community-filter-chip" class="team-picked-chip" style="display: none;"></div>
+          </div>
+          <div id="community-list" class="community-list">
+            <div class="loading">불러오는 중...</div>
+          </div>
+        </div>
+
+        <div id="community-write-wrap" class="community-write-wrap" style="display: none;">
+          <button class="league-back-btn" id="community-write-back">← 취소</button>
+          <div class="school-tabs community-category-tabs" id="community-write-category-tabs">
+            <button type="button" class="school-tab-btn active" data-category="국축">🇰🇷 국내축구</button>
+            <button type="button" class="school-tab-btn" data-category="해축">🌍 해외축구</button>
+          </div>
+          <input type="text" id="community-title-input" class="community-title-input" placeholder="제목" maxlength="80" />
+          <div class="team-search-wrap">
+            <input type="text" id="community-team-input" class="community-title-input" placeholder="🔍 관련 팀 선택 (선택사항)" autocomplete="off" />
+            <div id="community-team-results" class="team-search-results"></div>
+          </div>
+          <div id="community-team-picked" class="team-picked-chip" style="display: none;"></div>
+          <textarea id="community-body-input" class="community-body-input" placeholder="자유롭게 이야기해보세요" maxlength="3000" rows="8"></textarea>
+          <div id="community-write-error" class="error-state" style="display: none;"></div>
+          <button id="community-submit-btn" class="community-submit-btn">게시하기</button>
+        </div>
+
+        <div id="community-detail-wrap" class="community-detail-wrap" style="display: none;">
+          <button class="league-back-btn" id="community-detail-back">← 목록으로</button>
+          <div id="community-post-content"></div>
+        </div>
+      </section>
+
+      <!-- 설정 (알림 소리/종류별 켜고 끄기) -->
+      <section id="view-settings" class="view">
+        <h2 class="section-title">⚙️ 설정</h2>
+
+        <div class="settings-group">
+          <div class="settings-group-title">🎨 화면 테마</div>
+          <div class="theme-toggle-row">
+            <button class="theme-toggle-btn" data-theme-option="dark">🌙 다크</button>
+            <button class="theme-toggle-btn" data-theme-option="light">☀️ 라이트</button>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <button id="notify-btn" class="notify-btn">🔔 골 알림 받기</button>
+          <p class="settings-note">
+            📱 앱을 안 보고 있을 때도 알림이 오려면, 알림 권한을 허용하고 이 버튼으로 알림을 켜둬야 해요.
+            iPhone은 <b>Safari로 열어 "홈 화면에 추가"</b>한 뒤 그 아이콘으로 실행해야 백그라운드에서도 알림이 옵니다
+            (사파리 탭으로만 열어두면 화면을 벗어난 뒤엔 알림이 오지 않아요).
+          </p>
+          <p class="settings-note">
+            🔋 갤럭시(삼성) 폰은 배터리 절약 기능이 브라우저를 자주 꺼서 알림이 늦거나 안 올 수 있어요.
+            <b>설정 → 배터리 및 디바이스 케어 → 백그라운드 사용 제한</b>에서 Chrome(또는 사용 중인 브라우저)이
+            "절전 앱"/"잠자기 앱" 목록에 있으면 빼주세요. 홈 화면에 추가해서 썼다면 그 앱도 같은 목록에서 확인해보세요.
+          </p>
+          <p class="settings-note">
+            🔔 갤럭시인데 알림이 배지로만 뜨고 화면 위로 안 뜬다면(팝업 X): <b>설정 → 알림 → 고급 설정 →
+            "앱별 알림 카테고리 관리"</b>를 켠 다음, <b>설정 → 앱 → PITCH PRO → 알림 → 카테고리 → 일반</b>에
+            들어가서 <b>"팝업으로 표시"</b>가 켜져 있는지 확인해주세요. (플로팅 알림이 "버블"이나 "스마트 팝업"으로
+            설정돼 있으면 오히려 방해될 수 있어요 - "사용 안 함"을 추천해요)
+          </p>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-row">
+            <span class="settings-row-label">🔊 알림 소리</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="pref-sound-toggle" checked />
+              <span class="toggle-switch-track"></span>
+            </label>
+          </div>
+          <div class="goal-sound-picker">
+            <label for="goal-sound-select">⚽ 골 알림음(앱을 보고 있을 때)</label>
+            <select id="goal-sound-select"></select>
+            <button id="goal-sound-preview" class="goal-sound-preview-btn" title="미리듣기">▶ 미리듣기</button>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">알림 종류</div>
+          <div id="notif-type-list" class="notif-type-list"></div>
+        </div>
+
+        <!-- 관리자(GOAT 계정) 전용 - 테스트 알림/통계/신고함/백업이 전부 여기 한 줄로 모여있으면
+             일반 설정 화면이 아래로 계속 늘어나 보기 나빠서, 별도 관리자 페이지로 뺐다(admin.js). -->
+        <div id="admin-page-link" class="settings-group" style="display: none;">
+          <button id="admin-page-open-btn" class="auth-submit-btn">🛠 관리자 페이지 열기</button>
+        </div>
+
+        <div class="settings-legal-links">
+          <a href="/terms.html" target="_blank" rel="noopener">이용약관</a>
+          <span>·</span>
+          <a href="/privacy.html" target="_blank" rel="noopener">개인정보처리방침</a>
+        </div>
+      </section>
+
+      <!-- 관리자 페이지(GOAT 계정 전용) - 설정 탭의 "관리자 페이지 열기" 버튼으로만 들어올 수 있다. -->
+      <section id="view-admin" class="view">
+        <button class="back-btn" data-back-to="settings">← 설정으로</button>
+        <h2 class="section-title">🛠 관리자 페이지</h2>
+
+        <div class="settings-group">
+          <div class="settings-group-title">🔔 알림 테스트</div>
+          <input type="text" id="admin-test-username" placeholder="보낼 아이디 (기본: 내 계정)" />
+          <select id="admin-test-type">
+            <option value="goal">⚽ 골</option>
+            <option value="redcard">🟥 퇴장</option>
+            <option value="kickoff">⏱ 경기 시작</option>
+            <option value="kickoff_soon">⏱ 5분 후 킥오프</option>
+            <option value="fulltime">🏁 경기 종료</option>
+            <option value="transfer">🔁 이적 소식</option>
+            <option value="plain">🔔 텍스트만(이미지 없음)</option>
+          </select>
+          <button id="admin-test-send-btn" class="auth-submit-btn">테스트 알림 보내기</button>
+          <div id="admin-test-result" class="auth-find-result"></div>
+        </div>
+
+        <!-- 외부 분석 도구 없이 자체 집계한 최근 7일 탭 조회수/주요 이벤트 통계. -->
+        <div class="settings-group">
+          <div class="settings-group-title">📊 사용 통계 (최근 7일)</div>
+          <div id="admin-analytics-body" class="admin-analytics-body">불러오는 중...</div>
+        </div>
+
+        <!-- 이용자가 신고한 게시글/댓글 대기함. -->
+        <div class="settings-group">
+          <div class="settings-group-title">🚨 신고 대기함</div>
+          <div id="admin-reports-body" class="admin-reports-body">불러오는 중...</div>
+        </div>
+
+        <!-- 계정/커뮤니티 데이터를 JSON 파일로 내려받는 수동 백업. -->
+        <div class="settings-group">
+          <div class="settings-group-title">💾 데이터 백업</div>
+          <p class="settings-note">계정·커뮤니티 게시글을 JSON 파일로 내려받아요. 실수로 데이터가 지워졌을 때를 대비해 가끔 눌러서 보관해두세요.</p>
+          <button id="admin-backup-btn" class="auth-submit-btn">백업 파일 다운로드</button>
+          <div id="admin-backup-result" class="auth-find-result"></div>
         </div>
       </section>
 
@@ -223,9 +393,32 @@
       </footer>
     </main>
 
+    <!-- 자주 안 쓰는 탭(이적시장/AI분석/명예의전당)까지 바텀 네비게이션에 다 늘어놓으면 한 화면에
+         너무 많아져서, 이 셋은 "더보기" 팝오버 안으로 옮겨뒀다. nav-btn 클래스/data-view는 그대로라
+         router.js의 기존 탭 전환 로직을 손댈 필요가 없다 - 위치만 바텀 네비게이션 밖(more-menu)으로
+         옮긴 것뿐이다. -->
+    <div id="more-menu" class="more-menu">
+      <button class="nav-btn" data-view="transfers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 7h11M18 7l-3-3M18 7l-3 3"/><path d="M17 17H6M6 17l3 3M6 17l3-3"/></svg>
+        <span>이적시장</span>
+      </button>
+      <button class="nav-btn" data-view="ai">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.6 4.2L18 9l-4.4 1.8L12 15l-1.6-4.2L6 9l4.4-1.8z"/><path d="M19 15l.7 1.8L21.5 17.5l-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>
+        <span>AI 분석</span>
+      </button>
+      <button class="nav-btn" data-view="hof">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4h12v3a6 6 0 0 1-12 0z"/><path d="M6 5H3v1a4 4 0 0 0 3 3.87M18 5h3v1a4 4 0 0 1-3 3.87"/><path d="M12 13v4M9 21h6M9.5 21c0-2 .8-3 2.5-3s2.5 1 2.5 3"/></svg>
+        <span>명예의전당</span>
+      </button>
+      <button class="nav-btn" data-view="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>설정</span>
+      </button>
+    </div>
+
     <nav class="bottom-nav">
       <button class="nav-btn active" data-view="matches">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="1.5"/><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="3"/><rect x="8" y="4" width="8" height="4"/><rect x="8" y="16" width="8" height="4"/></svg>
         <span>경기</span>
       </button>
       <button class="nav-btn" data-view="news">
@@ -236,23 +429,70 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8M12 17v4"/><path d="M6 4h12v4a6 6 0 0 1-12 0z"/><path d="M6 6H3v1a4 4 0 0 0 3 3.87M18 6h3v1a4 4 0 0 1-3 3.87"/></svg>
         <span>리그</span>
       </button>
-      <button class="nav-btn" data-view="transfers">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 7h11M18 7l-3-3M18 7l-3 3"/><path d="M17 17H6M6 17l3 3M6 17l3-3"/></svg>
-        <span>이적시장</span>
-      </button>
-      <button class="nav-btn" data-view="ai">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l1.6 4.2L18 9l-4.4 1.8L12 15l-1.6-4.2L6 9l4.4-1.8z"/><path d="M19 15l.7 1.8L21.5 17.5l-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>
-        <span>AI 분석</span>
-      </button>
       <button class="nav-btn" data-view="myteam">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>
         <span>나의 팀</span>
       </button>
-      <button class="nav-btn" data-view="hof">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4h12v3a6 6 0 0 1-12 0z"/><path d="M6 5H3v1a4 4 0 0 0 3 3.87M18 5h3v1a4 4 0 0 1-3 3.87"/><path d="M12 13v4M9 21h6M9.5 21c0-2 .8-3 2.5-3s2.5 1 2.5 3"/></svg>
-        <span>명예의전당</span>
+      <button class="nav-btn" data-view="community">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/></svg>
+        <span>커뮤니티</span>
+      </button>
+      <button class="more-toggle-btn" id="more-toggle-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg>
+        <span>더보기</span>
       </button>
     </nav>
+
+    <!-- 포인트 안내 팝업 - 나의 팀 프로필의 ⓘ 버튼으로 언제든 다시 열 수 있고, 로그인 후 처음 볼 땐
+         자동으로 한 번 떠서 "뭐 하면 몇 점"인지 알려준다. -->
+    <div id="points-info-modal" class="points-info-modal" style="display: none;">
+      <div class="points-info-backdrop"></div>
+      <div class="points-info-card">
+        <div class="points-info-header">
+          <h3>🏅 포인트 안내</h3>
+          <button id="points-info-close" class="points-info-close" aria-label="닫기">✕</button>
+        </div>
+        <div class="points-info-rows">
+          <div class="points-info-row">
+            <span class="points-info-icon">✅</span>
+            <span class="points-info-label">집관인증 참여</span>
+            <span class="points-info-value">+5P</span>
+          </div>
+          <div class="points-info-row">
+            <span class="points-info-icon">🏆</span>
+            <span class="points-info-label">우리 팀 승리</span>
+            <span class="points-info-value good">최종 +10P</span>
+          </div>
+          <div class="points-info-row">
+            <span class="points-info-icon">🤝</span>
+            <span class="points-info-label">무승부</span>
+            <span class="points-info-value">최종 +5P 유지</span>
+          </div>
+          <div class="points-info-row">
+            <span class="points-info-icon">😢</span>
+            <span class="points-info-label">패배</span>
+            <span class="points-info-value bad">최종 -5P</span>
+          </div>
+          <div class="points-info-row">
+            <span class="points-info-icon">🥅</span>
+            <span class="points-info-label">승부차기 승리</span>
+            <span class="points-info-value good">최종 +3P</span>
+          </div>
+          <div class="points-info-row">
+            <span class="points-info-icon">🥅</span>
+            <span class="points-info-label">승부차기 패배</span>
+            <span class="points-info-value">최종 +2P</span>
+          </div>
+        </div>
+        <p class="points-info-note">
+          집관인증은 킥오프 30분 전부터 30분 후까지만 할 수 있어요. 인증하는 순간엔 승패를 모르니 우선 참여 포인트(5P)를 주고,
+          경기가 끝나면 결과에 따라 자동으로 최종 포인트로 정산돼요. 컵대회에서 무승부 뒤 승부차기로 갈리면 무승부(+5P) 대신
+          승부차기 결과로 정산돼요(승리 +3P / 패배 +2P).
+        </p>
+        <button id="points-history-toggle" class="points-history-toggle">📜 내 포인트 내역 보기</button>
+        <div id="points-history-list" class="points-history-list" style="display: none;"></div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/js/app.js"></script>

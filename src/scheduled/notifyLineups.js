@@ -1,7 +1,7 @@
 import { getJSON, putJSON } from "../lib/kv.js";
 import { KV_KEYS } from "../lib/config.js";
-import { sendGoalPush } from "../lib/push.js";
 import * as apiFootball from "../sources/apiFootball.js";
+import { loadSubscriptions, filterInterested, sendToSubscriber } from "../lib/subscriptions.js";
 
 // 킥오프 70분 전부터 확인 시작(API-Football은 보통 킥오프 1시간 전쯤 라인업을 올림).
 // 한 번 발표됐다고 확인되면(match.lineupsAnnounced=true) 그 경기는 다시 조회하지 않는다 -> API 절약.
@@ -11,17 +11,6 @@ import * as apiFootball from "../sources/apiFootball.js";
 const WINDOW_MAX_MS = 70 * 60 * 1000;
 const NOTIFIED_TTL_SECONDS = 6 * 60 * 60;
 const NOTIFIED_KEY_PREFIX = "lineupnotified:";
-
-async function loadSubscriptions(env) {
-  const list = await env.CACHE.list({ prefix: KV_KEYS.pushSubscriptionPrefix });
-  const subs = await Promise.all(
-    list.keys.map(async (k) => {
-      const raw = await env.CACHE.get(k.name);
-      return raw ? JSON.parse(raw) : null;
-    })
-  );
-  return subs.filter(Boolean);
-}
 
 export async function notifyLineups(env) {
   const matchesBlob = await getJSON(env, KV_KEYS.matches);
@@ -55,19 +44,27 @@ export async function notifyLineups(env) {
     const notifiedKey = `${NOTIFIED_KEY_PREFIX}${match.id}`;
     const alreadyNotified = subscriptions.length ? await env.CACHE.get(notifiedKey) : true;
     if (!alreadyNotified) {
-      const interested = subscriptions.filter(
-        (s) => s.teamIds?.includes(match.homeTeam.id) || s.teamIds?.includes(match.awayTeam.id)
-      );
+      // 즐겨찾기 팀(teamIds)뿐 아니라 🔔로 이 경기만 개별 지정한(matchIds) 구독자도 대상에 포함해야 한다
+      // (예전엔 teamIds만 봐서 즐겨찾기 안 한 팀 경기를 개별 알림 켜둬도 라인업 알림이 안 갔었음).
+      const interested = filterInterested(subscriptions, match);
       if (interested.length) {
+        const image = `/api/notif-image/status?homeTeam=${encodeURIComponent(
+          match.homeTeam.shortName || match.homeTeam.name
+        )}&homeCrest=${encodeURIComponent(match.homeTeam.crest || "")}&awayTeam=${encodeURIComponent(
+          match.awayTeam.shortName || match.awayTeam.name
+        )}&awayCrest=${encodeURIComponent(match.awayTeam.crest || "")}&badge=${encodeURIComponent("LINEUP")}&color=${encodeURIComponent(
+          "#24e583"
+        )}`;
         const payload = {
           type: "lineup",
           title: "📋 라인업 발표",
           body: `${match.homeTeam.shortName || match.homeTeam.name} vs ${match.awayTeam.shortName || match.awayTeam.name} 라인업이 발표됐습니다.`,
           matchId: match.id,
+          image,
         };
         for (const sub of interested) {
           try {
-            await sendGoalPush(env, sub.subscription, payload);
+            await sendToSubscriber(env, sub, payload);
           } catch (err) {
             console.error("lineup push send failed:", err);
           }

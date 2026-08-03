@@ -1,5 +1,6 @@
 import { fetchJSON } from "./api.js";
 import { toggleFavorite, isFavorite } from "./favorites.js";
+import { trackEvent } from "./analytics.js";
 
 const TOKEN_KEY = "pitchpro.authToken";
 const USER_KEY = "pitchpro.authUser";
@@ -37,10 +38,10 @@ export function isLoggedIn() {
   return !!getToken();
 }
 
-export async function signup({ username, password, nickname, favoriteTeamId, favoriteTeamName, favoriteTeamCrest }) {
+export async function signup({ username, password, nickname, favoriteTeamId, favoriteTeamName, favoriteTeamCrest, securityAnswer }) {
   const data = await fetchJSON("/auth/signup", {
     method: "POST",
-    body: { username, password, nickname, favoriteTeamId, favoriteTeamName, favoriteTeamCrest },
+    body: { username, password, nickname, favoriteTeamId, favoriteTeamName, favoriteTeamCrest, securityAnswer },
   });
 
   // 회원가입 시 고른 최애팀은 편의상 기존 즐겨찾기(나의 팀)에도 자동으로 넣어준다.
@@ -52,12 +53,14 @@ export async function signup({ username, password, nickname, favoriteTeamId, fav
   }
 
   writeSession(data.token, data.user);
+  trackEvent("signup");
   return data.user;
 }
 
 export async function login({ username, password }) {
   const data = await fetchJSON("/auth/login", { method: "POST", body: { username, password } });
   writeSession(data.token, data.user);
+  trackEvent("login");
   return data.user;
 }
 

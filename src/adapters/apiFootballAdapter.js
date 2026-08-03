@@ -1,4 +1,4 @@
-import { findCompetitionByLeagueId } from "../lib/config.js";
+import { findCompetitionByLeagueId, findCompetition, isInSummerTransferWindow } from "../lib/config.js";
 
 const STATUS_MAP = {
   NS: "SCHEDULED",
@@ -53,8 +53,107 @@ function safeCrest(teamId, logo) {
   return override || logo || null;
 }
 
+// API-Football은 K리그/K3/K4 팀 이름을 전부 영문 로마자로 준다("Jeonbuk Motors", "Asan Mugunghwa",
+// "Jungnang Chorus Mustang" 등 - 실제 캐시 데이터로 확인한 원문 표기, 확인일 2026-07-18). 국내
+// 사용자에게는 한글 공식 명칭이 훨씬 익숙하므로, 경기/순위/팀상세/검색/이적시장 어디서나 한글 이름으로
+// 바꿔 보여준다. raw는 팀 id로 매칭이 안 될 때(예: 이적시장의 상대팀처럼 id 없이 이름 문자열만 오는
+// 응답)를 위한 폴백 매칭 키다. id는 src/lib/kleagueVenues.js와 동일한 API-Football 팀 id 기준.
+// K3/K4는 순위표 캐시(byCode.K3/K4)에서 실제 팀 id/원문명을 확인하고, 대한축구협회 공식 2026 시즌
+// 순위표(사용자 제공 스크린샷)의 한글 표기와 도시/기관명으로 대조해 매칭했다(예: "Gyeongju HNP" ==
+// 한수원(한국수력원자력) 소재지 경주 -> "경주한수원FC"). 25717(전북현대모터스 K3팀)은 1군(2762)과
+// 이름이 같아 보이지만 서로 다른 대회의 별개 팀이다(2군).
+const KLEAGUE_TEAM_NAMES = [
+  // K리그1
+  { id: 2766, raw: "FC Seoul", ko: "FC서울" },
+  { id: 2762, raw: "Jeonbuk Motors", ko: "전북현대모터스" },
+  { id: 2746, raw: "Gangwon FC", ko: "강원FC" },
+  { id: 2764, raw: "Pohang Steelers", ko: "포항스틸러스" },
+  { id: 2767, raw: "Ulsan Hyundai FC", ko: "울산HD" },
+  { id: 2748, raw: "FC Anyang", ko: "FC안양" },
+  { id: 2763, raw: "Incheon United", ko: "인천유나이티드" },
+  { id: 2761, raw: "Jeju United FC", ko: "제주SK" },
+  { id: 2745, raw: "Bucheon FC 1995", ko: "부천FC1995" },
+  { id: 2750, raw: "Daejeon Citizen", ko: "대전하나시티즌" },
+  { id: 2768, raw: "Gimcheon Sangmu FC", ko: "김천상무" },
+  { id: 2759, raw: "Gwangju FC", ko: "광주FC" },
+  // K리그2
+  { id: 2752, raw: "Busan I Park", ko: "부산아이파크" },
+  { id: 2765, raw: "Suwon Bluewings", ko: "수원삼성블루윙즈" },
+  { id: 2747, raw: "Daegu FC", ko: "대구FC" },
+  { id: 2756, raw: "Suwon City FC", ko: "수원FC" },
+  { id: 2749, raw: "Seoul E-Land FC", ko: "서울이랜드FC" },
+  { id: 7087, raw: "Hwaseong", ko: "화성FC" },
+  { id: 2753, raw: "Asan Mugunghwa", ko: "충남아산FC" },
+  { id: 7078, raw: "Gimpo Citizen", ko: "김포FC" },
+  { id: 2751, raw: "Gyeongnam FC", ko: "경남FC" },
+  { id: 7060, raw: "Cheonan City", ko: "천안시티FC" },
+  { id: 9171, raw: "Yongin City", ko: "용인FC" },
+  { id: 7098, raw: "Paju Citizen", ko: "파주시민축구단" },
+  { id: 2757, raw: "Seongnam FC", ko: "성남FC" },
+  { id: 7061, raw: "Cheongju", ko: "충북청주FC" },
+  { id: 2758, raw: "Ansan Greeners", ko: "안산그리너스FC" },
+  { id: 2760, raw: "Jeonnam Dragons", ko: "전남드래곤즈" },
+  { id: 7076, raw: "Gimhae City", ko: "김해FC" },
+  // K3리그
+  { id: 7105, raw: "Siheung Citizen", ko: "시흥시민축구단" },
+  { id: 7099, raw: "Pocheon", ko: "포천시민축구단" },
+  { id: 7068, raw: "Daejeon Korail", ko: "대전코레일FC" },
+  { id: 7056, raw: "Busan Transportation", ko: "부산교통공사축구단" },
+  { id: 7059, raw: "Changwon City", ko: "창원FC" },
+  { id: 18653, raw: "Dangjin Citizen", ko: "당진시민축구단" },
+  { id: 7112, raw: "Yeoju Sejong", ko: "여주FC" },
+  { id: 7083, raw: "Gyeongju HNP", ko: "경주한수원FC" },
+  { id: 7108, raw: "Ulsan Citizen", ko: "울산시민축구단" },
+  { id: 7075, raw: "Gangneung City", ko: "FC강릉" },
+  { id: 7064, raw: "Chuncheon", ko: "춘천시민축구단" },
+  { id: 7111, raw: "Yangpyeong", ko: "양평FC" },
+  { id: 7096, raw: "Mokpo City", ko: "FC목포" },
+  { id: 25717, raw: "Jeonbuk Motors II", ko: "전북현대모터스" },
+  // K4리그
+  { id: 16452, raw: "Jinju Citizen", ko: "진주시민축구단" },
+  { id: 27863, raw: "Jincheon", ko: "진천HRFC" },
+  { id: 27858, raw: "Geumsan Insam", ko: "금산인삼FC" },
+  { id: 7092, raw: "Jungnang Chorus Mustang", ko: "서울중랑축구단" },
+  { id: 27860, raw: "Jecheon Citizen", ko: "제천시민축구단" },
+  { id: 23089, raw: "Namyangju", ko: "남양주시민축구단" },
+  { id: 25720, raw: "Sejong SA", ko: "세종SA축구단" },
+  { id: 18654, raw: "Geoje Citizen", ko: "거제시민축구단" },
+  { id: 18656, raw: "Pyeongchang United", ko: "평창유나이티드축구클럽" },
+  { id: 25719, raw: "Gijang United", ko: "기장군민축구단" },
+  { id: 27859, raw: "Haman", ko: "함안군민축구단" },
+  { id: 27865, raw: "Seosan Pioneer", ko: "서산에프씨" },
+  { id: 7101, raw: "Pyeongtaek Citizen", ko: "평택시티즌FC" },
+];
+
+const KOREAN_TEAM_NAME_BY_ID = Object.fromEntries(KLEAGUE_TEAM_NAMES.map(({ id, ko }) => [String(id), ko]));
+const KOREAN_TEAM_NAME_BY_RAW = Object.fromEntries(KLEAGUE_TEAM_NAMES.map(({ raw, ko }) => [raw.toLowerCase(), ko]));
+
+export function koreanTeamName(teamId, fallbackName) {
+  return (
+    KOREAN_TEAM_NAME_BY_ID[String(teamId)] ||
+    (fallbackName && KOREAN_TEAM_NAME_BY_RAW[fallbackName.toLowerCase()]) ||
+    fallbackName
+  );
+}
+
+// id 없이 이름 문자열만 있는 응답(예: 이적 목록의 상대팀)에 쓴다.
+export function koreanizeTeamNameOnly(name) {
+  if (!name) return name;
+  return KOREAN_TEAM_NAME_BY_RAW[name.toLowerCase()] || name;
+}
+
 function pickTeam(team) {
-  return { id: String(team.id), name: team.name, shortName: team.name, crest: safeCrest(team.id, team.logo) };
+  const name = koreanTeamName(team.id, team.name);
+  return { id: String(team.id), name, shortName: name, crest: safeCrest(team.id, team.logo) };
+}
+
+// 이미 정규화된(오래된 캐시 등에 남아있을 수 있는) 팀 객체의 이름만 다시 한글로 보정한다 - KV에
+// 캐시된 경기/순위 데이터는 새로 갱신되기 전까지 예전 이름을 들고 있을 수 있어(API 한도 초과 등으로
+// 갱신이 오래 막히면 특히), 응답 직전에도 한 번 더 보정해서 캐시 갱신 여부와 무관하게 항상 맞게 보인다.
+export function koreanizeTeam(team) {
+  if (!team) return team;
+  const name = koreanTeamName(team.id, team.name);
+  return name === team.name && name === team.shortName ? team : { ...team, name, shortName: name };
 }
 
 // 목록(fixtures?league=)에는 이미 league 정보가 들어있어 그걸 그대로 쓰고,
@@ -77,6 +176,10 @@ export function normalizeFixture(raw) {
     score: {
       fullTime: { home: raw.goals.home ?? null, away: raw.goals.away ?? null },
       halfTime: { home: raw.score.halftime?.home ?? null, away: raw.score.halftime?.away ?? null },
+      // 컵대회 승부차기 스코어 - goals.home/away는 연장전까지의 스코어에서 멈추고 승부차기 결과는
+      // 따로 온다(API-Football). 예전엔 이 필드를 안 읽어서 승부차기로 끝난 경기의 승자를 알 방법이
+      // 없었다(집관인증 포인트 정산·실시간 골 감지 둘 다 이 필드가 필요).
+      penalty: { home: raw.score.penalty?.home ?? null, away: raw.score.penalty?.away ?? null },
     },
     venue: raw.fixture.venue?.name || null,
     referees: raw.fixture.referee ? [{ name: raw.fixture.referee }] : [],
@@ -98,7 +201,7 @@ const FORMATION_STYLES = {
   "5-4-1": "매우 수비적인 포메이션, 실점을 최소화하는 데 집중",
 };
 
-function describeFormation(formation) {
+export function describeFormation(formation) {
   if (!formation) return null;
   return FORMATION_STYLES[formation] || `${formation} 포메이션`;
 }
@@ -186,6 +289,20 @@ export function normalizeGoalEvents(events) {
     }));
 }
 
+// 매치 도미넌스를 시간대별로 쪼개 보여주기 위한 용도(routes/matches.js가 아니라 프론트 렌더링 쪽에서
+// 세그먼트 계산에 씀) - 카드 이벤트는 이미 매번 fixture events를 받아오는 김에(goalEvents/
+// substitutions와 같은 응답) 추가 API 호출 없이 뽑아낼 수 있다.
+export function normalizeCardEvents(events) {
+  return (events || [])
+    .filter((e) => e.type === "Card")
+    .map((e) => ({
+      minute: formatMinute(e.time),
+      teamId: String(e.team.id),
+      player: e.player?.name || "알 수 없음",
+      red: e.detail === "Red Card" || e.detail === "Second Yellow Card",
+    }));
+}
+
 // subst 이벤트는 player가 교체되어 나가는 선수, assist가 들어오는 선수(API-Football 관례).
 export function normalizeSubstitutionEvents(events) {
   return (events || [])
@@ -219,12 +336,14 @@ export function normalizePlayerRatings(rawResponse) {
 function buildStandingsTable(rows) {
   return rows.map((row) => ({
     position: row.rank,
-    team: { id: String(row.team.id), name: row.team.name, shortName: row.team.name, crest: safeCrest(row.team.id, row.team.logo) },
+    team: pickTeam(row.team),
     playedGames: row.all.played,
     won: row.all.win,
     draw: row.all.draw,
     lost: row.all.lose,
     points: row.points,
+    goalsFor: row.all.goals?.for ?? null,
+    goalsAgainst: row.all.goals?.against ?? null,
     goalDifference: row.goalsDiff,
   }));
 }
@@ -267,10 +386,11 @@ export function normalizeTopPlayers(rawList, statKey) {
 }
 
 export function normalizeTeam(raw) {
+  const name = koreanTeamName(raw.team.id, raw.team.name);
   return {
     id: String(raw.team.id),
-    name: raw.team.name,
-    shortName: raw.team.name,
+    name,
+    shortName: name,
     crest: safeCrest(raw.team.id, raw.team.logo),
     country: raw.team.country || null,
     founded: raw.team.founded || null,
@@ -339,8 +459,10 @@ export function normalizeCoach(raw) {
 // API-Football 자체 DB가 아직 못 따라간(웹 검색으로 사실 확인된) 감독/이적 건만 최소한으로 수동 보정한다.
 // 전체 이적시장을 다 검증할 수는 없어서, 사용자가 즐겨찾는 팀 등 확인된 건만 등록.
 const COACH_OVERRIDES = {
-  // Chelsea: Xabi Alonso, 2026-07-01 부임(4년 계약) - API-Football coachs 엔드포인트 미반영(확인일 2026-07-12)
-  49: { id: "override-alonso", name: "Xabi Alonso", nationality: "Spain", age: null, photo: null },
+  // Chelsea: Xabi Alonso, 2026-07-01 부임(4년 계약) - API-Football coachs?team=49 엔드포인트 미반영(확인일 2026-07-12).
+  // 사진은 API-Football coachs?search=Alonso로 찾은 그의 실제 coach 레코드(id 6801, 레버쿠젠/레알마드리드
+  // 재임 시절 등록분)에서 가져온 것 - 같은 소스라 별도로 이미지를 호스팅할 필요가 없다(확인일 2026-07-26).
+  49: { id: "override-alonso", name: "Xabi Alonso", nationality: "Spain", age: null, photo: "https://media.api-sports.io/football/coachs/6801.png" },
 };
 
 // 이름/재임 정보는 API-Football이 맞게 주는데 사진만 깨진 방패 아이콘 플레이스홀더인 경우(확인일 2026-07-13).
@@ -391,19 +513,22 @@ export function normalizePlayerDetail(raw) {
   };
 }
 
-// 이적시장 탭에 보여줄 "최근" 이적만 남긴다 - /transfers?team=은 그 팀의 이적 역사 전체를 주기 때문에
-// 옛날 이적까지 다 보이면 "지금 이적시장" 느낌이 안 나고 응답도 쓸데없이 커진다.
-// 날짜 기준 rolling window(예: 최근 120일) 대신 "올해(달력 연도)"만 남기는 게 사용자가 기대하는
-// "지금 이적시장" 개념과 더 맞아서(연초엔 겨울 이적시장, 여름엔 여름 이적시장 전부 포함), 연도로 직접 자른다.
-function isThisYear(dateStr) {
+// 이적시장 탭에 보여줄 "지금 이적시장"만 남긴다 - /transfers?team=은 그 팀의 이적 역사 전체를 주기
+// 때문에 옛날 이적까지 다 보이면 응답도 쓸데없이 커지고 원하는 느낌도 안 난다.
+// 예전엔 "올해(달력 연도)" 전체를 기준으로 잘랐는데, 그러면 겨울 창구(1~2월) 이적까지 같이 섞여
+// 나왔다 - 사용자 요청으로 "이번 여름 이적시장" 딱 그 기간(대회별 transferWindows[1])만 남긴다.
+// 대회 코드가 없으면(호출부에서 안 넘겨준 경우) 판단할 기준이 없으니 안전하게 연도만으로 거른다.
+function isThisSummerWindow(dateStr, competitionCode) {
   const t = new Date(dateStr);
   if (Number.isNaN(t.getTime())) return false;
-  return t.getUTCFullYear() === new Date().getUTCFullYear();
+  if (t.getUTCFullYear() !== new Date().getUTCFullYear()) return false;
+  const comp = competitionCode ? findCompetition(competitionCode) : null;
+  return comp ? isInSummerTransferWindow(comp, t) : true;
 }
 
 // player 하나가 여러 시즌에 걸쳐 여러 번 이적했을 수 있어 response 배열 전체를 순회하며,
 // 그 팀이 "in"(영입) 또는 "out"(방출)으로 관여한 이적만 골라 방향을 붙인다.
-export function normalizeTeamTransfers(rawResponse, teamId) {
+export function normalizeTeamTransfers(rawResponse, teamId, competitionCode) {
   const results = [];
 
   for (const entry of rawResponse || []) {
@@ -411,7 +536,7 @@ export function normalizeTeamTransfers(rawResponse, teamId) {
     if (!player?.id) continue;
 
     for (const t of entry.transfers || []) {
-      if (!t.date || !isThisYear(t.date)) continue;
+      if (!t.date || !isThisSummerWindow(t.date, competitionCode)) continue;
 
       const inTeam = t.teams?.in;
       const outTeam = t.teams?.out;
@@ -423,10 +548,10 @@ export function normalizeTeamTransfers(rawResponse, teamId) {
         playerId: String(player.id),
         playerName: player.name,
         playerPhoto: player.photo || null,
-        fromTeam: outTeam?.name || "알 수 없음",
-        fromCrest: outTeam?.logo || null,
-        toTeam: inTeam?.name || "알 수 없음",
-        toCrest: inTeam?.logo || null,
+        fromTeam: outTeam ? koreanTeamName(outTeam.id, outTeam.name) : "알 수 없음",
+        fromCrest: outTeam ? safeCrest(outTeam.id, outTeam.logo) : null,
+        toTeam: inTeam ? koreanTeamName(inTeam.id, inTeam.name) : "알 수 없음",
+        toCrest: inTeam ? safeCrest(inTeam.id, inTeam.logo) : null,
         date: t.date,
         moveType: t.type || null,
         direction: isIncoming ? "in" : "out",
@@ -438,9 +563,10 @@ export function normalizeTeamTransfers(rawResponse, teamId) {
 }
 
 export function normalizeTransfer(raw) {
+  const inTeam = raw.teams?.in;
   return {
-    team: raw.teams?.in?.name || "알 수 없음",
-    crest: raw.teams?.in?.logo || null,
+    team: inTeam ? koreanTeamName(inTeam.id, inTeam.name) : "알 수 없음",
+    crest: inTeam ? safeCrest(inTeam.id, inTeam.logo) : null,
     joined: raw.date || null,
     departed: null,
     moveType: raw.type || null,

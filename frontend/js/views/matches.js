@@ -21,6 +21,7 @@ import { isWatched, toggleWatch } from "../watchlist.js";
 import { setMatchWatch } from "../push.js";
 import { isFavorite } from "../favorites.js";
 import { saveViewState } from "../viewState.js";
+import { getTheme } from "../theme.js";
 
 const state = {
   dayOffset: 0,
@@ -29,6 +30,12 @@ const state = {
   lineupNotified: new Set(),
   pollTimer: null,
   hasCheckedLineupsOnce: false,
+  // 이번 세션에서 이미 한 번 그려본 날짜는 탭을 오가거나 다시 새로고침해도 스켈레톤으로 안 비우고
+  // 화면에 남겨둔 채 조용히 갱신한다 - 매번 탭 전환마다 깜빡이며 다시 로딩되는 느낌을 없앤다.
+  loadedOffsets: new Set(),
+  // 경기 상세는 목록 캐시로 먼저 한 번(라인업/스탯 없음) 그리고, 전체 조회가 끝나면 다시 그린다 -
+  // 같은 경기를 다시 그릴 때는 그 사이 사용자가 눌러둔 탭(라인업 등)을 유지해야 한다(renderMatchDetail 참고).
+  detailMatchId: null,
 };
 
 const el = {
@@ -49,7 +56,11 @@ export function setDayOffset(offset) {
 export async function loadMatches(opts = {}) {
   el.dateLabel.textContent = formatDateLabel(state.dayOffset);
   if (!opts.silent) saveViewState({ view: "matches", dayOffset: state.dayOffset });
-  if (!opts.silent) el.matchesList.innerHTML = skeletonList(5);
+  // 이 날짜를 이번 세션에 이미 한 번 그려봤으면(탭을 오가거나 재방문), 화면에 남겨둔 채 뒤에서
+  // 조용히 새로 받아와서 갈아끼운다 - 매번 스켈레톤으로 비웠다 채우면 재방문할 때마다 로딩이 도는
+  // 것처럼 느껴진다.
+  const alreadyLoaded = state.loadedOffsets.has(state.dayOffset);
+  if (!opts.silent && !alreadyLoaded) el.matchesList.innerHTML = skeletonList(5);
   try {
     const iso = toISODate(dateWithOffset(state.dayOffset));
     const data = await fetchJSON(`/matches?date=${iso}`);
@@ -57,10 +68,11 @@ export async function loadMatches(opts = {}) {
     checkForGoals(matches);
     checkForLineupAnnouncements(matches);
     renderMatches(matches);
-    if (!opts.silent) fadeIn(el.matchesList);
+    state.loadedOffsets.add(state.dayOffset);
+    if (!opts.silent && !alreadyLoaded) fadeIn(el.matchesList);
     startAutoRefresh();
   } catch (err) {
-    if (!opts.silent) el.matchesList.innerHTML = `<div class="error-state">경기 정보를 불러오지 못했습니다.<br>${err.message}</div>`;
+    if (!opts.silent && !alreadyLoaded) el.matchesList.innerHTML = `<div class="error-state">경기 정보를 불러오지 못했습니다.<br>${err.message}</div>`;
   }
 }
 
@@ -69,14 +81,16 @@ function isWatchedMatch(m) {
   return isWatched(m.id) || isFavorite(m.homeTeam.id) || isFavorite(m.awayTeam.id);
 }
 
-// 이전에 불러온 스코어/상태와 비교해서, 지켜보는 경기에 골이 들어가거나 시작/종료되면 토스트+효과음을 띄운다.
+// 이전에 불러온 스코어/상태와 비교해서, 지켜보는 경기에 골이 들어가거나 시작/하프타임/종료되면 토스트+효과음을 띄운다.
 function checkForGoals(matches) {
   const scoredEvents = [];
   const kickoffEvents = [];
+  const halftimeEvents = [];
   const finishedEvents = [];
 
   matches.forEach((m) => {
     const isLive = LIVE_STATUSES.has(m.status);
+    const isPaused = m.status === "PAUSED";
     const isFinished = m.status === "FINISHED";
     const home = m.score.fullTime.home ?? 0;
     const away = m.score.fullTime.away ?? 0;
@@ -84,11 +98,16 @@ function checkForGoals(matches) {
     const prevStatus = state.lastStatus.get(m.id);
     const watched = isWatchedMatch(m);
 
+    // 어느 쪽이 넣었는지(homeScored/awayScored)까지 같이 들고 있어야, 나중에 "내가 즐겨찾는 팀이 넣었는지
+    // 실점했는지"를 구분해서 세리모니와 탄식 소리를 다르게 낼 수 있다.
     if (isLive && prevScore && (home > prevScore.home || away > prevScore.away) && watched) {
-      scoredEvents.push(m);
+      scoredEvents.push({ match: m, homeScored: home > prevScore.home, awayScored: away > prevScore.away });
     }
     if (isLive && prevStatus && !LIVE_STATUSES.has(prevStatus) && watched) {
       kickoffEvents.push(m);
+    }
+    if (isPaused && prevStatus === "IN_PLAY" && watched) {
+      halftimeEvents.push(m);
     }
     if (isFinished && prevStatus && LIVE_STATUSES.has(prevStatus) && watched) {
       finishedEvents.push(m);
@@ -102,8 +121,9 @@ function checkForGoals(matches) {
     state.lastStatus.set(m.id, m.status);
   });
 
-  scoredEvents.forEach(showGoalToast);
+  scoredEvents.forEach(({ match, homeScored }) => handleGoalDetected(match, homeScored ? "home" : "away"));
   kickoffEvents.forEach(showKickoffToast);
+  halftimeEvents.forEach(showHalftimeToast);
   finishedEvents.forEach(showFinishedToast);
 }
 
@@ -215,35 +235,122 @@ function playGoalSound() {
   }
 }
 
-function showGoalToast(m) {
-  const home = m.score.fullTime.home;
-  const away = m.score.fullTime.away;
-  const toast = document.createElement("div");
-  toast.className = "goal-toast";
-  toast.innerHTML = `
-    <div class="goal-toast-ball">⚽</div>
-    <div class="goal-toast-text">
-      <div class="goal-toast-title">GOAL!</div>
-      <div class="goal-toast-body">${m.homeTeam.shortName || m.homeTeam.name} ${home} - ${away} ${m.awayTeam.shortName || m.awayTeam.name}</div>
+// 골이 감지되면 이 경기에서 내가 즐겨찾는 팀이 있는지부터 확인해서, 그 팀이 넣었는지(세리모니 애니메이션)
+// 실점했는지(탄식 소리)를 가른다. 즐겨찾는 팀이 이 경기에 없으면(🔔로만 지켜보는 경기) 중립적으로 항상
+// 세리모니를 보여준다.
+function handleGoalDetected(match, side) {
+  const scoringTeam = side === "home" ? match.homeTeam : match.awayTeam;
+  const myTeamId = isFavorite(match.homeTeam.id) ? match.homeTeam.id : isFavorite(match.awayTeam.id) ? match.awayTeam.id : null;
+  const conceded = myTeamId && scoringTeam.id !== myTeamId;
+
+  if (conceded) {
+    showConcedeToast(match, scoringTeam);
+  } else {
+    showGoalCelebration(match, scoringTeam);
+  }
+}
+
+// 경기 목록 응답에는 득점자가 없어서(스코어만 옴), 세리모니에 이름을 띄우려고 상세를 한 번 더 불러온다.
+// 실패해도(네트워크 등) 애니메이션 자체는 이름 없이 그대로 보여준다.
+async function showGoalCelebration(match, scoringTeam) {
+  playGoalSound();
+  let scorerName = null;
+  try {
+    const detail = await fetchJSON(`/matches/${match.id}`);
+    const teamGoals = (detail.goalEvents || []).filter((g) => g.teamId === scoringTeam.id);
+    scorerName = teamGoals[teamGoals.length - 1]?.scorer || null;
+  } catch {
+    // 득점자 조회 실패 - 이름 없이 진행
+  }
+  renderGoalCelebration(match, scoringTeam, scorerName);
+}
+
+// 좌측 엠블럼+팀명 컬럼 / 우측 GOAL!·시간 헤더 + 득점자 컬럼 구조. 탭하면 그 경기 상세로 이동한다.
+function renderGoalCelebration(match, scoringTeam, scorerName) {
+  const minute = match.elapsed != null && match.elapsed !== "" ? `${match.elapsed}'` : "";
+  const teamName = scoringTeam.shortName || scoringTeam.name;
+
+  const wrap = document.createElement("div");
+  wrap.className = "goal-banner-wrap";
+  wrap.innerHTML = `
+    <div class="goal-popup">
+      <div class="goal-team-col">
+        <div class="team-emblem-box">${crestImg(scoringTeam, "")}</div>
+        <div class="goal-team-name">${teamName}</div>
+      </div>
+      <div class="goal-main-col">
+        <div class="goal-header">
+          <span class="goal-badge">⚽ GOAL!</span>
+          ${minute ? `<span class="goal-time">${minute} ⚽</span>` : ""}
+        </div>
+        <div class="goal-scorer">${scorerName || teamName}</div>
+      </div>
     </div>
   `;
-  document.body.appendChild(toast);
+  document.body.appendChild(wrap);
 
-  const flash = document.createElement("div");
-  flash.className = "goal-flash";
-  document.body.appendChild(flash);
-
-  playGoalSound();
-
-  requestAnimationFrame(() => {
-    toast.classList.add("show");
-    flash.classList.add("show");
+  requestAnimationFrame(() => wrap.classList.add("show"));
+  wrap.addEventListener("click", () => {
+    dismissCelebration(wrap);
+    loadMatchDetail(match.id, match);
   });
-  setTimeout(() => flash.remove(), 700);
-  setTimeout(() => {
-    toast.classList.remove("show");
-    setTimeout(() => toast.remove(), 400);
-  }, 4200);
+  setTimeout(() => dismissCelebration(wrap), 4200);
+}
+
+function dismissCelebration(wrap) {
+  if (!wrap.isConnected) return;
+  wrap.classList.remove("show");
+  setTimeout(() => wrap.remove(), 500);
+}
+
+function showConcedeToast(match, scoringTeam) {
+  const home = match.score.fullTime.home;
+  const away = match.score.fullTime.away;
+  if (getGoalSound() !== "none") playConcedeSound();
+  showSimpleToast({
+    icon: "😩",
+    title: "실점 ㅠㅠ",
+    body: `${scoringTeam.shortName || scoringTeam.name} 득점 · ${match.homeTeam.shortName || match.homeTeam.name} ${home} - ${away} ${match.awayTeam.shortName || match.awayTeam.name}`,
+    silent: true,
+  });
+}
+
+// 실제 음원 파일이 있으면 그걸 우선 재생하고, 없거나(404) 재생에 실패하면 합성음(fallbackFn)으로
+// 조용히 대체한다 - 나중에 파일만 추가/교체하면 코드 변경 없이 바로 실제 음원으로 바뀐다.
+function playFileWithFallback(path, fallbackFn, volume = 0.8) {
+  try {
+    const audio = new Audio(path);
+    audio.volume = volume;
+    let usedFallback = false;
+    const fallback = () => {
+      if (usedFallback) return;
+      usedFallback = true;
+      fallbackFn();
+    };
+    audio.addEventListener("error", fallback, { once: true });
+    audio.play().catch(fallback);
+  } catch {
+    fallbackFn();
+  }
+}
+
+function playConcedeSound() {
+  playFileWithFallback("/sounds/conced.mp3", playConcedeGroan);
+}
+
+function playLineupChime() {
+  playFileWithFallback("/sounds/lineup.mp3", playDingDong);
+}
+
+// 초인종 "띵동" - 위 음(높은 종) 하나, 살짝 뒤에 아래 음(낮은 종) 하나를 겹쳐서 내림 진행으로 낸다.
+function playDingDong() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    tone(ctx, { freq: 987, start: 0, duration: 0.5, type: "sine", gain: 0.26 });
+    tone(ctx, { freq: 740, start: 0.32, duration: 0.6, type: "sine", gain: 0.24 });
+  } catch {
+    // Web Audio 미지원/차단 상태면 조용히 무시
+  }
 }
 
 function playChime() {
@@ -256,7 +363,63 @@ function playChime() {
   }
 }
 
-function showSimpleToast({ icon, title, body, soundFile }) {
+// 관중 탄식 소리에 해당하는 실제 녹음 파일이 없어서(구할 방법이 없어 합성으로 대체), 두 개의 톱니파를
+// 살짝 어긋난 타이밍에 아래로 떨어뜨려 "아유..." 하고 힘 빠지는 느낌의 합성음으로 대신한다.
+// 화이트노이즈를 저음역대로 스윕하는 필터에 통과시켜 "우~" 하는 관중 웅성거림 텍스처를 만들고,
+// 그 위에 서로 살짝 어긋나게 튜닝한 목소리 톤 여러 개를 얹어 "여러 사람이 동시에 탄식하는" 두께를
+// 더한다(실제 관중 소리 녹음을 구할 방법이 없어 Web Audio로 합성한 근사치).
+function playConcedeGroan() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const duration = 1.3;
+    const now = ctx.currentTime;
+
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(0.5, now + 0.08);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    master.connect(ctx.destination);
+
+    // 관중 웅성거림 노이즈: 화이트노이즈 -> 대역통과 필터 주파수를 위에서 아래로 스윕
+    const bufferSize = Math.floor(ctx.sampleRate * duration);
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = "bandpass";
+    noiseFilter.Q.value = 0.7;
+    noiseFilter.frequency.setValueAtTime(1100, now);
+    noiseFilter.frequency.exponentialRampToValueAtTime(220, now + duration);
+
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.9;
+
+    noise.connect(noiseFilter).connect(noiseGain).connect(master);
+    noise.start(now);
+    noise.stop(now + duration);
+
+    // "아~" 하고 힘 빠지는 목소리 성분 - 서로 살짝 어긋난 3개 음을 겹쳐서 여러 명이 동시에 내는 소리처럼.
+    [220, 233, 208].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.55, now + duration);
+      const voiceGain = ctx.createGain();
+      voiceGain.gain.value = 0.12 - i * 0.02;
+      osc.connect(voiceGain).connect(master);
+      osc.start(now + i * 0.03);
+      osc.stop(now + duration);
+    });
+  } catch {
+    // Web Audio 미지원/차단 상태면 조용히 무시
+  }
+}
+
+function showSimpleToast({ icon, title, body, soundFile, silent = false }) {
   const toast = document.createElement("div");
   toast.className = "simple-toast";
   toast.innerHTML = `
@@ -267,7 +430,7 @@ function showSimpleToast({ icon, title, body, soundFile }) {
     </div>
   `;
   document.body.appendChild(toast);
-  if (getGoalSound() !== "none") {
+  if (!silent && getGoalSound() !== "none") {
     if (soundFile) playFile(soundFile, 0.7);
     else playChime();
   }
@@ -280,19 +443,33 @@ function showSimpleToast({ icon, title, body, soundFile }) {
 }
 
 function showLineupToast(m) {
+  if (getGoalSound() !== "none") playLineupChime();
   showSimpleToast({
     icon: "🏟️",
     title: "라인업 발표",
     body: `${m.homeTeam.shortName || m.homeTeam.name} vs ${m.awayTeam.shortName || m.awayTeam.name} 라인업이 발표됐습니다.`,
+    silent: true,
   });
 }
 
+// 경기 시작/전반전 종료 모두 경기 종료(showFinishedToast)와 같은 효과음(end.mp3)을 그대로 쓴다.
 function showKickoffToast(m) {
   showSimpleToast({
     icon: "⏱",
     title: "경기 시작",
     body: `${m.homeTeam.shortName || m.homeTeam.name} vs ${m.awayTeam.shortName || m.awayTeam.name} 킥오프!`,
-    soundFile: "/sounds/start.mp3",
+    soundFile: "/sounds/end.mp3",
+  });
+}
+
+function showHalftimeToast(m) {
+  const home = m.score.fullTime.home;
+  const away = m.score.fullTime.away;
+  showSimpleToast({
+    icon: "🟨",
+    title: "전반전 종료",
+    body: `${m.homeTeam.shortName || m.homeTeam.name} ${home} - ${away} ${m.awayTeam.shortName || m.awayTeam.name}`,
+    soundFile: "/sounds/end.mp3",
   });
 }
 
@@ -325,6 +502,20 @@ function competitionRank(code) {
 
 function isFollowedMatch(m) {
   return isFavorite(m.homeTeam.id) || isFavorite(m.awayTeam.id);
+}
+
+// 경기 목록 화면의 대회 그룹 정렬 우선순위: K리그 -> 챔피언스리그 -> 세계 5대리그 -> 컵대회(월드컵/유로/코리아컵),
+// 그 외 대회는 기존 순서(패치 순) 그대로, 친선경기(FRIENDLY)는 별도 규칙으로 항상 맨 아래.
+const MATCH_LIST_TIERS = [
+  ["KL1", "KL2"],
+  ["CL"],
+  ["PL", "PD", "BL1", "SA", "FL1"],
+  ["WC", "EC", "KFA"],
+];
+
+function matchListRank(code) {
+  const idx = MATCH_LIST_TIERS.findIndex((tier) => tier.includes(code));
+  return idx === -1 ? MATCH_LIST_TIERS.length : idx;
 }
 
 function pickFeaturedMatch(matches) {
@@ -386,11 +577,14 @@ function renderMatches(matches) {
     groups.get(key).matches.push(m);
   });
 
-  // 친선경기는 대회가 아니라 부가적인 목록이라, 순서와 상관없이 항상 맨 아래로 보낸다.
+  // 친선경기는 대회가 아니라 부가적인 목록이라 순서와 상관없이 항상 맨 아래, 그 위로는
+  // K리그 -> 챔스 -> 5대리그 -> 컵대회 순으로 그룹을 재배열한다(Array.sort는 안정 정렬이라
+  // 같은 우선순위 안에서는 기존 순서를 유지한다).
   const orderedGroups = [...groups.values()].sort((a, b) => {
     const aFriendly = a.info.code === "FRIENDLY" ? 1 : 0;
     const bFriendly = b.info.code === "FRIENDLY" ? 1 : 0;
-    return aFriendly - bFriendly;
+    if (aFriendly !== bFriendly) return aFriendly - bFriendly;
+    return matchListRank(a.info.code) - matchListRank(b.info.code);
   });
 
   orderedGroups.forEach((group) => {
@@ -449,20 +643,25 @@ function renderHeroCard(m) {
   const card = document.createElement("div");
   card.className = "hero-match-card";
 
-  const isLive = LIVE_STATUSES.has(m.status);
+  // dataStale: 킥오프 후 넉넉한 경기 지속시간이 지나도록 여전히 IN_PLAY/PAUSED면 크론 갱신이
+  // 멈춘 것(API 쿼터 소진 등) - "지금도 라이브"라고 착각하게 두지 않고 지연 안내로 대체한다.
+  const isLive = LIVE_STATUSES.has(m.status) && !m.dataStale;
   const isFinished = m.status === "FINISHED";
   const home = m.score.fullTime.home;
   const away = m.score.fullTime.away;
   const hasScore = home !== null && home !== undefined;
+  card.classList.toggle("is-live", isLive);
 
-  const statusText = isLive
+  const statusText = m.dataStale
+    ? "업데이트 지연"
+    : isLive
     ? liveMinuteLabel(m.status, getDisplayElapsed(m.id, m.elapsed))
     : isFinished
     ? "종료"
     : m.status === "TIME_TBD"
     ? STATUS_KO.TIME_TBD
     : formatKickoff(m.utcDate);
-  const statusClass = isLive ? "live" : isFinished ? "finished" : "scheduled";
+  const statusClass = m.dataStale ? "stale" : isLive ? "live" : isFinished ? "finished" : "scheduled";
 
   card.innerHTML = `
     <div class="hero-match-top">
@@ -470,7 +669,9 @@ function renderHeroCard(m) {
         ${emblemImg(m.competition, "hero-match-comp-emblem")}
         <span class="hero-match-comp-name">${m.competition.name}</span>
       </div>
-      ${watchBellHtml(m.id)}
+      <div class="match-row-actions">
+        ${watchBellHtml(m.id)}
+      </div>
     </div>
     <div class="hero-match-teams">
       <div class="hero-match-team" data-team-id="${m.homeTeam.id}">
@@ -504,14 +705,17 @@ function renderMatchRow(m) {
   const row = document.createElement("div");
   row.className = "match-row";
 
-  const isLive = LIVE_STATUSES.has(m.status);
+  const isLive = LIVE_STATUSES.has(m.status) && !m.dataStale;
   const isFinished = m.status === "FINISHED";
   const home = m.score.fullTime.home;
   const away = m.score.fullTime.away;
   const hasScore = home !== null && home !== undefined;
+  row.classList.toggle("is-live", isLive);
 
   let statusHtml;
-  if (isLive) {
+  if (m.dataStale) {
+    statusHtml = `<div class="match-status stale" title="실시간 정보 갱신이 지연되고 있습니다">⏱ 지연</div>`;
+  } else if (isLive) {
     statusHtml = `<div class="match-status live"><span class="live-dot"></span>${liveMinuteLabel(m.status, getDisplayElapsed(m.id, m.elapsed))}</div>`;
   } else if (isFinished) {
     statusHtml = `<div class="match-status finished">종료</div>`;
@@ -539,7 +743,6 @@ function renderMatchRow(m) {
       <span class="team-name">${m.awayTeam.shortName || m.awayTeam.name}</span>
     </div>
     <div class="match-row-actions">
-      ${m.ticketUrl ? `<a class="match-ticket-btn" href="${m.ticketUrl}" target="_blank" rel="noopener" title="티켓 예매하기" onclick="event.stopPropagation()">🎟</a>` : ""}
       ${watchBellHtml(m.id)}
     </div>
   `;
@@ -603,6 +806,340 @@ function statRow(label, home, away, statsHome, statsAway, key) {
   `;
 }
 
+// "매치 도미넌스" - API가 이 지표를 그대로 주진 않아서, 이미 갖고 있는 스탯(점유율/슈팅/유효슈팅/
+// xG/코너킥)의 홈-원정 비율을 가중 평균해 "누가 경기를 지배했는지"를 하나의 막대로 압축해 보여준다.
+// 슈팅/xG처럼 실제 득점 기회에 가까운 지표에 점유율보다 더 큰 비중을 둔다(단순 볼 소유보다 위협적인
+// 공격 지표가 "지배력"에 가깝다는 통념을 반영).
+const DOMINANCE_WEIGHTS = [
+  ["possession", 0.2],
+  ["shotsTotal", 0.15],
+  ["shotsOnGoal", 0.2],
+  ["xg", 0.3],
+  ["corners", 0.15],
+];
+
+function computeDominance(statsHome, statsAway) {
+  let weightedSum = 0;
+  let weightTotal = 0;
+  for (const [key, weight] of DOMINANCE_WEIGHTS) {
+    const h = parseFloat(statsHome[key]) || 0;
+    const a = parseFloat(statsAway[key]) || 0;
+    const total = h + a;
+    if (!total) continue;
+    weightedSum += (h / total) * weight;
+    weightTotal += weight;
+  }
+  if (!weightTotal) return null;
+  const home = Math.round((weightedSum / weightTotal) * 100);
+  return { home, away: 100 - home };
+}
+
+// 시간대별 도미넌스 구간 - API가 분 단위 슈팅/점유율 추이를 안 줘서(있는 건 경기 전체 누적 스탯뿐)
+// 매 구간을 처음부터 다시 계산할 순 없다. 대신 "전체 도미넌스 비율"을 각 구간의 기본값으로 깔아두고,
+// 그 구간 안에서 실제로 있었던 골/카드 이벤트(둘 다 분 단위 타임스탬프가 이미 있음)만큼 그 구간의
+// 비율을 밀어준다 - 데이터가 없는 구간은 억지로 굴곡을 만들지 않고 "전체 평균과 비슷했다"로 남긴다.
+// mid는 그래프 x축에 그 구간을 대표하는 점을 찍을 위치(분).
+const DOMINANCE_SEGMENTS = [
+  { label: "1-15'", start: 1, end: 15, mid: 8 },
+  { label: "16-30'", start: 16, end: 30, mid: 23 },
+  { label: "31-45'", start: 31, end: 45, mid: 38 },
+  { label: "46-60'", start: 46, end: 60, mid: 53 },
+  { label: "61-75'", start: 61, end: 75, mid: 68 },
+  { label: "76-90'+", start: 76, end: 999, mid: 83 },
+];
+const DOMINANCE_MATCH_END_MINUTE = 96; // 추가시간까지 감안해 넉넉히 잡은 그래프 x축 끝
+const GOAL_SWING = 22; // 골 하나가 그 구간 도미넌스에 주는 영향
+const RED_CARD_SWING = 12;
+const YELLOW_CARD_SWING = 4;
+
+function eventMinute(ev) {
+  return parseInt(ev.minute, 10) || 0;
+}
+
+function segmentEvents(events, segment) {
+  return (events || []).filter((ev) => {
+    const minute = eventMinute(ev);
+    return minute >= segment.start && minute <= segment.end;
+  });
+}
+
+function computeSegmentDominance(baseHomePct, segment, homeTeamId, goalEvents, cardEvents) {
+  const goalSwing = segmentEvents(goalEvents, segment).reduce((sum, g) => sum + (g.teamId === homeTeamId ? GOAL_SWING : -GOAL_SWING), 0);
+  const cardSwing = segmentEvents(cardEvents, segment).reduce((sum, c) => {
+    const weight = c.red ? RED_CARD_SWING : YELLOW_CARD_SWING;
+    // 카드를 받은 팀이 불리해지니, 상대 팀 쪽 도미넌스가 올라간다.
+    return sum + (c.teamId === homeTeamId ? -weight : weight);
+  }, 0);
+  const home = Math.round(Math.min(92, Math.max(8, baseHomePct + goalSwing + cardSwing)));
+  return { home, away: 100 - home };
+}
+
+// ---- 팀 색상을 차트에서 잘 보이는 명도/채도로 보정 ----
+// 저지 색을 그대로 쓰면 너무 어둡거나(예: 진초록 유니폼) 채도가 낮아 차트 배경 위에서 거의 안 보이고,
+// 색약 사용자에게는 구분이 더 어려워지는 경우가 많다. 색상(hue)은 유지한 채 명도/채도만 다크/라이트
+// 배경 각각에서 잘 읽히는 범위로 당겨온다(dataviz 스킬의 validate_palette.js로 실측 확인한 범위).
+function hexToHsl(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255,
+    g = parseInt(hex.slice(3, 5), 16) / 255,
+    b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b),
+    min = Math.min(r, g, b);
+  let h,
+    s,
+    l = (max + min) / 2;
+  if (max === min) {
+    h = s = 0;
+  } else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      case b:
+        h = (r - g) / d + 4;
+        break;
+    }
+    h /= 6;
+  }
+  return [h * 360, s * 100, l * 100];
+}
+
+function hslToHex(h, s, l) {
+  h /= 360;
+  s /= 100;
+  l /= 100;
+  let r, g, b;
+  if (s === 0) {
+    r = g = b = l;
+  } else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  const toHex = (x) => Math.round(x * 255).toString(16).padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+const clampNum = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+function chartSafeColor(hex, theme) {
+  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return null;
+  const [h, s, l] = hexToHsl(hex);
+  const targetL = theme === "light" ? clampNum(l, 34, 46) : clampNum(l, 46, 60);
+  const targetS = clampNum(Math.max(s, 45), 45, 90);
+  return hslToHex(h, targetS, targetL);
+}
+
+// 이번 경기 라인업에 실린 실제 유니폼 색(renderPitch의 피치 틴트와 같은 소스)을 우선 쓰고, 라인업이
+// 아직 없으면(킥오프 전, 라인업 미제공 대회) 앱 기본 홈/원정 색으로 대체한다.
+function dominanceTeamColors(m) {
+  const home = m.lineups?.find((l) => l.teamId === m.homeTeam.id);
+  const away = m.lineups?.find((l) => l.teamId === m.awayTeam.id);
+  const theme = getTheme();
+  return {
+    home: chartSafeColor(home?.colors?.player, theme) || "var(--accent)",
+    away: chartSafeColor(away?.colors?.player, theme) || "var(--accent-2)",
+  };
+}
+
+const DOMINANCE_CHART_W = 620;
+const DOMINANCE_BASELINE_Y = 110;
+const DOMINANCE_AMPLITUDE = 1.6;
+const DOMINANCE_EVENT_ICON = { goal: "⚽", yellow: "🟨", red: "🟥" };
+
+function dominanceX(minute) {
+  return (minute / DOMINANCE_MATCH_END_MINUTE) * DOMINANCE_CHART_W;
+}
+function dominanceY(pct) {
+  return DOMINANCE_BASELINE_Y - (pct - 50) * DOMINANCE_AMPLITUDE;
+}
+
+// 시간대별 흐름 그래프 - 기준선(50%) 위는 홈 우세, 아래는 원정 우세. 각 구간 값 사이를 직선으로
+// 이어서 "그래프"로 보이게 하되, 실제로는 여전히 6개 구간 표본이라는 걸 숨기지 않도록(가짜 매끈한
+// 곡선 대신) 있는 그대로의 꺾은선만 그린다. 골/카드 아이콘은 구간 중앙이 아니라 실제 발생 분에
+// 정확히 찍는다.
+function renderDominanceChart(m, baseDominance, colors) {
+  if (!m.goalEvents?.length && !m.cardEvents?.length) return "";
+  const homeTeamId = m.homeTeam.id;
+  const homeName = m.homeTeam.shortName || m.homeTeam.name;
+  const awayName = m.awayTeam.shortName || m.awayTeam.name;
+
+  const series = DOMINANCE_SEGMENTS.map((segment) => ({
+    ...segment,
+    ...computeSegmentDominance(baseDominance.home, segment, homeTeamId, m.goalEvents, m.cardEvents),
+  }));
+
+  const points = [
+    { x: 0, y: dominanceY(series[0].home) },
+    ...series.map((s) => ({ x: dominanceX(s.mid), y: dominanceY(s.home) })),
+    { x: DOMINANCE_CHART_W, y: dominanceY(series[series.length - 1].home) },
+  ];
+  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const areaPath = `${linePath} L${DOMINANCE_CHART_W},${DOMINANCE_BASELINE_Y} L0,${DOMINANCE_BASELINE_Y} Z`;
+
+  const gridlines = [0, 15, 30, 45, 60, 75, 90]
+    .map((min) => `<line class="dominance-gridline" x1="${dominanceX(min).toFixed(1)}" x2="${dominanceX(min).toFixed(1)}" y1="6" y2="200" />`)
+    .join("");
+  const axisLabels = [0, 15, 30, 45, 60, 75, 90]
+    .map((min) => {
+      const x = dominanceX(min).toFixed(1);
+      const label = min === 45 ? "HT" : min === 0 ? "0'" : `${min}'`;
+      return `<text class="${min === 45 ? "dominance-ht-label" : "dominance-axis-label"}" x="${x}" y="216" text-anchor="middle">${label}</text>`;
+    })
+    .join("");
+
+  const events = [
+    ...(m.goalEvents || []).map((g) => ({ minute: eventMinute(g), teamId: g.teamId, icon: DOMINANCE_EVENT_ICON.goal, title: `${g.scorer} ${g.minute}'` })),
+    ...(m.cardEvents || []).map((c) => ({
+      minute: eventMinute(c),
+      teamId: c.teamId,
+      icon: c.red ? DOMINANCE_EVENT_ICON.red : DOMINANCE_EVENT_ICON.yellow,
+      title: `${c.player} ${c.minute}'`,
+    })),
+  ];
+  const eventIconsHtml = events
+    .map((ev) => {
+      const x = dominanceX(ev.minute).toFixed(1);
+      const y = ev.teamId === homeTeamId ? 18 : 202;
+      return `<text class="dominance-event-icon" x="${x}" y="${y}" text-anchor="middle">${ev.icon}</text>`;
+    })
+    .join("");
+
+  // JSON을 <script> 태그 안에 그대로 넣을 거라, 선수 이름 등에 "</script"가 우연히 들어있어도 태그가
+  // 조기 종료되지 않도록 "<"를 이스케이프해둔다.
+  const dataPayload = JSON.stringify({ series, events, homeName, awayName, colors }).replace(/</g, "\\u003c");
+
+  return `
+    <div class="dominance-timeline">
+      <div class="dominance-timeline-title">시간대별 흐름</div>
+      <div class="legend">
+        <span class="legend-item">${crestImg(m.homeTeam, "dominance-legend-crest")}<span class="legend-line" style="background:${colors.home}"></span>${homeName}</span>
+        <span class="legend-item">${crestImg(m.awayTeam, "dominance-legend-crest")}<span class="legend-line" style="background:${colors.away}"></span>${awayName}</span>
+      </div>
+      <div class="dominance-chart-wrap" data-dominance-chart>
+        <script type="application/json" data-dominance-data>${dataPayload}<\/script>
+        <svg viewBox="0 0 ${DOMINANCE_CHART_W} 230" class="dominance-svg" preserveAspectRatio="none">
+          <defs>
+            <clipPath id="dominanceClipAbove-${m.id}"><rect x="0" y="0" width="${DOMINANCE_CHART_W}" height="${DOMINANCE_BASELINE_Y}" /></clipPath>
+            <clipPath id="dominanceClipBelow-${m.id}"><rect x="0" y="${DOMINANCE_BASELINE_Y}" width="${DOMINANCE_CHART_W}" height="120" /></clipPath>
+          </defs>
+          ${gridlines}
+          <line class="dominance-baseline" x1="0" y1="${DOMINANCE_BASELINE_Y}" x2="${DOMINANCE_CHART_W}" y2="${DOMINANCE_BASELINE_Y}" />
+          <path d="${areaPath}" fill="${colors.home}" opacity="0.14" clip-path="url(#dominanceClipAbove-${m.id})" />
+          <path d="${areaPath}" fill="${colors.away}" opacity="0.14" clip-path="url(#dominanceClipBelow-${m.id})" />
+          <path d="${linePath}" fill="none" stroke="${colors.home}" stroke-width="2" stroke-linejoin="round" clip-path="url(#dominanceClipAbove-${m.id})" />
+          <path d="${linePath}" fill="none" stroke="${colors.away}" stroke-width="2" stroke-linejoin="round" clip-path="url(#dominanceClipBelow-${m.id})" />
+          ${eventIconsHtml}
+          ${axisLabels}
+          <line class="dominance-crosshair" x1="0" y1="10" x2="0" y2="200" data-dominance-crosshair />
+          <circle class="dominance-hover-dot" style="fill:${colors.home}" data-dominance-dot r="4" />
+          <rect x="0" y="0" width="${DOMINANCE_CHART_W}" height="230" fill="transparent" data-dominance-hitrect />
+        </svg>
+        <div class="dominance-tooltip" data-dominance-tooltip></div>
+      </div>
+      <div class="foot-note dominance-foot-note">기준선 위는 ${homeName} 우세, 아래는 ${awayName} 우세 - 그래프 위에 손가락/마우스를 올리면 구간별 수치가 나옵니다.</div>
+    </div>
+  `;
+}
+
+// 차트 렌더링 이후(renderMatchDetail의 DOM 삽입 뒤) 호출 - 호버 시 크로스헤어/점/툴팁을 갱신한다.
+function wireDominanceChart(wrap) {
+  const dataEl = wrap.querySelector("[data-dominance-data]");
+  const svg = wrap.querySelector(".dominance-svg");
+  const hitRect = wrap.querySelector("[data-dominance-hitrect]");
+  const crosshair = wrap.querySelector("[data-dominance-crosshair]");
+  const dot = wrap.querySelector("[data-dominance-dot]");
+  const tooltip = wrap.querySelector("[data-dominance-tooltip]");
+  if (!dataEl || !svg || !hitRect || !crosshair || !dot || !tooltip) return;
+
+  let data;
+  try {
+    data = JSON.parse(dataEl.textContent);
+  } catch {
+    return;
+  }
+
+  function nearestSegment(minute) {
+    let best = data.series[0];
+    let bestDist = Infinity;
+    for (const s of data.series) {
+      const d = Math.abs(s.mid - minute);
+      if (d < bestDist) {
+        bestDist = d;
+        best = s;
+      }
+    }
+    return best;
+  }
+
+  function showAt(clientX) {
+    const rect = svg.getBoundingClientRect();
+    const relX = ((clientX - rect.left) / rect.width) * DOMINANCE_CHART_W;
+    const minute = clampNum((relX / DOMINANCE_CHART_W) * DOMINANCE_MATCH_END_MINUTE, 0, DOMINANCE_MATCH_END_MINUTE);
+    const seg = nearestSegment(minute);
+    const x = dominanceX(seg.mid);
+    const y = dominanceY(seg.home);
+
+    crosshair.setAttribute("x1", x);
+    crosshair.setAttribute("x2", x);
+    crosshair.style.opacity = 1;
+    dot.setAttribute("cx", x);
+    dot.setAttribute("cy", y);
+    dot.style.opacity = 1;
+
+    const evs = data.events.filter((e) => e.minute >= seg.start && e.minute <= seg.end);
+    const evHtml = evs.length ? `<div class="dominance-tooltip-events">${evs.map((e) => `${e.icon} ${e.title}`).join(" · ")}</div>` : "";
+    tooltip.innerHTML = `<strong>${seg.label}</strong><br><span style="color:${data.colors.home};font-weight:700">${data.homeName} ${seg.home}%</span> · <span style="color:${data.colors.away};font-weight:700">${data.awayName} ${seg.away}%</span>${evHtml}`;
+    tooltip.style.opacity = 1;
+    const leftPct = (x / DOMINANCE_CHART_W) * 100;
+    tooltip.style.left = `clamp(0px, ${leftPct}% - 60px, calc(100% - 190px))`;
+  }
+  function hide() {
+    crosshair.style.opacity = 0;
+    dot.style.opacity = 0;
+    tooltip.style.opacity = 0;
+  }
+  hitRect.addEventListener("pointermove", (e) => showAt(e.clientX));
+  hitRect.addEventListener("pointerleave", hide);
+  hitRect.addEventListener("touchstart", (e) => showAt(e.touches[0].clientX), { passive: true });
+}
+
+function renderDominance(m, statsHome, statsAway) {
+  const dominance = computeDominance(statsHome, statsAway);
+  if (!dominance) return "";
+  const homeName = m.homeTeam.shortName || m.homeTeam.name;
+  const awayName = m.awayTeam.shortName || m.awayTeam.name;
+  const colors = dominanceTeamColors(m);
+  return `
+    <div class="dominance-section">
+      <div class="dominance-title">매치 도미넌스</div>
+      <div class="dominance-bar">
+        <div class="dominance-fill" style="width:${dominance.home}%;background:${colors.home}"></div>
+        <div class="dominance-fill" style="width:${dominance.away}%;background:${colors.away}"></div>
+      </div>
+      <div class="dominance-labels">
+        <span class="dominance-label" style="color:${colors.home}">${homeName} ${dominance.home}%</span>
+        <span class="dominance-label" style="color:${colors.away}">${dominance.away}% ${awayName}</span>
+      </div>
+      ${renderDominanceChart(m, dominance, colors)}
+    </div>
+  `;
+}
+
 function renderStatistics(m) {
   if (!m.statistics || m.statistics.length < 2) return "";
   const statsHome = m.statistics.find((s) => s.teamId === m.homeTeam.id)?.stats || {};
@@ -624,7 +1161,7 @@ function renderStatistics(m) {
     .join("");
 
   if (!rows.trim()) return "";
-  return `<div class="team-section"><h3 class="team-section-title">경기 스탯</h3>${rows}</div>`;
+  return `<div class="team-section"><h3 class="team-section-title">경기 스탯</h3>${rows}${renderDominance(m, statsHome, statsAway)}</div>`;
 }
 
 // grid는 API-Football이 주는 "row:col" 좌표. 팀별로 자기 진영 골라인 쪽에서 하프라인 쪽으로
@@ -669,13 +1206,39 @@ function averageAge(startXI) {
   return (ages.reduce((sum, a) => sum + a, 0) / ages.length).toFixed(1);
 }
 
-function pitchPlayerDot(p, x, y, ringColor, teamId) {
+// 골 이벤트엔 선수 id가 없어(API-Football 이벤트 응답 자체가 이름만 줌, adapters/apiFootballAdapter.js
+// normalizeGoalEvents 참고) 이름으로 대조한다 - 같은 경기 안에서 라인업과 골 이벤트가 같은 소스(API-Football
+// 또는 KFA 스크랩 하나)에서 나오므로 이름 표기가 서로 어긋날 일은 없다. 자책골은 상대팀 골이라 득점
+// 표시에서 제외한다(scorer 이름은 자책골 넣은 선수 본인이라 헷갈릴 수 있어서).
+function playerGoalAssistCounts(playerName, goalEvents) {
+  if (!playerName || !goalEvents?.length) return { goals: 0, assists: 0 };
+  const goals = goalEvents.filter((g) => g.scorer === playerName && !g.ownGoal).length;
+  const assists = goalEvents.filter((g) => g.assist === playerName).length;
+  return { goals, assists };
+}
+
+function playerEventBadgesHtml(playerName, goalEvents) {
+  const { goals, assists } = playerGoalAssistCounts(playerName, goalEvents);
+  if (!goals && !assists) return "";
+  const goalHtml = goals ? `<span class="lineup-event-icon goal" title="골 ${goals}개">⚽${goals > 1 ? `×${goals}` : ""}</span>` : "";
+  const assistHtml = assists ? `<span class="lineup-event-icon assist" title="어시스트 ${assists}개">👟${assists > 1 ? `×${assists}` : ""}</span>` : "";
+  return `<span class="lineup-event-badges">${goalHtml}${assistHtml}</span>`;
+}
+
+function pitchPlayerDot(p, x, y, ringColor, teamId, goalEvents) {
   const lastName = p.name.split(" ").slice(-1)[0];
   const ratingHtml =
     typeof p.rating === "number"
       ? `<div class="pitch-rating ${ratingClass(p.rating)}">${p.rating.toFixed(1)}</div>`
       : "";
   const subOffHtml = p.subbedOffMinute ? `<div class="pitch-sub-off">${p.subbedOffMinute}'</div>` : "";
+  // 골/평점/교체시간이 사진 테두리 네 귀퉁이 중 위쪽 두 곳(평점=우상, 교체시간=좌상)을 이미 쓰고
+  // 있어서, 골/어시스트 배지는 아래쪽(좌하)에 겹치지 않게 배치한다.
+  const { goals, assists } = playerGoalAssistCounts(p.name, goalEvents);
+  const eventBadgeHtml =
+    goals || assists
+      ? `<div class="pitch-event-badge" title="${goals ? `골 ${goals}개 ` : ""}${assists ? `어시스트 ${assists}개` : ""}">${goals ? "⚽" : ""}${assists ? "👟" : ""}</div>`
+      : "";
   return `
     <div class="pitch-player-abs" style="left:${x}%; top:${y}%;">
       <div class="pitch-photo-wrap">
@@ -684,6 +1247,7 @@ function pitchPlayerDot(p, x, y, ringColor, teamId) {
           ${playerAvatarImg(p, teamId, "pitch-photo")}
         </div>
         ${ratingHtml}
+        ${eventBadgeHtml}
       </div>
       <div class="pitch-player-name">${lastName}</div>
     </div>
@@ -691,7 +1255,7 @@ function pitchPlayerDot(p, x, y, ringColor, teamId) {
 }
 
 // isHome이면 자기 골문(하단)에서 하프라인 쪽(위)으로, 원정이면 자기 골문(상단)에서 하프라인 쪽(아래)으로.
-function renderSidePlayers(startXI, isHome, jerseyColor, gkColor, teamId) {
+function renderSidePlayers(startXI, isHome, jerseyColor, gkColor, teamId, goalEvents) {
   const rows = layoutSide(startXI);
   const maxRow = Math.max(...rows.keys(), 1);
   const dots = [];
@@ -705,19 +1269,25 @@ function renderSidePlayers(startXI, isHome, jerseyColor, gkColor, teamId) {
         ? 92 - ((row - 1) / Math.max(maxRow - 1, 1)) * 34
         : 8 + ((row - 1) / Math.max(maxRow - 1, 1)) * 34;
       const color = row === 1 ? gkColor || "#f2c230" : jerseyColor || (isHome ? "#24e583" : "#5a8bff");
-      dots.push(pitchPlayerDot(p, x, y, color, teamId));
+      dots.push(pitchPlayerDot(p, x, y, color, teamId, goalEvents));
     });
   });
 
   return dots.join("");
 }
 
-function benchColumn(lineup, side) {
+function benchColumn(lineup, side, goalEvents) {
   const avgAge = lineup ? averageAge(lineup.startXI) : null;
   const subs = lineup?.substitutes || [];
   return `
     <div class="pitch-bench-col ${side}">
-      ${subs.length ? subs.map((p) => `<div class="pitch-bench-player" data-player-id="${p.id}">${p.number ?? ""} ${p.name}</div>`).join("") : '<div class="empty-state">교체 명단 없음</div>'}
+      ${
+        subs.length
+          ? subs
+              .map((p) => `<div class="pitch-bench-player" data-player-id="${p.id}">${p.number ?? ""} ${p.name}${playerEventBadgesHtml(p.name, goalEvents)}</div>`)
+              .join("")
+          : '<div class="empty-state">교체 명단 없음</div>'
+      }
       <div class="pitch-side-footer">
         ${avgAge ? `<div class="pitch-stat"><b>${avgAge}세</b><span>평균 나이</span></div>` : ""}
         ${lineup?.coach ? `<div class="pitch-stat"><b>${lineup.coach}</b><span>감독</span></div>` : ""}
@@ -726,7 +1296,7 @@ function benchColumn(lineup, side) {
   `;
 }
 
-function renderPitch(home, away, homeTeam, awayTeam) {
+function renderPitch(home, away, homeTeam, awayTeam, goalEvents) {
   if (!home?.startXI?.some((p) => p.grid) && !away?.startXI?.some((p) => p.grid)) return "";
 
   const homeTint = home?.colors?.player || "#24e583";
@@ -748,12 +1318,53 @@ function renderPitch(home, away, homeTeam, awayTeam) {
         <span>${awayTeam?.shortName || awayTeam?.name || ""}</span>
         ${awayTeam ? crestImg(awayTeam, "team-crest") : ""}
       </div>
-      ${home ? renderSidePlayers(home.startXI, true, home.colors?.player, home.colors?.goalkeeper, homeTeam?.id) : ""}
-      ${away ? renderSidePlayers(away.startXI, false, away.colors?.player, away.colors?.goalkeeper, awayTeam?.id) : ""}
+      ${home ? renderSidePlayers(home.startXI, true, home.colors?.player, home.colors?.goalkeeper, homeTeam?.id, goalEvents) : ""}
+      ${away ? renderSidePlayers(away.startXI, false, away.colors?.player, away.colors?.goalkeeper, awayTeam?.id, goalEvents) : ""}
     </div>
     <div class="pitch-bench-row">
-      ${benchColumn(home, "home")}
-      ${benchColumn(away, "away")}
+      ${benchColumn(home, "home", goalEvents)}
+      ${benchColumn(away, "away", goalEvents)}
+    </div>
+  `;
+}
+
+const POSITION_ORDER = { GK: 0, DF: 1, MF: 2, FW: 3 };
+
+// kleague.com 폴백 라인업은 API-Football처럼 grid(row:col) 좌표가 없어서(pitchPosition은 있지만
+// 좌표계가 달라 기존 세로 피치 UI로 바로 변환하기 어렵다), 피치 다이어그램 대신 포지션별로 묶은
+// 간단한 리스트로 보여준다 - "라인업이 아예 안 나오는" 것보단 훨씬 낫다.
+function renderSimpleLineupList(lineup, team, goalEvents) {
+  if (!lineup?.startXI?.length) return "";
+  const sorted = lineup.startXI.slice().sort((a, b) => (POSITION_ORDER[a.position] ?? 9) - (POSITION_ORDER[b.position] ?? 9));
+  const subs = lineup.substitutes || [];
+  return `
+    <div class="lineup-simple-team">
+      <div class="lineup-simple-header">
+        ${team ? crestImg(team, "team-crest") : ""}
+        <span>${team?.shortName || team?.name || ""}</span>
+        ${lineup.formation ? `<span class="pitch-formation-tag">${lineup.formation}</span>` : ""}
+      </div>
+      <div class="lineup-simple-list">
+        ${sorted
+          .map(
+            (p) => `
+          <div class="lineup-simple-row" data-player-id="${p.id}">
+            <span class="lineup-simple-num">${p.number ?? ""}</span>
+            ${playerAvatarImg(p, team?.id, "lineup-simple-photo")}
+            <span class="lineup-simple-name">${p.name}</span>
+            ${playerEventBadgesHtml(p.name, goalEvents)}
+            <span class="lineup-simple-pos">${p.position ?? ""}</span>
+          </div>
+        `
+          )
+          .join("")}
+      </div>
+      ${
+        subs.length
+          ? `<div class="lineup-simple-subs">${subs.map((p) => `<span data-player-id="${p.id}">${p.number ?? ""} ${p.name}${playerEventBadgesHtml(p.name, goalEvents)}</span>`).join("")}</div>`
+          : ""
+      }
+      ${lineup.coach ? `<div class="lineup-simple-coach">감독: ${lineup.coach}</div>` : ""}
     </div>
   `;
 }
@@ -762,12 +1373,13 @@ function renderLineups(m) {
   if (!m.lineups || m.lineups.length < 2) return "";
   const home = m.lineups.find((l) => l.teamId === m.homeTeam.id);
   const away = m.lineups.find((l) => l.teamId === m.awayTeam.id);
-  const pitchHtml = renderPitch(home, away, m.homeTeam, m.awayTeam);
+  const pitchHtml = renderPitch(home, away, m.homeTeam, m.awayTeam, m.goalEvents);
+  const simpleListHtml = pitchHtml ? "" : renderSimpleLineupList(home, m.homeTeam, m.goalEvents) + renderSimpleLineupList(away, m.awayTeam, m.goalEvents);
 
   return `
     <div class="team-section">
       <h3 class="team-section-title">라인업</h3>
-      ${pitchHtml || '<div class="empty-state">포메이션 좌표 정보가 없습니다.</div>'}
+      ${pitchHtml || simpleListHtml || '<div class="empty-state">라인업 정보가 없습니다.</div>'}
       ${m.tacticalNote ? `<p class="tactical-note">💡 ${m.tacticalNote}</p>` : ""}
     </div>
   `;
@@ -808,7 +1420,7 @@ function renderHeadToHead(h2h, m) {
         const hasScore = home !== null && home !== undefined;
         return `
           <div class="mini-match-row">
-            <div class="mini-status">${new Date(match.utcDate).toLocaleDateString("ko-KR", { timeZone: KST_TIME_ZONE, month: "short", day: "numeric" })}</div>
+            <div class="mini-status">${new Date(match.utcDate).toLocaleDateString("ko-KR", { timeZone: KST_TIME_ZONE, year: "numeric", month: "short", day: "numeric" })}</div>
             <div class="mini-team">${crestImg(match.homeTeam, "team-crest")}<span>${match.homeTeam.shortName || match.homeTeam.name}</span></div>
             <div class="mini-score">${hasScore ? `${home}:${away}` : "vs"}</div>
             <div class="mini-team">${crestImg(match.awayTeam, "team-crest")}<span>${match.awayTeam.shortName || match.awayTeam.name}</span></div>
@@ -817,6 +1429,13 @@ function renderHeadToHead(h2h, m) {
       })
       .join("")}
   `;
+}
+
+// "45+2"처럼 추가시간 표기가 섞여 있어도 실제 시간 순으로 정렬되도록, 추가시간은 소수점으로 얹는다
+// (본 시간 45분 골보다 45+2분 골이 항상 뒤로 오게).
+function parseMinuteValue(minute) {
+  const [base, extra] = String(minute).split("+").map(Number);
+  return (base || 0) + (extra ? extra / 100 : 0);
 }
 
 // 리그별로 라인업/스탯 데이터 형태가 들쭉날쭉해서(K리그2 일부 경기는 포메이션은 있는데 선수 좌표가
@@ -833,14 +1452,24 @@ function safeRender(fn, fallback) {
 }
 
 function renderMatchDetail(m) {
-  const isLive = LIVE_STATUSES.has(m.status);
+  // 목록 캐시로 먼저 그린 뒤(라인업/스탯 없음) 전체 조회가 끝나 다시 그릴 때, 그 사이 사용자가
+  // "라인업"/"통계" 등으로 탭을 옮겨놨으면 그대로 유지한다 - 예전엔 매번 무조건 "정보" 탭으로
+  // 리셋돼서, 로딩 딜레이 동안 라인업 탭을 눌러도 데이터가 도착하는 순간 정보 탭으로 튕겨나갔다.
+  // 다른 경기로 넘어온 경우(id가 다름)는 지금처럼 "정보"부터 보여주는 게 맞다.
+  const isSameMatch = state.detailMatchId === m.id;
+  const previousActiveTab = isSameMatch ? el.detailContent.querySelector(".team-tab-btn.active")?.dataset.detailTab : null;
+  state.detailMatchId = m.id;
+
+  const isLive = LIVE_STATUSES.has(m.status) && !m.dataStale;
   const isFinished = m.status === "FINISHED";
   const home = m.score.fullTime.home;
   const away = m.score.fullTime.away;
   const hasScore = home !== null && home !== undefined;
 
-  const statusClass = isLive ? "live" : isFinished ? "finished" : "";
-  const statusText = isLive
+  const statusClass = m.dataStale ? "stale" : isLive ? "live" : isFinished ? "finished" : "";
+  const statusText = m.dataStale
+    ? "⏱ 업데이트 지연"
+    : isLive
     ? `🟢 ${liveMinuteLabel(m.status, getDisplayElapsed(m.id, m.elapsed))}`
     : isFinished
     ? "경기 종료"
@@ -858,9 +1487,11 @@ function renderMatchDetail(m) {
     ? `<div class="team-section">
         <h3 class="team-section-title">득점자</h3>
         ${m.goalEvents
+          .slice()
+          .sort((a, b) => parseMinuteValue(a.minute) - parseMinuteValue(b.minute))
           .map((g) => {
             const isHome = g.teamId === m.homeTeam.id;
-            const line = `⊕ ${g.scorer} ${g.minute}'${g.penalty ? " (PK)" : ""}${g.ownGoal ? " (OG)" : ""}${g.assist ? ` <span class="goal-assist">(도움: ${g.assist})</span>` : ""}`;
+            const line = `⚽ ${g.scorer} ${g.minute}'${g.penalty ? " (PK)" : ""}${g.ownGoal ? " (OG)" : ""}${g.assist ? ` <span class="goal-assist">(도움: ${g.assist})</span>` : ""}`;
             return `<div class="goal-scorer-row ${isHome ? "home" : "away"}">${line}</div>`;
           })
           .join("")}
@@ -917,6 +1548,17 @@ function renderMatchDetail(m) {
       ${htHtml}
     </div>
 
+    ${
+      m.broadcastUrl || m.ticketUrl
+        ? `
+      <div class="detail-actions">
+        ${m.broadcastUrl ? `<a class="detail-action-btn" href="${m.broadcastUrl}" target="_blank" rel="noopener">📺 ${m.broadcastProvider}에서 중계 보기</a>` : ""}
+        ${m.ticketUrl ? `<a class="detail-action-btn" href="${m.ticketUrl}" target="_blank" rel="noopener"><img class="detail-action-icon" src="/img/ticket-icon.png" alt="" />티켓 예매하기</a>` : ""}
+      </div>
+    `
+        : ""
+    }
+
     <div class="team-tabs">
       <button class="team-tab-btn active" data-detail-tab="info">정보</button>
       <button class="team-tab-btn" data-detail-tab="lineup">라인업</button>
@@ -945,6 +1587,8 @@ function renderMatchDetail(m) {
     dotEl.addEventListener("click", () => goToPlayer(dotEl.dataset.playerId));
   });
 
+  el.detailContent.querySelectorAll("[data-dominance-chart]").forEach((wrap) => wireDominanceChart(wrap));
+
   const DETAIL_TAB_ORDER = ["info", "lineup", "stats", "h2h"];
 
   function activateDetailTab(tabName) {
@@ -957,6 +1601,8 @@ function renderMatchDetail(m) {
   el.detailContent.querySelectorAll(".team-tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => activateDetailTab(btn.dataset.detailTab));
   });
+
+  if (previousActiveTab && previousActiveTab !== "info") activateDetailTab(previousActiveTab);
 
   // 탭을 좌우 스와이프로도 넘길 수 있게(fotmob처럼). 세로 스크롤과 헷갈리지 않도록 수평 이동이
   // 수직 이동보다 충분히 클 때만 탭을 전환한다.
@@ -1017,3 +1663,43 @@ el.dateInput.addEventListener("change", () => {
 });
 
 onTabChange("matches", loadMatches);
+
+// ---------- 알림/사운드 데모(?demo=goals) ----------
+// 실제 경기에서 골/하프타임/종료가 일어나길 기다리지 않고도 새 알림·세리모니를 눈으로 바로 확인할 수
+// 있도록, URL에 ?demo=goals가 있으면 가짜 경기로 전체 시퀀스를 순서대로 재생한다. 일반 사용자는 이
+// 쿼리 파라미터를 붙일 일이 없어 평소 사용에는 아무 영향이 없다.
+function buildDemoMatch(homeScore, awayScore, status, elapsed) {
+  return {
+    id: "demo-match",
+    utcDate: new Date().toISOString(),
+    status,
+    elapsed,
+    competition: { code: "PL", name: "데모 리그", emblem: null },
+    homeTeam: { id: "demo-home", name: "우리팀", shortName: "우리팀", crest: null },
+    awayTeam: { id: "demo-away", name: "상대팀", shortName: "상대팀", crest: null },
+    score: { fullTime: { home: homeScore, away: awayScore }, halfTime: { home: null, away: null } },
+  };
+}
+
+function runNotificationDemo() {
+  const steps = [
+    () => showKickoffToast(buildDemoMatch(0, 0, "IN_PLAY", 1)),
+    () => showHalftimeToast(buildDemoMatch(0, 0, "PAUSED", 45)),
+    () => {
+      // renderGoalCelebration은 화면만 그리고, 실제 골 감지 흐름에서는 showGoalCelebration이
+      // 상세 조회 전에 소리부터 먼저 재생한다 - 데모도 같은 순서를 그대로 재현한다.
+      playGoalSound();
+      const m = buildDemoMatch(1, 0, "IN_PLAY", 55);
+      renderGoalCelebration(m, m.homeTeam, "테스트 선수");
+    },
+    () => showConcedeToast(buildDemoMatch(1, 1, "IN_PLAY", 70), buildDemoMatch(1, 1, "IN_PLAY", 70).awayTeam),
+    () => showFinishedToast(buildDemoMatch(1, 1, "FINISHED", 90)),
+  ];
+  steps.forEach((step, i) => setTimeout(step, 400 + i * 4000));
+}
+
+// "경기" 탭은 앱 시작 시 기본으로 이미 활성화돼 있어(onTabChange는 탭 버튼 클릭時에만 발동하므로 여기선
+// 못 쓴다) 페이지 로드 후 바로 한 번 재생한다.
+if (new URLSearchParams(window.location.search).get("demo") === "goals") {
+  setTimeout(runNotificationDemo, 1200);
+}

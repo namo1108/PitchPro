@@ -10,8 +10,11 @@
   "kv_namespaces": [
     { "binding": "CACHE", "id": "4a82ab329c014cf781586986df945dbc" }
   ],
+  // Cloudflare Cron Trigger의 최소 단위(1분)까지 당겼다. 이보다 더 빠른 골/상태변화 감지는
+  // src/scheduled/pollLiveMatches.js가 각 tick 안에서 라이브 경기가 있는 동안 10초 간격으로
+  // 추가로 반복 조회해서 보완한다(2026-07-19, API-Football Pro 플랜 일 7500회 여유 확인 후 적용).
   "triggers": {
-    "crons": ["*/5 * * * *"]
+    "crons": ["* * * * *"]
   },
   "observability": {
     "enabled": true

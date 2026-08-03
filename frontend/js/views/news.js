@@ -10,19 +10,24 @@ function formatPubDate(pubDate) {
   return d.toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: KST_TIME_ZONE });
 }
 
+// 이번 세션에 한 번 그려본 뒤로는 탭을 다시 눌러도 스켈레톤으로 비우지 않고 화면에 남겨둔 채
+// 조용히 새로 받아와서 갈아끼운다 - 매번 탭 전환마다 깜빡이며 로딩되는 느낌을 없앤다.
+let loadedOnce = false;
+
 async function loadNews() {
-  el.list.innerHTML = skeletonList(5);
+  if (!loadedOnce) el.list.innerHTML = skeletonList(5);
   try {
     const data = await fetchJSON("/news");
-    renderNews(data.items || []);
+    renderNews(data.items || [], !loadedOnce);
+    loadedOnce = true;
   } catch (err) {
-    el.list.innerHTML = `<div class="error-state">뉴스를 불러오지 못했습니다.<br>${err.message}</div>`;
+    if (!loadedOnce) el.list.innerHTML = `<div class="error-state">뉴스를 불러오지 못했습니다.<br>${err.message}</div>`;
   }
 }
 
 const SOURCE_LABEL = { bbc: "해외", donga: "국내" };
 
-function renderNews(items) {
+function renderNews(items, animate) {
   if (!items.length) {
     el.list.innerHTML = '<div class="empty-state">아직 뉴스가 없습니다.</div>';
     return;
@@ -45,7 +50,9 @@ function renderNews(items) {
     })
     .join("");
 
-  fadeIn(el.list);
+  // 재방문 시 조용히 갱신할 때는 이미 화면에 떠 있는 걸 다시 페이드인시키지 않는다(안 그러면 매번
+  // 잠깐 사라졌다 나타나는 것처럼 보임) - 이번 세션 첫 로딩일 때만 페이드인한다.
+  if (animate) fadeIn(el.list);
 }
 
 onTabChange("news", loadNews);

@@ -8,6 +8,7 @@
   --accent: #24e583;
   --accent-soft: rgba(36, 229, 131, 0.14);
   --accent-dark: #12a35c;
+  --accent-2: #00d4ff;
   --live-red: #ff4757;
   --gold: #ffd166;
   --text-primary: #f3f7f4;
@@ -16,6 +17,29 @@
   --radius: 14px;
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  /* 다이나믹/화려한 톤을 위한 그라디언트+글로우 팔레트 - 경기 목록의 히어로 카드/라이브 강조에 사용 */
+  --gradient-brand: linear-gradient(135deg, #24e583 0%, #00d4ff 100%);
+  --gradient-live: linear-gradient(120deg, #24e583 0%, #12d9c4 45%, #00aaff 100%);
+  --gradient-gold: linear-gradient(135deg, #ffd166 0%, #ff9f4d 100%);
+  --glow-live: 0 0 0 1px rgba(36, 229, 131, 0.55), 0 0 28px rgba(0, 212, 255, 0.25), 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+/* 라이트 모드 - 밤 경기장 사진(body 배경)은 라이트 UI와 어울리지 않아 그대로 옅게 만드는 대신
+   아예 다른 배경(브랜드 그린 글로우만 남긴 옅은 배경, 아래 body 규칙)으로 대체한다. 나머지는 구조
+   토큰(배경/테두리/글자색)만 밝은 값으로 바꿔주면, 그 토큰을 참조하는 대부분의 컴포넌트가 따라온다 -
+   accent/live-red/gold 같은 의미색은 라이트 배경에서도 그대로 잘 보여서 유지한다.
+   설정 탭의 테마 토글(js/theme.js)이 :root에 data-theme="light"를 붙이면 이 값들로 바뀐다. */
+:root[data-theme="light"] {
+  --bg-primary: #f4f8f5;
+  --bg-elevated: #eaf1ec;
+  --bg-card: #ffffff;
+  --bg-card-hover: #eef6f0;
+  --border: rgba(18, 33, 26, 0.1);
+  --border-strong: rgba(18, 33, 26, 0.18);
+  --text-primary: #12211a;
+  --text-secondary: #4d6358;
+  --text-muted: #7c9086;
+  --shadow: 0 8px 24px rgba(18, 33, 26, 0.12);
 }
 
 * {
@@ -28,15 +52,62 @@ html, body {
   overflow-x: hidden;
 }
 
+/* PC처럼 뷰포트가 900px보다 넓으면 예전엔 경기장 사진이 가운데 900px에만 떠 있고 양옆은
+   그냥 밋밋한 단색이었다 - 사진을 화면 전체로 깔고(cover), 잔디 스트라이프 패턴 + 브랜드
+   컬러(그린/시안) 플로드라이트 글로우를 얹어서 넓은 화면에서도 여백이 "비어있다"기보단
+   "경기장 배경 위에 앱이 떠 있다"는 느낌이 나게 한다. */
 body {
   font-family: "Segoe UI", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   background:
-    linear-gradient(180deg, rgba(10, 20, 16, 0.35) 0%, rgba(10, 20, 16, 0.72) 55%, var(--bg-primary) 85%) center top / 100% 100% no-repeat fixed,
-    url("/img/stadium.png") center top / min(900px, 100%) auto no-repeat fixed;
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.025) 0px, rgba(255, 255, 255, 0.025) 60px, transparent 60px, transparent 120px) center top / 100% 100% fixed,
+    radial-gradient(circle at 10% -8%, rgba(36, 229, 131, 0.18), transparent 42%) center top / 100% 100% no-repeat fixed,
+    radial-gradient(circle at 92% -4%, rgba(0, 212, 255, 0.14), transparent 40%) center top / 100% 100% no-repeat fixed,
+    linear-gradient(180deg, rgba(10, 20, 16, 0.4) 0%, rgba(10, 20, 16, 0.78) 55%, var(--bg-primary) 85%) center top / 100% 100% no-repeat fixed,
+    url("/img/stadium.png") center top / cover no-repeat fixed;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
   min-height: 100dvh;
+}
+
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(circle at 10% -8%, rgba(36, 229, 131, 0.16), transparent 45%) center top / 100% 100% no-repeat fixed,
+    radial-gradient(circle at 92% -4%, rgba(0, 212, 255, 0.1), transparent 42%) center top / 100% 100% no-repeat fixed,
+    var(--bg-primary);
+}
+
+/* 아래는 배경/테두리를 변수가 아니라 rgba 값으로 직접 박아둔 큰 뼈대 요소들(상단바/하단 네비/로그인
+   게이트/넓은 화면 비네트) - 위 :root 토큰 재정의만으로는 안 바뀌어서 라이트 모드용으로 따로 덮어쓴다.
+   selector 등장 순서가 아니라 :root[data-theme="light"] 쪽이 속성 선택자만큼 더 구체적이라 항상
+   이긴다 - 그래서 원래 규칙 바로 옆이 아니라 이렇게 한데 모아둬도 무방하다. */
+:root[data-theme="light"] .topbar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(234, 244, 238, 0.94) 100%);
+  background-image:
+    repeating-linear-gradient(90deg, rgba(18, 33, 26, 0.025) 0px, rgba(18, 33, 26, 0.025) 40px, transparent 40px, transparent 80px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(234, 244, 238, 0.94) 100%);
+}
+:root[data-theme="light"] .kst-badge {
+  background: rgba(18, 33, 26, 0.05);
+  border-color: rgba(18, 33, 26, 0.12);
+}
+:root[data-theme="light"] .bottom-nav {
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.94) 0%, rgba(234, 244, 238, 0.94) 100%);
+}
+:root[data-theme="light"] .auth-gate {
+  background:
+    radial-gradient(circle at 10% -8%, rgba(36, 229, 131, 0.14), transparent 42%) center top / 100% 100% no-repeat fixed,
+    radial-gradient(circle at 92% -4%, rgba(0, 212, 255, 0.1), transparent 40%) center top / 100% 100% no-repeat fixed,
+    var(--bg-primary);
+}
+@media (min-width: 760px) {
+  :root[data-theme="light"] .app {
+    background: rgba(255, 255, 255, 0.55);
+    box-shadow:
+      0 0 0 1px rgba(18, 33, 26, 0.08),
+      50px 0 90px -30px rgba(18, 33, 26, 0.18),
+      -50px 0 90px -30px rgba(18, 33, 26, 0.18);
+  }
 }
 
 .app {
@@ -46,6 +117,18 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+}
+
+/* 넓은 화면에서는 앱 컬럼 자체에 살짝 비네트+틴트를 줘서 배경 위에 "떠 있는 카드"처럼 보이게 한다
+   (bottom-nav가 fixed로 실제 뷰포트 바닥에 붙어있어야 해서 .app 높이/마진은 그대로 둔다). */
+@media (min-width: 760px) {
+  .app {
+    background: rgba(6, 14, 10, 0.3);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      50px 0 90px -30px rgba(0, 0, 0, 0.65),
+      -50px 0 90px -30px rgba(0, 0, 0, 0.65);
+  }
 }
 
 /* ---------- 로그인 게이트(앱 실행 시 로그인 전까지 앱 본편을 가림) ---------- */
@@ -59,8 +142,10 @@ body {
   padding: 24px;
   overflow-y: auto;
   background:
+    radial-gradient(circle at 10% -8%, rgba(36, 229, 131, 0.16), transparent 42%) center top / 100% 100% no-repeat fixed,
+    radial-gradient(circle at 92% -4%, rgba(0, 212, 255, 0.12), transparent 40%) center top / 100% 100% no-repeat fixed,
     linear-gradient(180deg, rgba(10, 20, 16, 0.55) 0%, rgba(10, 20, 16, 0.85) 55%, var(--bg-primary) 90%) center top / 100% 100% no-repeat fixed,
-    url("/img/stadium.png") center top / min(900px, 100%) auto no-repeat fixed,
+    url("/img/stadium.png") center top / cover no-repeat fixed,
     var(--bg-primary);
 }
 
@@ -145,6 +230,67 @@ body {
 }
 
 /* ---------- Topbar ---------- */
+.theme-toggle-row {
+  display: flex;
+  gap: 8px;
+}
+.theme-toggle-btn {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-toggle-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.install-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--accent-soft);
+  border-bottom: 1px solid var(--border-strong);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.install-banner-icon {
+  flex: none;
+  font-size: 16px;
+}
+.install-banner-text {
+  flex: 1;
+  line-height: 1.4;
+}
+.install-banner-action {
+  flex: none;
+  background: var(--accent);
+  color: #06140d;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.install-banner-close {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+}
+
 .topbar {
   position: sticky;
   top: 0;
@@ -153,7 +299,8 @@ body {
   align-items: center;
   justify-content: center;
   padding: 16px 20px;
-  background: linear-gradient(180deg, rgba(13, 28, 21, 0.86) 0%, rgba(10, 20, 16, 0.86) 100%);
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(13, 28, 21, 0.9) 0%, rgba(10, 20, 16, 0.88) 100%);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
@@ -165,10 +312,28 @@ body {
       transparent 40px,
       transparent 80px
     ),
-    linear-gradient(180deg, rgba(13, 28, 21, 0.86) 0%, rgba(10, 20, 16, 0.86) 100%);
+    linear-gradient(180deg, rgba(13, 28, 21, 0.9) 0%, rgba(10, 20, 16, 0.88) 100%);
+  box-shadow: 0 1px 0 rgba(36, 229, 131, 0.28), 0 10px 26px -10px rgba(36, 229, 131, 0.2);
+}
+
+/* 스타디움 플로드라이트를 연상시키는 은은한 사선 광택이 천천히 훑고 지나간다 */
+.topbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.05) 48%, transparent 62%);
+  background-size: 220% 100%;
+  animation: topbarSheen 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes topbarSheen {
+  0%, 100% { background-position: -120% 0; }
+  50% { background-position: 120% 0; }
 }
 
 .brand {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -190,7 +355,12 @@ body {
   font-weight: 800;
   font-size: 17px;
   letter-spacing: -0.5px;
-  box-shadow: 0 4px 14px rgba(36, 229, 131, 0.35);
+  animation: brandGlow 3.2s ease-in-out infinite;
+}
+
+@keyframes brandGlow {
+  0%, 100% { box-shadow: 0 4px 14px rgba(36, 229, 131, 0.35), 0 0 18px rgba(36, 229, 131, 0.22); }
+  50% { box-shadow: 0 4px 16px rgba(36, 229, 131, 0.45), 0 0 26px rgba(0, 212, 255, 0.32); }
 }
 
 .brand-accent {
@@ -205,9 +375,10 @@ body {
   transform: translateY(-50%);
   font-size: 11px;
   font-weight: 700;
-  color: var(--text-muted);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(6px);
   border-radius: 20px;
   padding: 4px 9px;
   cursor: default;
@@ -279,6 +450,101 @@ body {
   transform: translateY(-1px) scale(1.06);
 }
 
+/* "더보기" 토글 버튼 - nav-btn과 똑같이 생겼지만 실제 화면 전환용 view가 없는 팝오버 스위치라
+   router.js의 범용 .nav-btn 클릭 핸들러(showView 등)에 절대 걸리면 안 돼서 클래스를 분리했다. */
+.more-toggle-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 7px 1px;
+  margin: 0 2px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.more-toggle-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.more-toggle-btn span {
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.more-toggle-btn:hover,
+.more-toggle-btn.active {
+  color: var(--accent);
+}
+
+.more-toggle-btn.active {
+  background: var(--accent-soft);
+}
+
+/* "더보기" 팝오버 - 이적시장/AI분석/명예의전당을 여기 담아둔다. 바텀 네비게이션 바로 위에
+   떠오르고, 안의 버튼들은 원래 .nav-btn 그대로라 router.js 로직을 하나도 안 건드린다. */
+.more-menu {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 900px;
+  margin: 0 auto;
+  z-index: 19;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: linear-gradient(180deg, rgba(18, 33, 26, 0.98) 0%, rgba(10, 20, 16, 0.98) 100%);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 16px 16px 0 0;
+  padding: 8px;
+  padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  transform: translateY(12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+.more-menu.open {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.more-menu .nav-btn {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+
+.more-menu .nav-btn svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.more-menu .nav-btn span {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.more-menu .nav-btn:hover {
+  background: var(--bg-elevated);
+}
+
 /* ---------- Content / Views ---------- */
 .content {
   flex: 1;
@@ -337,6 +603,7 @@ body {
   border-color: var(--accent);
   color: var(--accent);
   transform: translateY(-1px);
+  box-shadow: 0 0 16px rgba(36, 229, 131, 0.25);
 }
 
 .refresh-btn {
@@ -403,12 +670,14 @@ body {
 .watch-bell {
   background: none;
   border: none;
-  font-size: 15px;
+  font-size: 19px;
   line-height: 1;
   cursor: pointer;
   opacity: 0.45;
   transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
-  padding: 2px;
+  /* 목록 행에 남는 유일한 탭 대상이라(중계/티켓은 상세로 옮김), 터치하기 편하게 여백을 넉넉히 둔다. */
+  padding: 8px;
+  margin: -8px;
 }
 
 .watch-bell:hover {
@@ -420,17 +689,68 @@ body {
 }
 
 .hero-match-card {
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(160deg, var(--bg-elevated), var(--bg-card));
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  padding: 22px 20px;
   cursor: pointer;
   box-shadow: var(--shadow);
-  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+
+/* 배경에 은은하게 번지는 그라디언트 글로우 두 개를 겹쳐서 "화려한" 입체감을 준다 */
+.hero-match-card::before {
+  content: "";
+  position: absolute;
+  inset: -30% -10% auto -10%;
+  height: 150%;
+  background: radial-gradient(circle at 18% 0%, rgba(36, 229, 131, 0.22), transparent 55%),
+    radial-gradient(circle at 88% 12%, rgba(0, 212, 255, 0.16), transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 호버 시 은은하게 떠오르는 그라디언트 테두리 링 */
+.hero-match-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--gradient-brand);
+  opacity: 0;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  transition: opacity 0.3s var(--ease);
+  pointer-events: none;
 }
 
 .hero-match-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+}
+
+.hero-match-card:hover::after {
+  opacity: 0.55;
+}
+
+/* 라이브 경기는 그라디언트 글로우가 은은하게 숨쉬듯 펄스 */
+.hero-match-card.is-live {
+  box-shadow: var(--glow-live);
+  animation: heroLiveGlow 2.4s ease-in-out infinite;
+}
+
+@keyframes heroLiveGlow {
+  0%, 100% { box-shadow: var(--glow-live); }
+  50% { box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.6), 0 0 34px rgba(36, 229, 131, 0.38), 0 10px 30px rgba(0, 0, 0, 0.45); }
+}
+
+.hero-match-top, .hero-match-teams {
+  position: relative;
+  z-index: 1;
 }
 
 .hero-match-top {
@@ -444,7 +764,10 @@ body {
 .hero-match-top-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 4px 12px 4px 5px;
+  border-radius: 999px;
 }
 
 .hero-match-comp-emblem {
@@ -457,11 +780,11 @@ body {
 }
 
 .hero-match-comp-name {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--text-primary);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .hero-match-teams {
@@ -497,7 +820,13 @@ body {
   border-radius: 50%;
   background: #eef2ef;
   padding: 9px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 3px var(--bg-card), 0 0 0 5px rgba(36, 229, 131, 0.22), 0 6px 16px rgba(0, 0, 0, 0.3);
+  transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+
+.hero-match-team:hover .hero-match-crest {
+  transform: scale(1.07);
+  box-shadow: 0 0 0 3px var(--bg-card), 0 0 0 5px rgba(36, 229, 131, 0.4), 0 6px 16px rgba(0, 0, 0, 0.3);
 }
 
 .hero-match-center {
@@ -509,9 +838,17 @@ body {
 }
 
 .hero-match-score {
-  font-size: 32px;
-  font-weight: 800;
+  font-size: 36px;
+  font-weight: 900;
   letter-spacing: -0.02em;
+}
+
+.hero-match-card.is-live .hero-match-score {
+  background: var(--gradient-live);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 14px rgba(36, 229, 131, 0.35));
 }
 
 .hero-match-status {
@@ -528,11 +865,24 @@ body {
 }
 
 .hero-match-status.live {
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: #06241c;
+  background: var(--gradient-live);
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(36, 229, 131, 0.35);
+}
+
+.hero-match-status.live .live-dot {
+  background: #06241c;
+  box-shadow: none;
+  animation: pulse 1.2s infinite;
 }
 
 .hero-match-status.scheduled {
+  color: var(--gold);
+  background: rgba(255, 209, 102, 0.1);
+}
+
+.hero-match-status.stale {
   color: var(--gold);
   background: rgba(255, 209, 102, 0.1);
 }
@@ -544,20 +894,32 @@ body {
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--bg-elevated);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }
 
 .competition-header {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.03);
+  padding: 12px 16px 12px 20px;
+  background: linear-gradient(90deg, rgba(36, 229, 131, 0.09), rgba(255, 255, 255, 0.02) 65%);
   border-bottom: 1px solid var(--border);
   font-weight: 700;
   font-size: 13.5px;
   color: var(--text-primary);
   cursor: pointer;
   user-select: none;
+}
+
+.competition-header::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--gradient-brand);
 }
 
 .competition-header-name {
@@ -570,11 +932,11 @@ body {
 
 .competition-header-count {
   font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  background: var(--bg-card);
+  font-weight: 800;
+  color: #06241c;
+  background: var(--gradient-brand);
   border-radius: 999px;
-  padding: 2px 8px;
+  padding: 2px 9px;
 }
 
 .competition-header-arrow {
@@ -601,6 +963,7 @@ body {
 }
 
 .match-row {
+  position: relative;
   display: grid;
   grid-template-columns: 56px 1fr auto 1fr auto;
   align-items: center;
@@ -608,7 +971,27 @@ body {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
-  transition: background 0.2s var(--ease);
+  transition: background 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+.match-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--gradient-brand);
+  opacity: 0;
+  transition: opacity 0.2s var(--ease);
+}
+
+.match-row.is-live {
+  background: linear-gradient(90deg, rgba(36, 229, 131, 0.07), transparent 45%);
+}
+
+.match-row.is-live::before {
+  opacity: 1;
 }
 
 .match-row-actions {
@@ -617,23 +1000,6 @@ body {
   gap: 6px;
 }
 
-.match-ticket-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  font-size: 14px;
-  text-decoration: none;
-  border-radius: 6px;
-  background: var(--accent-soft);
-  flex-shrink: 0;
-  transition: transform 0.2s var(--ease);
-}
-
-.match-ticket-btn:hover {
-  transform: translateY(-1px) scale(1.05);
-}
 
 .match-row:last-child {
   border-bottom: none;
@@ -641,6 +1007,10 @@ body {
 
 .match-row:hover {
   background: var(--bg-card-hover);
+}
+
+.match-row:hover::before {
+  opacity: 1;
 }
 
 .match-status {
@@ -663,7 +1033,13 @@ body {
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
-  animation: pulse 1.2s infinite;
+  animation: pulse 1.2s infinite, liveDotRipple 1.8s infinite;
+}
+
+@keyframes liveDotRipple {
+  0% { box-shadow: 0 0 0 0 rgba(36, 229, 131, 0.5); }
+  70% { box-shadow: 0 0 0 5px rgba(36, 229, 131, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(36, 229, 131, 0); }
 }
 
 .live-dot.result-win {
@@ -688,6 +1064,10 @@ body {
 }
 
 .match-status.scheduled {
+  color: var(--gold);
+}
+
+.match-status.stale {
   color: var(--gold);
 }
 
@@ -738,8 +1118,14 @@ body {
 }
 
 .score-box.live-score {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--gradient-live);
+  color: #06241c;
+  font-weight: 900;
+  box-shadow: 0 3px 12px rgba(36, 229, 131, 0.3);
+}
+
+.score-box.live-score .score-dash {
+  color: rgba(6, 36, 28, 0.55);
 }
 
 .score-dash {
@@ -1184,7 +1570,14 @@ table.standings-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: fixed;
 }
+
+/* 득점/실점 컬럼이 추가되면서 팀명 칸이 좁아져 줄바꿈되던 문제 - table-layout: fixed로 컬럼 폭을
+   고정하고 팀명 칸만 넉넉히 잡은 뒤, 넘치는 이름은 말줄임표로 자른다. */
+.standings-table th:first-child, .standings-table td:first-child { width: 11%; }
+.standings-table th:nth-child(2), .standings-table td:nth-child(2) { width: 30%; }
+.standings-table th:not(:first-child):not(:nth-child(2)), .standings-table td:not(:first-child):not(:nth-child(2)) { width: 7.375%; }
 
 .standings-table thead th {
   background: rgba(255, 255, 255, 0.03);
@@ -1201,6 +1594,7 @@ table.standings-table {
   padding: 9px 8px;
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
+  overflow: hidden;
 }
 
 .standings-table tbody tr:last-child td {
@@ -1334,6 +1728,24 @@ table.standings-table {
   gap: 8px;
   font-weight: 600;
   cursor: pointer;
+  min-width: 0;
+}
+
+.team-cell.mine {
+  color: var(--accent);
+}
+
+.team-name-text {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mine-star {
+  font-size: 12px;
+  color: var(--gold);
 }
 
 .standings-table .num {
@@ -1438,6 +1850,10 @@ table.standings-table {
   color: var(--text-muted);
 }
 
+.scoreboard-status.stale {
+  color: var(--gold);
+}
+
 .detail-info-grid {
   margin-top: 20px;
   display: grid;
@@ -1470,6 +1886,45 @@ table.standings-table {
   text-align: center;
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+/* 중계/티켓 버튼 - 예전엔 경기 목록 행 안에 아이콘만 작게(18~24px) 박아뒀었는데, 손가락으로
+   누르기 힘들다는 피드백을 받아 경기 상세로 옮기고 여기선 넉넉한 크기의 버튼으로 보여준다.
+   좁은 화면에서 두 개를 나란히 두면 "쿠팡플레이에서 중계 보기" 같은 긴 문구가 어중간하게
+   줄바꿈돼 잘린 것처럼 보여서, 한 줄에 하나씩 세로로 쌓아 폭을 넉넉히 확보한다. */
+.detail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0 0;
+}
+
+.detail-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+.detail-action-btn:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.detail-action-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
 }
 
 /* ---------- Match stats / lineups / h2h ---------- */
@@ -1514,6 +1969,152 @@ table.standings-table {
 .stat-bar-fill {
   height: 100%;
   background: var(--accent);
+}
+
+.dominance-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.dominance-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.dominance-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* 색은 이제 팀 색상을 인라인 style로 넣으므로(dominanceTeamColors), 여기선 형태만 규정한다. */
+.dominance-fill {
+  height: 100%;
+}
+
+.dominance-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dominance-timeline {
+  margin-top: 18px;
+}
+
+.dominance-timeline-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dominance-legend-crest {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+.legend-line {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.dominance-chart-wrap {
+  position: relative;
+}
+.dominance-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.dominance-gridline {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.dominance-baseline {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.6;
+}
+.dominance-axis-label {
+  fill: var(--text-muted);
+  font-size: 9.5px;
+}
+.dominance-ht-label {
+  fill: var(--text-secondary);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+.dominance-event-icon {
+  font-size: 11px;
+}
+.dominance-crosshair {
+  stroke: var(--text-secondary);
+  stroke-width: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+.dominance-hover-dot {
+  opacity: 0;
+  pointer-events: none;
+  stroke: var(--bg-card);
+  stroke-width: 2;
+}
+
+.dominance-tooltip {
+  position: absolute;
+  top: 26px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  z-index: 2;
+}
+.dominance-tooltip strong {
+  color: var(--text-primary);
+}
+.dominance-tooltip-events {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
+.dominance-foot-note {
+  margin-top: 8px;
 }
 
 .tactical-note {
@@ -1661,6 +2262,30 @@ table.standings-table {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
+/* 평점(우상)/교체시간(좌상)이 이미 위쪽 귀퉁이를 쓰고 있어 골/어시스트는 사진 아래쪽에 겹치지 않게 둔다. */
+.pitch-event-badge {
+  position: absolute;
+  bottom: -4px;
+  left: -6px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  font-size: 9px;
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  line-height: 1.3;
+}
+
+.lineup-event-badges {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 4px;
+}
+
+.lineup-event-icon {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .pitch-player-name {
   font-size: 9.5px;
   font-weight: 700;
@@ -1714,6 +2339,97 @@ table.standings-table {
 
 .pitch-stat span {
   font-size: 9.5px;
+  color: var(--text-muted);
+}
+
+/* K리그 매치센터 폴백 라인업(피치 좌표계가 달라 다이어그램 대신 리스트로 보여줌) */
+.lineup-simple-team {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.lineup-simple-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.lineup-simple-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lineup-simple-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.lineup-simple-row:last-child {
+  border-bottom: none;
+}
+
+.lineup-simple-num {
+  width: 22px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.lineup-simple-photo {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #eef2ef;
+}
+
+.lineup-simple-name {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lineup-simple-pos {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.lineup-simple-subs {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.lineup-simple-coach {
+  margin-top: 8px;
+  font-size: 11.5px;
   color: var(--text-muted);
 }
 
@@ -2186,6 +2902,118 @@ table.standings-table {
   white-space: nowrap;
 }
 
+/* ---------- 설정 ---------- */
+.settings-group {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.settings-group .notify-btn,
+.settings-group .goal-sound-picker {
+  margin-bottom: 0;
+}
+
+.settings-group .goal-sound-picker {
+  margin-top: 14px;
+  border: none;
+  padding: 0;
+  background: none;
+}
+
+.settings-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.settings-group-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.settings-group > .settings-row + .goal-sound-picker {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.notif-type-list .settings-row + .settings-row {
+  border-top: 1px solid var(--border);
+}
+
+.settings-row-label {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+/* 알림 종류별/소리 on-off 스위치 - 네이티브 체크박스를 시각적으로 숨기고 트랙+손잡이로 그린다. */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.toggle-switch-track {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: background 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.toggle-switch-track::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.toggle-switch input:checked + .toggle-switch-track {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.toggle-switch input:checked + .toggle-switch-track::before {
+  background: var(--accent);
+  transform: translateX(18px);
+}
+
+.toggle-switch input:disabled + .toggle-switch-track {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .myteam-card {
   position: relative;
   display: flex;
@@ -2236,34 +3064,28 @@ table.standings-table {
 .form-strip {
   margin-top: 6px;
   display: flex;
-  gap: 4px;
+  gap: 1px;
+  font-size: 13px;
+  font-weight: 800;
 }
 
+/* 색칠된 정사각 배지(동그라미처럼 보여 헷갈린다는 피드백) 대신 승/무/패 한글 텍스트에 색만 입혀서
+   "승승승무패"처럼 나란히 붙여 보여준다. */
 .form-badge {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  font-size: 10px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #06140d;
+  line-height: 1;
 }
 
 .form-badge.w {
-  background: var(--accent);
+  color: var(--accent);
 }
 
 /* 무승부는 초록(승)/빨강(패)과 헷갈리지 않게 회색으로 통일 */
 .form-badge.d {
-  background: var(--text-muted);
-  color: #fff;
+  color: var(--text-muted);
 }
 
 .form-badge.l {
-  background: var(--live-red);
-  color: #fff;
+  color: var(--live-red);
 }
 
 .myteam-remove {
@@ -2539,6 +3361,187 @@ table.standings-table {
   color: var(--live-red);
   font-size: 12px;
   min-height: 14px;
+}
+
+.auth-security-hint {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: -2px 0 0;
+}
+
+.auth-agree-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  cursor: pointer;
+}
+/* #auth-form input { width: 100% }가 ID 선택자라 일반 규칙보다 우선해서, 체크박스도 텍스트
+   입력칸처럼 가로 전체로 늘어나 옆의 동의 문구가 좁은 세로줄로 밀려나는 버그가 있었다 - ID 선택자를
+   이겨야 해서 여기만 예외적으로 !important를 쓴다. */
+#auth-form input[type="checkbox"].auth-agree-checkbox {
+  width: 16px !important;
+  margin-top: 2px;
+  flex: none;
+  accent-color: var(--accent);
+}
+.auth-agree-row span {
+  flex: 1;
+  min-width: 0;
+}
+.auth-agree-row a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.admin-analytics-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.admin-analytics-row {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.admin-analytics-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.admin-analytics-total {
+  font-weight: 400;
+  color: var(--accent);
+  margin-left: 6px;
+}
+.admin-analytics-detail {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.admin-reports-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.admin-report-row {
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.admin-report-target {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.admin-report-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 4px 0;
+  white-space: pre-wrap;
+}
+.admin-report-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.admin-report-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.admin-report-actions button {
+  flex: 1;
+}
+
+.settings-legal-links {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 24px 0 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.settings-legal-links a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+.settings-legal-links a:hover {
+  color: var(--accent);
+}
+
+.auth-find-toggle {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 6px 0 0;
+}
+
+#auth-find-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#auth-find-wrap input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  padding: 11px 12px;
+}
+
+#auth-find-wrap input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#auth-find-username-panel,
+#auth-find-password-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-find-result {
+  font-size: 12.5px;
+  min-height: 14px;
+}
+
+.auth-find-result.ok {
+  color: var(--accent);
+}
+
+.auth-find-result.error {
+  color: var(--live-red);
+}
+
+#admin-test-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#admin-test-panel input,
+#admin-test-panel select {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  padding: 11px 12px;
 }
 
 /* ---------- 프로필/레벨/친구 ---------- */
@@ -3316,56 +4319,6 @@ table.standings-table {
 }
 
 /* ---------- Goal toast ---------- */
-.goal-toast {
-  position: fixed;
-  top: 16px;
-  left: 50%;
-  transform: translate(-50%, -140%);
-  z-index: 999;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-  color: #06140d;
-  padding: 12px 22px;
-  border-radius: 14px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-  text-align: left;
-  max-width: 90vw;
-  opacity: 0;
-  transition: transform 0.35s var(--ease), opacity 0.35s var(--ease);
-  pointer-events: none;
-}
-
-.goal-toast.show {
-  transform: translate(-50%, 0);
-  opacity: 1;
-}
-
-.goal-toast-ball {
-  font-size: 30px;
-  line-height: 1;
-  animation: goalBallSpin 0.7s ease-in-out infinite;
-}
-
-@keyframes goalBallSpin {
-  0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(180deg) scale(1.15); }
-  100% { transform: rotate(360deg) scale(1); }
-}
-
-.goal-toast-title {
-  font-size: 17px;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  animation: goalTitlePulse 0.5s ease-in-out infinite alternate;
-}
-
-@keyframes goalTitlePulse {
-  from { transform: scale(1); }
-  to { transform: scale(1.08); }
-}
-
 .goal-toast-body {
   font-size: 13px;
   font-weight: 700;
@@ -3409,19 +4362,142 @@ table.standings-table {
   letter-spacing: 0.02em;
 }
 
-.goal-flash {
+/* ---------- 골 세리모니 애니메이션(전체 화면 오버레이) ---------- */
+/* 상단에서 슬라이드다운되는 골 알림 팝업 - 화면을 가리지 않고 계속 앱을 볼 수 있다. */
+.goal-banner-wrap {
   position: fixed;
-  inset: 0;
-  z-index: 998;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  display: flex;
+  justify-content: center;
+  padding: max(14px, env(safe-area-inset-top, 0px)) 14px 0;
   pointer-events: none;
-  background: radial-gradient(ellipse at top, rgba(61, 252, 160, 0.35), transparent 65%);
-  opacity: 0;
-  transition: opacity 0.15s ease-out;
 }
 
-.goal-flash.show {
+.goal-popup {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 420px;
+  cursor: pointer;
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  background: linear-gradient(135deg, #0d100e 0%, #0a0a0a 55%, #0d1310 100%);
+  border: 2px solid var(--accent);
+  border-radius: 18px;
+  padding: 13px 18px;
+  box-shadow:
+    0 0 0 1px rgba(36, 229, 131, 0.5),
+    0 0 18px rgba(36, 229, 131, 0.45),
+    0 0 42px rgba(36, 229, 131, 0.22),
+    0 20px 44px rgba(0, 0, 0, 0.5);
+  transform: translateY(-140%);
+  opacity: 0;
+  transition: transform 0.5s var(--ease), opacity 0.3s ease;
+}
+
+.goal-banner-wrap.show .goal-popup {
+  transform: translateY(0);
   opacity: 1;
-  transition: opacity 0.55s ease-in;
+}
+
+.goal-team-col {
+  flex-shrink: 0;
+  width: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.team-emblem-box {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #ffffff, #e4e9e6 70%);
+  box-shadow: 0 0 0 1px rgba(36, 229, 131, 0.4), 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.team-emblem-box img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+}
+
+.goal-team-name {
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.goal-main-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.goal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.goal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-shadow: 0 0 16px rgba(36, 229, 131, 0.55);
+  animation: goalBadgePop 0.4s var(--ease);
+}
+
+@keyframes goalBadgePop {
+  from { transform: scale(0.7); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.goal-time {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+  border: 1.5px solid var(--accent);
+  border-radius: 999px;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
+.goal-scorer {
+  font-size: 25px;
+  font-weight: 900;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------- 축알못의 축구교실 ---------- */
@@ -3619,13 +4695,45 @@ table.standings-table {
 
 /* ---------- Responsive ---------- */
 @media (max-width: 480px) {
+  /* 경기 목록 행 한 칸(375px 기준)을 실측(Playwright 헤드리스로 iPhone 뷰포트 스크린샷 확인)해보니
+     티켓(🎟)만 있던 시절 기준값(auto 폭 칼럼 3개 + score-box min-width:56px)이 TV(📺) 아이콘까지
+     최대 3개가 붙는 경우(K리그 경기 등: 중계+티켓+알림벨) 팀 이름 칸이 33px까지 눌려 "Ga…"처럼
+     두 글자만 보이는 문제가 있었다. 시각/스코어/액션 칼럼을 각각 줄여 팀 이름에 공간을 돌려준다.
+     (숫자는 실측 후 재조정한 값 - 감으로 정한 값이 아님.) */
   .match-row {
-    grid-template-columns: 44px 1fr auto 1fr auto;
-    gap: 6px;
-    padding: 10px 12px;
+    grid-template-columns: 34px 1fr auto 1fr auto;
+    gap: 4px;
+    padding: 10px 8px;
+  }
+  .team {
+    gap: 5px;
+  }
+  .team-crest {
+    width: 18px;
+    height: 18px;
   }
   .team-name {
-    font-size: 13px;
+    font-size: 12px;
+  }
+  .match-status {
+    font-size: 10.5px;
+  }
+  .score-box {
+    min-width: 34px;
+    padding: 3px 5px;
+    font-size: 14px;
+    gap: 3px;
+  }
+  .match-row-actions {
+    gap: 2px;
+  }
+  .hero-match-crest {
+    width: 48px;
+    height: 48px;
+    padding: 7px;
+  }
+  .hero-match-team span {
+    font-size: 12.5px;
   }
   .scoreboard-crest {
     width: 44px;
@@ -3634,4 +4742,520 @@ table.standings-table {
   .scoreboard-score {
     font-size: 30px;
   }
+}
+
+/* ---------- 첫 방문 온보딩 힌트("나의 팀" 탭 가리키는 말풍선) ---------- */
+.onboarding-tip {
+  position: fixed;
+  z-index: 3000;
+  max-width: 250px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.onboarding-tip.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.onboarding-tip-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  background: var(--bg-card);
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  padding: 12px 12px 12px 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(36, 229, 131, 0.2);
+}
+
+.onboarding-tip-emoji {
+  font-size: 19px;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.onboarding-tip-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.onboarding-tip-text strong {
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.onboarding-tip-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.onboarding-tip-arrow {
+  position: absolute;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: var(--bg-card);
+  border-right: 1px solid var(--accent);
+  border-bottom: 1px solid var(--accent);
+  transform: rotate(45deg);
+}
+
+/* ---------- 포인트 안내 팝업 ---------- */
+.points-info-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  align-self: center;
+}
+
+.points-info-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.points-info-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.points-info-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.points-info-card {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+.points-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.points-info-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.points-info-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.points-info-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.points-info-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.points-info-icon {
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.points-info-label {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.points-info-value {
+  font-weight: 800;
+  font-size: 13.5px;
+  color: var(--text-primary);
+}
+
+.points-info-value.good {
+  color: var(--accent);
+}
+
+.points-info-value.bad {
+  color: var(--danger, #e5484d);
+}
+
+.points-info-note {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.points-history-toggle {
+  width: 100%;
+  margin-top: 12px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 9px;
+  cursor: pointer;
+}
+
+.points-history-list {
+  margin-top: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.points-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  background: var(--bg-card);
+  border-radius: 8px;
+}
+
+.points-history-reason {
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.points-history-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.points-history-delta {
+  font-weight: 800;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.points-history-delta.good {
+  color: var(--accent);
+}
+
+.points-history-delta.bad {
+  color: var(--danger, #e5484d);
+}
+
+.points-history-date {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ---------- 팬 커뮤니티 게시판 ---------- */
+.community-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.community-write-btn {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: #06140d;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.community-filter-row {
+  position: relative;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.community-team-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px 2px 4px;
+}
+
+.community-team-badge-crest {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: #eef2ef;
+}
+
+.community-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.community-row {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease);
+}
+
+.community-row:hover {
+  border-color: var(--accent);
+}
+
+.community-row-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.community-row-nickname {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.community-row-comments {
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.community-write-wrap,
+.community-detail-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.community-title-input,
+.community-body-input,
+.community-comment-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13.5px;
+  padding: 11px 12px;
+  resize: vertical;
+}
+
+.community-title-input:focus,
+.community-body-input:focus,
+.community-comment-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.community-submit-btn {
+  background: var(--accent);
+  color: #06140d;
+  border: none;
+  border-radius: var(--radius);
+  padding: 12px;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.community-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.community-post-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.community-post-title {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.community-post-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.community-delete-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.community-delete-btn:hover {
+  border-color: var(--danger, #e5484d);
+  color: var(--danger, #e5484d);
+}
+
+.community-report-btn {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.community-report-btn:hover {
+  border-color: #ffb454;
+  color: #ffb454;
+}
+
+.community-comments-section {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.community-comments-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.community-comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.community-comment {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.community-comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.community-comment-body {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.community-comment-edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.community-comment-edit-actions .community-submit-btn {
+  flex: 1;
+  padding: 8px;
+  font-size: 12.5px;
+}
+
+.community-comment-edit-actions .community-delete-btn {
+  padding: 8px 14px;
+}
+
+.community-comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.community-login-hint {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 10px;
 }

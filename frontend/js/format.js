@@ -64,9 +64,12 @@ export function liveMinuteLabel(status, elapsed) {
 const FALLBACK_CREST =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='18' font-size='18'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E";
 
+// team.crest/name은 대부분 API-Football 등 신뢰 소스에서 오지만, 커뮤니티 글의 팀 태그처럼 클라이언트가
+// 실어보낸 값을 그대로 쓰는 경로도 생겨서(팀 이름 자체는 검색 결과에서만 고르지만, API 요청은 위조 가능)
+// alt 속성 값은 항상 이스케이프한다 - 안 그러면 따옴표로 속성을 깨고 나가는 XSS가 가능해진다.
 export function crestImg(team, size) {
   const src = team.crest || "";
-  return `<img class="${size}" src="${src || FALLBACK_CREST}" onerror="this.src='${FALLBACK_CREST}'" alt="${team.shortName || team.name || ""}" />`;
+  return `<img class="${size}" src="${escapeHtml(src || FALLBACK_CREST)}" onerror="this.src='${FALLBACK_CREST}'" alt="${escapeHtml(team.shortName || team.name || "")}" />`;
 }
 
 const FALLBACK_EMBLEM =
@@ -74,7 +77,7 @@ const FALLBACK_EMBLEM =
 
 export function emblemImg(competition, size) {
   const src = competition?.emblem || "";
-  return `<img class="${size}" src="${src || FALLBACK_EMBLEM}" onerror="this.src='${FALLBACK_EMBLEM}'" alt="${competition?.name || ""}" />`;
+  return `<img class="${size}" src="${escapeHtml(src || FALLBACK_EMBLEM)}" onerror="this.src='${FALLBACK_EMBLEM}'" alt="${escapeHtml(competition?.name || "")}" />`;
 }
 
 function hashString(str) {
@@ -168,12 +171,23 @@ export function resultClass(result) {
 }
 
 // 최근 경기 중 스코어가 확정된 것만 최근 것부터 count개 뽑아 W/D/L 뱃지 띠로 렌더링한다.
+// recentMatches(팀 상세 API 응답)는 최신 경기가 배열 맨 앞에 오는 순서로 온다 - 예전엔 이걸
+// 과거순(오래된 경기가 먼저)이라고 잘못 가정하고 .slice(-count)(배열 끝에서 count개, 즉 가장
+// "오래된" count경기)를 뽑아서, 실제로는 최근 경기가 아니라 훨씬 예전 경기들을 보여주고 있었다
+// (예: 최근 2연패가 있어도 그보다 앞선 시기의 무패 구간이 우연히 뽑혀 패배가 안 보이는 식).
+// 배열 앞에서 count개(진짜 최신 순)를 뽑은 뒤, 좌→우로 "오래된 경기 -> 최근 경기" 순서로 읽히도록 뒤집는다.
+// 예전엔 W/D/L 알파벳을 색칠된 정사각 배지(동그라미처럼 보임)에 담아 보여줬는데, "승/무/패 텍스트가
+// 더 직관적"이라는 피드백에 따라 배지 없이 색깔만 입힌 한글 텍스트를 나란히 붙여 보여준다
+// (예: 승승승무패) - 과거->최근 순으로 이미 뒤집어 놓은 배열이라 왼쪽이 오래된 경기, 오른쪽이 최근이다.
+const FORM_RESULT_LABEL = { W: "승", D: "무", L: "패" };
+
 export function formBadgesHtml(matches, perspectiveTeamId, count = 5) {
   const badges = (matches || [])
     .map((m) => matchResultForTeam(m, perspectiveTeamId))
     .filter(Boolean)
-    .slice(-count)
-    .map((result) => `<span class="form-badge ${result.toLowerCase()}">${result}</span>`)
+    .slice(0, count)
+    .reverse()
+    .map((result) => `<span class="form-badge ${result.toLowerCase()}">${FORM_RESULT_LABEL[result]}</span>`)
     .join("");
   return badges ? `<div class="form-strip">${badges}</div>` : "";
 }
@@ -189,4 +203,11 @@ export function fadeIn(el) {
 // 목록류 화면의 첫 로딩 상태를 밋밋한 텍스트 대신 셰이머 스켈레톤으로.
 export function skeletonList(count = 4) {
   return `<div class="skeleton-list">${Array.from({ length: count }, () => '<div class="skeleton-row"></div>').join("")}</div>`;
+}
+
+// 여긴 API-Football/kleague.com처럼 신뢰하는 소스가 아니라 다른 사용자가 직접 입력한 값(커뮤니티
+// 글/댓글/닉네임)이 그대로 innerHTML에 들어가는 첫 사례라, 렌더링 전에 반드시 이스케이프해야 한다
+// (안 그러면 <script> 등을 제목에 넣는 식으로 다른 사용자 화면에서 코드가 실행되는 stored XSS가 생김).
+export function escapeHtml(str) {
+  return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }

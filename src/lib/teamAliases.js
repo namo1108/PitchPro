@@ -57,8 +57,9 @@ export const TEAM_KOREAN_ALIASES = [
   { en: "ajax", ko: ["아약스"] },
   { en: "porto", ko: ["포르투"] },
   { en: "benfica", ko: ["벤피카"] },
-  // 국가대표
-  { en: "korea republic", ko: ["한국", "대한민국"] },
+  // 국가대표 (API-Football이 실제로 주는 표기는 "Korea Republic"이 아니라 "South Korea" - 실제
+  // /teams 응답으로 확인함, 2026-07-25)
+  { en: "south korea", ko: ["한국", "대한민국"] },
   { en: "japan", ko: ["일본"] },
   { en: "brazil", ko: ["브라질"] },
   { en: "argentina", ko: ["아르헨티나"] },

@@ -1,11 +1,26 @@
 import { json } from "../lib/http.js";
-import { KV_KEYS } from "../lib/config.js";
+import { KV_KEYS, NOTIFICATION_TYPES } from "../lib/config.js";
 import { getAuthedUser } from "../lib/auth.js";
+import { sendPushToUsername } from "../lib/push.js";
 
 async function hashEndpoint(endpoint) {
   const data = new TextEncoder().encode(endpoint);
   const digest = await crypto.subtle.digest("SHA-256", data);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// 이 설정 이전에 만들어진 구독(record.prefs 없음)이든, 새로 만드는 구독이든 항상 이 기본값(전부 켜짐)
+// 에서 시작한다 - 사용자가 명시적으로 끈 항목만 false로 남는다.
+function defaultPrefs() {
+  return { sound: true, types: Object.fromEntries(NOTIFICATION_TYPES.map((t) => [t.id, true])) };
+}
+
+function mergePrefs(existing, incoming) {
+  const base = defaultPrefs();
+  return {
+    sound: incoming?.sound ?? existing?.sound ?? base.sound,
+    types: { ...base.types, ...existing?.types, ...incoming?.types },
+  };
 }
 
 export async function handleVapidPublicKey(request, env) {
@@ -34,6 +49,7 @@ export async function handleSubscribe(request, env) {
         subscription: body.subscription,
         teamIds: body.teamIds || [],
         matchIds: existing?.matchIds || [],
+        prefs: mergePrefs(existing?.prefs, null),
         username: user?.username || existing?.username || null,
         updatedAt: new Date().toISOString(),
       })
@@ -85,4 +101,56 @@ export async function handleWatchMatch(request, env) {
     return json({ detail: "일시적으로 알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요." }, 503);
   }
   return json({ status: "ok", matchIds: record.matchIds });
+}
+
+// 설정 탭에서 "이 기기"의 알림 소리/종류별 켜고 끄기를 조회한다. 구독 자체가 없으면(알림을 아직
+// 한 번도 켠 적 없음) 기본값(전부 켜짐)을 그대로 돌려줘서, 프론트가 매번 null 체크를 안 해도 되게 한다.
+export async function handleGetPreferences(request, env, url) {
+  const endpoint = url.searchParams.get("endpoint");
+  if (!endpoint) return json({ detail: "endpoint가 필요합니다." }, 400);
+
+  const id = await hashEndpoint(endpoint);
+  const raw = await env.CACHE.get(`${KV_KEYS.pushSubscriptionPrefix}${id}`);
+  const record = raw ? JSON.parse(raw) : null;
+  return json({ prefs: mergePrefs(record?.prefs, null) });
+}
+
+export async function handleSetPreferences(request, env) {
+  const body = await request.json();
+  if (!body?.endpoint) return json({ detail: "endpoint가 필요합니다." }, 400);
+
+  const id = await hashEndpoint(body.endpoint);
+  const key = `${KV_KEYS.pushSubscriptionPrefix}${id}`;
+  const raw = await env.CACHE.get(key);
+  if (!raw) return json({ detail: "구독 정보가 없습니다." }, 404);
+
+  const record = JSON.parse(raw);
+  record.prefs = mergePrefs(record.prefs, body.prefs);
+  record.updatedAt = new Date().toISOString();
+
+  try {
+    await env.CACHE.put(key, JSON.stringify(record));
+  } catch (err) {
+    console.error("push preferences write failed:", err);
+    return json({ detail: "일시적으로 알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요." }, 503);
+  }
+  return json({ status: "ok", prefs: record.prefs });
+}
+
+// 실제 골/이벤트가 날 때까지 기다리지 않고도 특정 계정 기기로 알림이 실제로(백그라운드에서도) 오는지
+// 바로 확인해보고 싶을 때 쓰는 관리자용 테스트 발송 - username 하나만 지정해서 그 계정에만 간다
+// (전체 구독자 브로드캐스트가 아님 - 실사용자에게 테스트 알림이 잘못 가는 일이 없게).
+export async function handleTestPush(request, env) {
+  const body = await request.json();
+  if (!body?.username) return json({ detail: "username이 필요합니다." }, 400);
+
+  const sent = await sendPushToUsername(env, body.username, {
+    type: body.type || "goal",
+    title: body.title || "🔔 테스트 알림",
+    body: body.body || "이 알림이 보이면 백그라운드 푸시가 정상 동작하는 거예요.",
+    ...(body.image ? { image: body.image } : {}),
+  });
+
+  if (!sent) return json({ detail: "이 계정으로 등록된 알림 구독을 찾을 수 없습니다." }, 404);
+  return json({ status: "ok" });
 }

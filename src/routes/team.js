@@ -9,6 +9,7 @@ import {
   selectCurrentCoach,
   applyCoachOverride,
   applySquadRemovals,
+  koreanizeTeam,
 } from "../adapters/apiFootballAdapter.js";
 import {
   getKLeaguePlayerPhotoMap,
@@ -20,6 +21,17 @@ import { findKLeagueVenue } from "../lib/kleagueVenues.js";
 
 const TEAM_CACHE_TTL_SECONDS = 600;
 const TEAM_STALE_KEY_PREFIX = "team:stale:";
+
+// 팀 한글명 매핑을 나중에 추가/수정해도, 캐시(10분)나 업스트림 장애 시 대체용 stale 캐시(TTL 없음)에
+// 남아있는 예전 이름이 그대로 나가지 않도록 응답 직전에 한 번 더 보정한다.
+function reKoreanize(result) {
+  return {
+    ...result,
+    team: koreanizeTeam(result.team),
+    recentMatches: (result.recentMatches || []).map((m) => ({ ...m, homeTeam: koreanizeTeam(m.homeTeam), awayTeam: koreanizeTeam(m.awayTeam) })),
+    upcomingMatches: (result.upcomingMatches || []).map((m) => ({ ...m, homeTeam: koreanizeTeam(m.homeTeam), awayTeam: koreanizeTeam(m.awayTeam) })),
+  };
+}
 
 async function buildTeam(env, teamId) {
   const [teamRaw, recentRaw, upcomingRaw, squadRaw, coachRaw] = await Promise.all([
@@ -64,16 +76,16 @@ export async function handleTeamDetail(request, env, id) {
   const venue = findKLeagueVenue(id);
 
   const cached = await getJSON(env, cacheKey);
-  if (cached) return json({ ...cached, venue });
+  if (cached) return json({ ...reKoreanize(cached), venue });
 
   try {
     const result = await buildTeam(env, id);
     await putJSON(env, cacheKey, result, { expirationTtl: TEAM_CACHE_TTL_SECONDS });
     await putJSON(env, staleKey, result); // TTL 없이 마지막 성공 응답을 보관 -> 업스트림 장애/레이트리밋 시 대체용
-    return json({ ...result, venue });
+    return json({ ...reKoreanize(result), venue });
   } catch (err) {
     const stale = await getJSON(env, staleKey);
-    if (stale) return json({ ...stale, venue, stale: true });
+    if (stale) return json({ ...reKoreanize(stale), venue, stale: true });
     return json({ detail: String(err.message || err) }, 502);
   }
 }

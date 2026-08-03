@@ -1,6 +1,7 @@
 import { json } from "../lib/http.js";
 import { getJSON } from "../lib/kv.js";
 import { KV_KEYS, transferMarketCompetitions } from "../lib/config.js";
+import { koreanTeamName, koreanizeTeamNameOnly } from "../adapters/apiFootballAdapter.js";
 
 // 팀별로 구분해서 보여줄 거라, 같은 리그 안 이적이 양쪽 팀 관점(영입 쪽/방출 쪽)에서 각각 한 번씩
 // 나오는 건 자연스러운 중복이라 걸러내지 않는다(예: A팀 방출 목록에도, B팀 영입 목록에도 같은 건이 뜸).
@@ -14,8 +15,13 @@ export async function handleTransfers(request, env) {
     if (!byCompetition.has(team.competitionCode)) byCompetition.set(team.competitionCode, []);
     byCompetition.get(team.competitionCode).push({
       teamId: team.teamId,
-      teamName: team.teamName,
-      items: team.transfers.slice().sort((a, b) => new Date(b.date) - new Date(a.date)),
+      // 이 팀은 id가 있어 id 기준으로, 상대팀(fromTeam/toTeam)은 id 없이 이름 문자열만 있어 이름 기준으로
+      // 한글화한다(둘 다 순위표/이적시장 크론이 다시 돌기 전까지 예전 이름을 들고 있을 수 있어 응답 직전 보정).
+      teamName: koreanTeamName(team.teamId, team.teamName),
+      items: team.transfers
+        .slice()
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .map((t) => ({ ...t, fromTeam: koreanizeTeamNameOnly(t.fromTeam), toTeam: koreanizeTeamNameOnly(t.toTeam) })),
     });
   }
 

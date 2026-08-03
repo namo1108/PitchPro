@@ -17,43 +17,70 @@ async function getRegistration() {
   return swRegistration;
 }
 
-// 아직 구독 중이 아니면 권한 요청 + 구독 + 서버 등록까지 처리하고 구독 객체를 돌려준다.
-// 권한 거부/미지원이면 null.
+// 서비스워커(sw.js)는 localStorage에 접근할 수 없어서, pushsubscriptionchange로 재구독할 때
+// 열린 탭에 즐겨찾기 팀 id 목록을 물어본다 - 여기서 응답해준다.
+navigator.serviceWorker?.addEventListener("message", (event) => {
+  if (event.data?.type === "request-favorite-team-ids") {
+    event.ports[0]?.postMessage({ teamIds: listFavorites().map((t) => t.id) });
+  }
+});
+
+// 브라우저 쪽 구독 객체가 이미 있어도 서버 KV 레코드는 지워졌을 수 있다(만료 구독 자동 정리 등) ->
+// 매번 서버에 다시 등록하고, 실제로 저장됐는지 응답을 확인해야 버튼 상태와 실제 알림 수신 여부가
+// 어긋나지 않는다(예전엔 서버가 503을 반환해도 버튼은 "켜짐"으로 표시됐었다).
+async function postSubscribe(subscription, teamIds) {
+  const { ok } = await fetchJSONPost("/push/subscribe", { subscription: subscription.toJSON(), teamIds });
+  return ok;
+}
+
+// 아직 구독 중이 아니면 권한 요청 + 구독까지 처리하고, 브라우저 구독이 있든 새로 만들었든
+// 항상 서버 등록을 (재)시도해서 실제로 저장됐는지 확인한 뒤 구독 객체를 돌려준다.
+// 권한 거부/미지원/서버 등록 실패면 null.
 export async function ensureSubscribed() {
   const reg = await getRegistration();
   if (!reg) return null;
 
-  const existing = await reg.pushManager.getSubscription();
-  if (existing) return existing;
+  let subscription = await reg.pushManager.getSubscription();
 
-  const permission = await Notification.requestPermission();
-  if (permission !== "granted") return null;
+  if (!subscription) {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return null;
 
-  const { publicKey } = await fetchJSON("/push/vapid-public-key");
-  if (!publicKey) return null;
+    const { publicKey } = await fetchJSON("/push/vapid-public-key");
+    if (!publicKey) return null;
 
-  const subscription = await reg.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(publicKey),
-  });
+    subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    });
+  }
 
   const teamIds = listFavorites().map((t) => t.id);
-  await fetchJSONPost("/push/subscribe", { subscription: subscription.toJSON(), teamIds });
-  syncNotifyButton(true);
-  return subscription;
+  const ok = await postSubscribe(subscription, teamIds);
+  syncNotifyButton(ok);
+  return ok ? subscription : null;
+}
+
+// 설정 탭이 "지금 이 기기가 알림을 받고 있는지"만 조용히 확인할 때 쓴다 - ensureSubscribed와 달리
+// 권한 요청 팝업을 띄우지 않고, 이미 구독 중이면 그 구독을, 아니면 null을 돌려준다.
+export async function getCurrentSubscription() {
+  const reg = await getRegistration();
+  if (!reg) return null;
+  return reg.pushManager.getSubscription();
 }
 
 // 특정 경기 하나를 알림 대상으로 켜거나 끈다. 구독이 없으면 새로 만든다.
 export async function setMatchWatch(matchId, watch) {
   const subscription = await ensureSubscribed();
   if (!subscription) return false;
-  const result = await fetchJSONPost("/push/watch-match", { endpoint: subscription.endpoint, matchId, watch });
-  return result?.status === "ok";
+  const { ok, data } = await fetchJSONPost("/push/watch-match", { endpoint: subscription.endpoint, matchId, watch });
+  return ok && data?.status === "ok";
 }
 
 function syncNotifyButton(subscribed) {
   const btn = document.getElementById("notify-btn");
   if (btn) updateButton(btn, subscribed);
+  window.dispatchEvent(new CustomEvent("push-subscription-changed", { detail: { subscribed } }));
 }
 
 export function initPushButton() {
@@ -65,7 +92,15 @@ export function initPushButton() {
 
   getRegistration().then(async (reg) => {
     const existing = await reg.pushManager.getSubscription();
-    updateButton(btn, !!existing);
+    if (!existing) {
+      syncNotifyButton(false);
+      return;
+    }
+    // 브라우저 구독은 남아 있어도 서버 KV 레코드가 지워졌을 수 있어(만료 구독 자동 정리 등),
+    // 페이지를 열 때마다 조용히 재등록해서 버튼 표시와 실제 수신 가능 여부가 어긋나지 않게 한다.
+    const teamIds = listFavorites().map((t) => t.id);
+    const ok = await postSubscribe(existing, teamIds);
+    syncNotifyButton(ok);
   });
 
   btn.addEventListener("click", async () => {
@@ -75,12 +110,12 @@ export function initPushButton() {
     if (existing) {
       await fetchJSONPost("/push/unsubscribe", { endpoint: existing.endpoint }).catch(() => {});
       await existing.unsubscribe();
-      updateButton(btn, false);
+      syncNotifyButton(false);
       return;
     }
 
     const subscription = await ensureSubscribed();
-    updateButton(btn, !!subscription);
+    syncNotifyButton(!!subscription);
   });
 }
 
@@ -109,6 +144,8 @@ window.addEventListener("auth-changed", async () => {
 });
 
 // 로그인 상태면 Authorization 헤더를 실어 보내서, 서버가 이 구독을 계정과 연결할 수 있게 한다.
+// fetch 자체는 4xx/5xx에도 정상적으로 resolve하므로(reject 아님), ok를 같이 돌려줘야 호출부가
+// "요청은 갔지만 서버가 실패로 응답했다"를 "성공"으로 착각하지 않는다.
 async function fetchJSONPost(path, body) {
   const token = getToken();
   const headers = { "content-type": "application/json" };
@@ -118,7 +155,8 @@ async function fetchJSONPost(path, body) {
     headers,
     body: JSON.stringify(body),
   });
-  return res.json();
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, data };
 }
 
 function updateButton(btn, subscribed) {

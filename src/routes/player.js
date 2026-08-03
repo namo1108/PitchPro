@@ -1,15 +1,23 @@
 import { json } from "../lib/http.js";
 import { getJSON, putJSON } from "../lib/kv.js";
 import * as apiFootball from "../sources/apiFootball.js";
-import { normalizePlayerDetail, normalizeTransfer, normalizePlayerSeasonStats } from "../adapters/apiFootballAdapter.js";
+import { normalizePlayerDetail, normalizeTransfer, normalizePlayerSeasonStats, koreanizeTeamNameOnly } from "../adapters/apiFootballAdapter.js";
 
 const PLAYER_CACHE_TTL_SECONDS = 3600;
 const STATS_SEASONS = [2026, 2025];
 
+// K리그 팀 한글명 매핑을 나중에 추가/수정해도, 이미 캐시된(최대 1시간) 응답이 예전 이름을 들고 있지
+// 않도록 응답 직전에 한 번 더 보정한다(팀 id가 없는 이름 문자열이라 이름 기준 매칭만 가능).
+function reKoreanize(result) {
+  if (result.player) result.player.team = koreanizeTeamNameOnly(result.player.team);
+  if (result.formerTeams) result.formerTeams = result.formerTeams.map((t) => ({ ...t, team: koreanizeTeamNameOnly(t.team) }));
+  return result;
+}
+
 export async function handlePlayerDetail(request, env, id) {
   const cacheKey = `player:${id}`;
   const cached = await getJSON(env, cacheKey);
-  if (cached) return json(cached);
+  if (cached) return json(reKoreanize(cached));
 
   const [profileRes, transfersRes, ...statsRes] = await Promise.all([
     apiFootball.getPlayerProfile(env, id),
@@ -33,3 +41,4 @@ export async function handlePlayerDetail(request, env, id) {
   await putJSON(env, cacheKey, result, { expirationTtl: PLAYER_CACHE_TTL_SECONDS });
   return json(result);
 }
+

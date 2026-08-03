@@ -1,5 +1,5 @@
 import { fetchJSON } from "../api.js";
-import { onTabChange } from "../router.js";
+import { onTabChange, pushSubView } from "../router.js";
 import { emblemImg, crestImg, transferAvatarImg, fadeIn, skeletonList, KST_TIME_ZONE } from "../format.js";
 import { goToPlayer } from "./playerDetail.js";
 
@@ -18,29 +18,36 @@ function formatTransferDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("ko-KR", { timeZone: KST_TIME_ZONE, month: "long", day: "numeric" });
 }
 
+// "€ 55M"처럼 실제 이적료 문구가 오면 그대로 보여준다(API-Football이 드물게 제공). "Return from
+// loan"(임대 복귀)이 /loan/i에 걸려 새 임대처럼 보이던 것과, 금액 없는 "Transfer"가 의미있는 이적료인
+// 것처럼 그대로 노출되던 걸 고쳤다(src/scheduled/refreshTransferMarket.js formatMoveType와 동일 로직).
 function feeLabel(moveType) {
   if (!moveType) return "";
+  if (/return/i.test(moveType) && /loan/i.test(moveType)) return "임대 복귀";
   if (/free/i.test(moveType)) return "자유계약";
   if (/loan/i.test(moveType)) return "임대";
   if (/n\/?a/i.test(moveType)) return "";
+  if (/^transfer$/i.test(moveType.trim())) return "";
   return moveType;
 }
 
+// 이번 세션에 한 번 그려본 뒤로는(state.loaded) 탭을 다시 눌러도 스켈레톤으로 비우지 않고 화면에
+// 남겨둔 채 조용히 새로 받아와서 갈아끼운다 - 매번 탭 전환마다 깜빡이며 로딩되는 느낌을 없앤다.
 async function loadTransfers() {
-  el.list.innerHTML = skeletonList(8);
+  if (!state.loaded) el.list.innerHTML = skeletonList(8);
   try {
     const data = await fetchJSON("/transfers");
     state.leagues = data.leagues || [];
-    renderLeagueList();
+    renderLeagueList(!state.loaded);
     state.loaded = true;
   } catch (err) {
-    el.list.innerHTML = `<div class="error-state">이적 소식을 불러오지 못했습니다.<br>${err.message}</div>`;
+    if (!state.loaded) el.list.innerHTML = `<div class="error-state">이적 소식을 불러오지 못했습니다.<br>${err.message}</div>`;
   }
 }
 
 // 리그를 통째로 하나의 긴 목록으로 다 그리면(수백 건) 렉이 걸려서, 리그 목록 -> 리그별 팀 아코디언
 // 순으로 화면을 나눠 한 번에 그리는 양을 크게 줄인다(리그 화면(leagues.js)과 같은 구조).
-function renderLeagueList() {
+function renderLeagueList(animate) {
   if (!state.leagues.length) {
     el.list.innerHTML = '<div class="empty-state">최근 이적 소식이 아직 없습니다.</div>';
     return;
@@ -59,10 +66,16 @@ function renderLeagueList() {
     )
     .join("");
 
-  fadeIn(el.list);
+  if (animate) fadeIn(el.list);
   el.list.querySelectorAll("[data-code]").forEach((row) => {
     row.addEventListener("click", () => openLeague(row.dataset.code));
   });
+}
+
+// 목록으로 되돌리는 동작 - 뒤로가기 버튼과 하드웨어/제스처 뒤로가기 둘 다 결국 이 함수로 귀결된다.
+function showTransfersList() {
+  el.detailWrap.style.display = "none";
+  el.list.style.display = "flex";
 }
 
 function openLeague(code) {
@@ -72,13 +85,12 @@ function openLeague(code) {
   el.detailHeader.innerHTML = `${emblemImg(league, "league-detail-emblem")}<span>${league.name}</span>`;
   el.list.style.display = "none";
   el.detailWrap.style.display = "block";
+  pushSubView(showTransfersList);
   renderTeams(league.teams);
 }
 
-el.backBtn.addEventListener("click", () => {
-  el.detailWrap.style.display = "none";
-  el.list.style.display = "flex";
-});
+// 실제 되돌리기는 pushSubView가 등록해둔 콜백(showTransfersList)이 popstate 시점에 처리한다.
+el.backBtn.addEventListener("click", () => history.back());
 
 // 팀 목록만 먼저 그리고, 각 팀의 실제 이적 내역은 눌러서 펼칠 때 그때 그려서(+사진도 그때 불러옴)
 // 리그 하나에 팀이 많아도(K리그 제외 대부분 15~20개) 초기 렌더링 부담이 없게 한다.
@@ -105,7 +117,9 @@ function renderTeams(teams) {
 }
 
 function transferRowHtml(t) {
-  const fee = feeLabel(t.moveType);
+  // Transfermarkt에서 찾아낸 실제 이적료(feeAmount)가 있으면 그걸 우선 보여준다 - API-Football이 준
+  // 정성적 값(자유계약/임대 등)보다 구체적인 정보라서.
+  const fee = t.feeAmount || feeLabel(t.moveType);
   const directionBadge = t.direction === "in" ? '<span class="transfer-direction in">영입</span>' : '<span class="transfer-direction out">방출</span>';
 
   return `

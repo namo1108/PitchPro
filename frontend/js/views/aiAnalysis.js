@@ -14,15 +14,22 @@ function formatKickoff(utcDate) {
   return d.toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: KST_TIME_ZONE });
 }
 
+// 이번 세션에 한 번 그려본 뒤로는 탭을 다시 눌러도 스켈레톤으로 비우지 않고 화면에 남겨둔 채
+// 조용히 새로 받아와서 갈아끼운다 - 매번 탭 전환마다 깜빡이며 로딩되는 느낌을 없앤다.
+let loadedOnce = false;
+
 async function loadAnalysis() {
-  el.list.innerHTML = skeletonList(4);
-  el.linkOnlyWrap.innerHTML = "";
+  if (!loadedOnce) {
+    el.list.innerHTML = skeletonList(4);
+    el.linkOnlyWrap.innerHTML = "";
+  }
   try {
     const data = await fetchJSON("/analysis");
-    renderAnalysis(data.analysis || []);
+    renderAnalysis(data.analysis || [], !loadedOnce);
     renderLinkOnly(data.linkOnly || []);
+    loadedOnce = true;
   } catch (err) {
-    el.list.innerHTML = `<div class="error-state">분석 정보를 불러오지 못했습니다.<br>${err.message}</div>`;
+    if (!loadedOnce) el.list.innerHTML = `<div class="error-state">분석 정보를 불러오지 못했습니다.<br>${err.message}</div>`;
   }
 }
 
@@ -98,7 +105,7 @@ function noteList(title, icon, notes) {
   `;
 }
 
-function renderAnalysis(cards) {
+function renderAnalysis(cards, animate) {
   if (!cards.length) {
     el.list.innerHTML = '<div class="empty-state">베트맨 승무패 대상 예정 경기가 없습니다.</div>';
     return;
@@ -118,7 +125,9 @@ function renderAnalysis(cards) {
         <div class="ai-card-team" data-team-id="${c.awayTeam.id}">${crestImg(c.awayTeam, "team-crest")}<span>${c.awayTeam.shortName || c.awayTeam.name}</span></div>
       </div>
       ${noteList("K리그 공식 파워랭킹", "🏆", c.officialNotes)}
+      ${noteList("K리그 공식 최근 기록", "📋", c.kleagueOfficialNotes)}
       ${noteList("최근 폼", "📈", c.formNotes)}
+      ${noteList("상대전적", "🆚", c.h2hNotes)}
       ${noteList("순위", "📊", c.standingsNotes)}
       ${noteList("결장 이슈", "⚕", c.injuryNotes)}
       ${predictionBar(c.prediction)}
@@ -128,7 +137,7 @@ function renderAnalysis(cards) {
     )
     .join("");
 
-  fadeIn(el.list);
+  if (animate) fadeIn(el.list);
   el.list.querySelectorAll("[data-team-id]").forEach((elm) => {
     elm.addEventListener("click", () => goToTeam(elm.dataset.teamId));
   });

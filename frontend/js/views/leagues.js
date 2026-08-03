@@ -1,14 +1,15 @@
 import { fetchJSON } from "../api.js";
-import { onTabChange } from "../router.js";
+import { onTabChange, pushSubView } from "../router.js";
 import { crestImg, emblemImg, playerAvatarImg, fadeIn, skeletonList } from "../format.js";
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
 import { loadMatchDetail } from "./matches.js";
+import { isFavorite } from "../favorites.js";
 
 // 대회 27개를 한 줄짜리 긴 리스트로 두면 원하는 리그를 찾기 힘들어서, 지역/성격별로 묶어
 // 트리(아코디언)로 접었다 펼치게 한다. 코드에 없는 대회는 자동으로 "기타"에 담긴다.
 const LEAGUE_GROUPS = [
-  { title: "국제대회", codes: ["WC", "EC", "CL"] },
+  { title: "국제대회", codes: ["WC", "EC", "CL", "ACUP"] },
   { title: "국내(K리그)", codes: ["KL1", "KL2", "KFA", "K3", "K4"] },
   { title: "유럽 5대리그", codes: ["PL", "PD", "BL1", "SA", "FL1"] },
   { title: "유럽 기타", codes: ["DED", "PPL", "ELC", "NOR", "DEN", "SCO"] },
@@ -17,11 +18,12 @@ const LEAGUE_GROUPS = [
 ];
 
 // 첫 방문엔 국내(K리그) 그룹만 펼쳐두고 나머지는 접어서 시작한다.
-const state = { competitions: [], openCode: null, pollTimer: null, query: "", openGroups: new Set(["국내(K리그)"]) };
+const state = { competitions: [], openCode: null, pollTimer: null, query: "", openGroups: new Set(["국내(K리그)"]), loaded: false };
 
 const el = {
   list: document.getElementById("league-list"),
   searchInput: document.getElementById("league-search-input"),
+  teamResults: document.getElementById("league-team-results"),
   detailWrap: document.getElementById("league-detail-wrap"),
   detailHeader: document.getElementById("league-detail-header"),
   bracketWrap: document.getElementById("bracket-wrap"),
@@ -30,14 +32,17 @@ const el = {
   backBtn: document.getElementById("league-back-btn"),
 };
 
+// 이번 세션에 한 번 그려본 뒤로는(state.loaded) 탭을 다시 눌러도 스켈레톤으로 비우지 않고 화면에
+// 남겨둔 채 조용히 새로 받아와서 갈아끼운다 - 매번 탭 전환마다 깜빡이며 로딩되는 느낌을 없앤다.
 async function loadCompetitions() {
-  el.list.innerHTML = skeletonList(8);
+  if (!state.loaded) el.list.innerHTML = skeletonList(8);
   try {
     const data = await fetchJSON("/competitions");
     state.competitions = data.competitions || [];
-    renderList();
+    renderList(!state.loaded);
+    state.loaded = true;
   } catch (err) {
-    el.list.innerHTML = `<div class="error-state">리그 목록을 불러오지 못했습니다.<br>${err.message}</div>`;
+    if (!state.loaded) el.list.innerHTML = `<div class="error-state">리그 목록을 불러오지 못했습니다.<br>${err.message}</div>`;
   }
 }
 
@@ -51,7 +56,7 @@ function leagueRowHtml(c) {
   `;
 }
 
-function renderList() {
+function renderList(animate = true) {
   const q = state.query.trim().toLowerCase();
 
   // 검색 중일 땐 그룹 구분 없이 매칭되는 대회만 평평한 목록으로 보여준다.
@@ -62,7 +67,7 @@ function renderList() {
       return;
     }
     el.list.innerHTML = filtered.map(leagueRowHtml).join("");
-    fadeIn(el.list);
+    if (animate) fadeIn(el.list);
     bindLeagueRows(el.list);
     return;
   }
@@ -98,7 +103,7 @@ function renderList() {
     })
     .join("");
 
-  fadeIn(el.list);
+  if (animate) fadeIn(el.list);
   bindLeagueRows(el.list);
   el.list.querySelectorAll("[data-group]").forEach((btn) => {
     btn.addEventListener("click", () => toggleGroup(btn.dataset.group, btn));
@@ -128,7 +133,70 @@ function bindLeagueRows(container) {
 el.searchInput.addEventListener("input", () => {
   state.query = el.searchInput.value;
   renderList();
+  queueTeamSearch(state.query.trim());
 });
+
+// ---------- 리그 검색창에 팀 검색도 같이 - 국가대표팀 포함 ----------
+// 리그 이름과 겹치지 않는 팀 이름(예: 손흥민 소속팀을 몰라도 "토트넘", "대한민국")을 쳐도 바로 팀
+// 상세로 넘어갈 수 있게, 같은 검색창에서 팀 검색(myTeam.js의 최애팀 검색과 동일한 API)도 같이 돈다.
+let teamSearchTimer = null;
+let teamSearchRequestId = 0;
+
+function queueTeamSearch(q) {
+  clearTimeout(teamSearchTimer);
+  if (q.length < 1) {
+    teamSearchRequestId++;
+    el.teamResults.innerHTML = ""; // 비어있으면 style.css의 .team-search-results:empty가 자동으로 숨긴다.
+    return;
+  }
+  const requestId = ++teamSearchRequestId;
+  teamSearchTimer = setTimeout(async () => {
+    try {
+      const data = await fetchJSON(`/teams/search?q=${encodeURIComponent(q)}`);
+      if (requestId !== teamSearchRequestId) return;
+      renderTeamResults(data.teams || []);
+    } catch {
+      if (requestId === teamSearchRequestId) el.teamResults.innerHTML = "";
+    }
+  }, 300);
+}
+
+function renderTeamResults(teams) {
+  if (!teams.length) {
+    el.teamResults.innerHTML = "";
+    return;
+  }
+  el.teamResults.innerHTML = teams
+    .map(
+      (t) => `
+    <div class="team-search-row" data-team-id="${t.id}">
+      ${crestImg(t, "team-search-crest")}
+      <span class="team-search-name">${t.name}</span>
+      <span class="team-search-comp">${t.competitionName}</span>
+    </div>
+  `
+    )
+    .join("");
+  el.teamResults.querySelectorAll("[data-team-id]").forEach((row) => {
+    row.addEventListener("click", () => {
+      el.searchInput.value = "";
+      state.query = "";
+      el.teamResults.innerHTML = "";
+      renderList();
+      goToTeam(row.dataset.teamId);
+    });
+  });
+}
+
+// 목록으로 되돌리는 동작 - 뒤로가기 버튼 클릭과 하드웨어/제스처 뒤로가기 둘 다 결국 이 함수로
+// 귀결되게 해서(history.back() -> popstate -> 이 콜백) 실제 기록과 화면이 항상 일치하게 한다.
+function showLeagueList() {
+  el.detailWrap.style.display = "none";
+  el.list.style.display = "flex";
+  el.searchInput.style.display = "block";
+  state.openCode = null;
+  stopStandingsPoll();
+}
 
 function openLeague(code) {
   const comp = state.competitions.find((c) => c.code === code);
@@ -137,6 +205,7 @@ function openLeague(code) {
   el.searchInput.style.display = "none";
   el.detailWrap.style.display = "block";
   state.openCode = code;
+  pushSubView(showLeagueList);
 
   if (comp.hasBracket) {
     el.bracketWrap.style.display = "block";
@@ -207,13 +276,9 @@ function renderBracket(rounds) {
   });
 }
 
-el.backBtn.addEventListener("click", () => {
-  el.detailWrap.style.display = "none";
-  el.list.style.display = "flex";
-  el.searchInput.style.display = "block";
-  state.openCode = null;
-  stopStandingsPoll();
-});
+// 실제 되돌리기는 pushSubView가 등록해둔 콜백(showLeagueList)이 popstate 시점에 처리한다 - 여기서
+// 직접 DOM을 되돌리면 history 기록과 어긋나서 다음 뒤로가기 때 엉뚱한 곳으로 갈 수 있다.
+el.backBtn.addEventListener("click", () => history.back());
 
 function startStandingsPoll() {
   stopStandingsPoll();
@@ -234,28 +299,37 @@ async function loadStandings(code, opts = {}) {
   if (!opts.silent) el.standingsWrap.innerHTML = skeletonList(6);
   try {
     const data = await fetchJSON(`/standings/${code}`);
-    renderTables(data.standings || [], opts.silent);
+    const comp = state.competitions.find((c) => c.code === code);
+    renderTables(data.standings || [], opts.silent, comp);
   } catch (err) {
     if (!opts.silent) el.standingsWrap.innerHTML = `<div class="error-state">순위 정보를 불러오지 못했습니다.<br>${err.message}</div>`;
   }
 }
 
-function tableRowsHtml(table) {
+// 승격/강등/대륙컵 진출 구간은 리그마다 규정이 달라서, config.js에 리그별로 명시해둔 값
+// (promotionSpots/relegationSpots)이 있으면 그걸 쓰고, 없는 리그는 기존 근사 규칙(상위 4=진출권,
+// 하위 3=강등권 - 유럽 5대리그 기준 근사치)을 그대로 쓴다.
+function tableRowsHtml(table, comp) {
+  const promotionSpots = comp?.promotionSpots;
+  const relegationSpots = comp?.relegationSpots;
   return table.table
     .map((row) => {
-      const isQualify = row.position <= 4;
-      const isRelegate = row.position > table.table.length - 3;
+      const isQualify = promotionSpots != null ? row.position <= promotionSpots : row.position <= 4;
+      const isRelegate = relegationSpots != null ? row.position > table.table.length - relegationSpots : row.position > table.table.length - 3;
       const badgeClass = isQualify ? "qualify" : isRelegate ? "relegate" : "";
       const dotClass = row.live ? `live-dot result-${row.liveResult}` : "";
       const ptsClass = row.live ? `pts live-${row.liveResult}` : "pts";
+      const mine = isFavorite(row.team.id);
       return `
         <tr class="${row.live ? "live-row" : ""}">
           <td><div class="pos-cell"><span class="pos-badge ${badgeClass}"></span>${row.position}</div></td>
-          <td><div class="team-cell" data-team-id="${row.team.id}">${crestImg(row.team, "team-crest")}${row.team.shortName || row.team.name}${row.live ? `<span class="${dotClass}" title="경기 진행 중(실시간 반영)"></span>` : ""}</div></td>
+          <td><div class="team-cell ${mine ? "mine" : ""}" data-team-id="${row.team.id}">${crestImg(row.team, "team-crest")}<span class="team-name-text">${row.team.shortName || row.team.name}</span>${mine ? '<span class="mine-star" title="나의 팀">★</span>' : ""}${row.live ? `<span class="${dotClass}" title="경기 진행 중(실시간 반영)"></span>` : ""}</div></td>
           <td class="num">${row.playedGames}</td>
           <td class="num">${row.won}</td>
           <td class="num">${row.draw}</td>
           <td class="num">${row.lost}</td>
+          <td class="num">${row.goalsFor ?? "-"}</td>
+          <td class="num">${row.goalsAgainst ?? "-"}</td>
           <td class="num">${row.goalDifference}</td>
           <td class="${ptsClass}">${row.points}</td>
         </tr>
@@ -266,7 +340,7 @@ function tableRowsHtml(table) {
 
 // MLS처럼 리그가 컨퍼런스(조)로 나뉘어 있으면 표가 여러 개 온다 - 그룹명 소제목과 함께 각각 따로 그린다.
 // 대부분의 리그는 그룹이 하나뿐이라 이 경우엔 기존과 동일하게 소제목 없이 표 하나만 보여준다.
-function renderTables(tables, silent) {
+function renderTables(tables, silent, comp) {
   const nonEmpty = tables.filter((t) => t.table?.length);
   if (!nonEmpty.length) {
     el.standingsWrap.innerHTML = '<div class="empty-state">순위 정보가 없습니다.</div>';
@@ -284,10 +358,10 @@ function renderTables(tables, silent) {
         <table class="standings-table">
           <thead>
             <tr>
-              <th>#</th><th>팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득실</th><th>승점</th>
+              <th>#</th><th>팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득점</th><th>실점</th><th>득실</th><th>승점</th>
             </tr>
           </thead>
-          <tbody>${tableRowsHtml(table)}</tbody>
+          <tbody>${tableRowsHtml(table, comp)}</tbody>
         </table>
       `;
     })

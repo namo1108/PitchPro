@@ -4,8 +4,8 @@ import { crestImg, formatKickoff, formBadgesHtml } from "../format.js";
 import { listFavorites, toggleFavorite } from "../favorites.js";
 import { goToTeam } from "./teamDetail.js";
 import { openSoccerSchool } from "./soccerSchool.js";
-import { GOAL_SOUNDS, getGoalSound, setGoalSound, previewGoalSound } from "./matches.js";
 import { getCurrentUser, isLoggedIn, signup, login, logout, refreshMe, onAuthChange, authFetch } from "../auth.js";
+import { trackEvent } from "../analytics.js";
 
 const el = {
   list: document.getElementById("myteam-list"),
@@ -27,22 +27,9 @@ const el = {
   tabs: document.querySelectorAll(".auth-form-tab"),
 };
 
-function initGoalSoundPicker() {
-  const select = document.getElementById("goal-sound-select");
-  const previewBtn = document.getElementById("goal-sound-preview");
-  if (!select || !previewBtn) return;
-
-  select.innerHTML = GOAL_SOUNDS.map((s) => `<option value="${s.id}">${s.label}</option>`).join("");
-  select.value = getGoalSound();
-
-  select.addEventListener("change", () => {
-    setGoalSound(select.value);
-    previewGoalSound();
-  });
-  previewBtn.addEventListener("click", () => previewGoalSound());
-}
-
-initGoalSoundPicker();
+// 축구교실은 순수 정적 콘텐츠(규칙/포지션/포메이션/용어)라 로그인 여부와 무관하게 항상 눌러야 하므로,
+// 로그인 후에만 다시 그려지는 profile-wrap 밖(index.html)의 고정 버튼에 한 번만 리스너를 붙인다.
+document.getElementById("soccer-school-btn")?.addEventListener("click", () => openSoccerSchool());
 
 // ---------- 로그인/회원가입 ----------
 
@@ -125,6 +112,8 @@ function renderTeamResults(teams) {
 el.openBtn?.addEventListener("click", () => {
   el.guestWrap.style.display = "none";
   el.formWrap.style.display = "block";
+  el.form.style.display = "block";
+  document.getElementById("auth-find-wrap").style.display = "none";
   setAuthMode("login");
 });
 
@@ -148,6 +137,7 @@ el.form?.addEventListener("submit", async (e) => {
         favoriteTeamId: pickedTeam?.id || null,
         favoriteTeamName: pickedTeam?.name || null,
         favoriteTeamCrest: pickedTeam?.crest || null,
+        securityAnswer: document.getElementById("auth-security-answer")?.value.trim() || "",
       });
     } else {
       await login({ username: el.usernameInput.value.trim(), password: el.passwordInput.value });
@@ -160,6 +150,95 @@ el.form?.addEventListener("submit", async (e) => {
     el.errorBox.textContent = err.message;
   } finally {
     el.submitBtn.disabled = false;
+  }
+});
+
+// ---------- 아이디/비밀번호 찾기 ----------
+// 이메일/휴대폰 인증이 없는 앱이라, 아이디 찾기는 닉네임으로 조회하고 비밀번호 찾기는 가입 때
+// 선택적으로 등록한 보안 답변으로 본인 확인한다(둘 다 auth.js의 새 엔드포인트를 그대로 fetchJSON으로 호출).
+const findEl = {
+  wrap: document.getElementById("auth-find-wrap"),
+  toggleBtn: document.getElementById("auth-find-toggle"),
+  closeBtn: document.getElementById("auth-find-close"),
+  tabs: document.querySelectorAll("#auth-find-wrap .auth-form-tab"),
+  usernamePanel: document.getElementById("auth-find-username-panel"),
+  passwordPanel: document.getElementById("auth-find-password-panel"),
+};
+
+findEl.toggleBtn?.addEventListener("click", () => {
+  el.form.style.display = "none";
+  findEl.wrap.style.display = "block";
+});
+
+findEl.closeBtn?.addEventListener("click", () => {
+  findEl.wrap.style.display = "none";
+  el.form.style.display = "block";
+});
+
+findEl.tabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    findEl.tabs.forEach((t) => t.classList.toggle("active", t === tab));
+    const mode = tab.dataset.findMode;
+    findEl.usernamePanel.style.display = mode === "username" ? "block" : "none";
+    findEl.passwordPanel.style.display = mode === "password" ? "block" : "none";
+  });
+});
+
+document.getElementById("find-username-submit")?.addEventListener("click", async () => {
+  const resultBox = document.getElementById("find-username-result");
+  const nickname = document.getElementById("find-username-nickname").value.trim();
+  if (!nickname) return;
+  resultBox.className = "auth-find-result";
+  resultBox.textContent = "찾는 중...";
+  try {
+    const data = await fetchJSON("/auth/find-username", { method: "POST", body: { nickname } });
+    resultBox.className = "auth-find-result ok";
+    resultBox.textContent = `아이디는 "${data.username}" 입니다.`;
+  } catch (err) {
+    resultBox.className = "auth-find-result error";
+    resultBox.textContent = err.message;
+  }
+});
+
+document.getElementById("find-password-check")?.addEventListener("click", async () => {
+  const username = document.getElementById("find-password-username").value.trim();
+  const resultBox = document.getElementById("find-password-result");
+  const questionWrap = document.getElementById("find-password-question-wrap");
+  questionWrap.style.display = "none";
+  resultBox.className = "auth-find-result";
+  if (!username) return;
+  resultBox.textContent = "확인 중...";
+  try {
+    const data = await fetchJSON("/auth/find-password/check", { method: "POST", body: { username } });
+    if (!data.hasSecurityQuestion) {
+      resultBox.className = "auth-find-result error";
+      resultBox.textContent = "보안 질문이 설정되어 있지 않아요. 관리자에게 문의해주세요.";
+      return;
+    }
+    resultBox.textContent = "";
+    document.getElementById("find-password-question-text").textContent = data.question;
+    questionWrap.style.display = "block";
+  } catch (err) {
+    resultBox.className = "auth-find-result error";
+    resultBox.textContent = err.message;
+  }
+});
+
+document.getElementById("find-password-submit")?.addEventListener("click", async (e) => {
+  const username = document.getElementById("find-password-username").value.trim();
+  const securityAnswer = document.getElementById("find-password-answer").value.trim();
+  const newPassword = document.getElementById("find-password-new").value;
+  const resultBox = document.getElementById("find-password-result");
+  e.target.disabled = true;
+  try {
+    await fetchJSON("/auth/find-password/reset", { method: "POST", body: { username, securityAnswer, newPassword } });
+    resultBox.className = "auth-find-result ok";
+    resultBox.textContent = "비밀번호가 변경됐어요. 이제 로그인해주세요.";
+  } catch (err) {
+    resultBox.className = "auth-find-result error";
+    resultBox.textContent = err.message;
+  } finally {
+    e.target.disabled = false;
   }
 });
 
@@ -221,6 +300,7 @@ function renderFriends(friends) {
 }
 
 function renderProfile() {
+  pointsHistoryLoaded = false; // 로그인/로그아웃으로 계정이 바뀌면 이전 사용자의 내역 캐시를 버린다.
   const user = getCurrentUser();
   if (!user) {
     el.profileWrap.style.display = "none";
@@ -239,8 +319,10 @@ function renderProfile() {
         <div class="profile-nickname">${user.nickname}</div>
         <button id="logout-btn" class="logout-btn">로그아웃</button>
       </div>
-      <div class="profile-level-row">${levelBarHtml(user)}</div>
-      <button id="soccer-school-btn" class="soccer-school-btn">⚽ 축알못의 축구교실 <span class="soccer-school-btn-sub">축구 기초부터 쉽게 배우기</span></button>
+      <div class="profile-level-row">
+        ${levelBarHtml(user)}
+        <button id="points-info-btn" class="points-info-btn" aria-label="포인트 안내" title="포인트 안내">ⓘ</button>
+      </div>
       <div class="friends-section">
         <div id="friend-requests-wrap" class="friend-requests-wrap"></div>
         <div class="friends-title">👥 친구</div>
@@ -258,11 +340,79 @@ function renderProfile() {
     await logout();
   });
 
-  document.getElementById("soccer-school-btn").addEventListener("click", () => openSoccerSchool());
+  document.getElementById("points-info-btn").addEventListener("click", showPointsInfoModal);
+  // 로그인 후 이 프로필 카드를 처음 보는 순간 한 번 자동으로 띄워서 "뭐 하면 몇 점"인지 바로 알려준다.
+  // 이후엔 ⓘ 버튼으로 언제든 다시 열어볼 수 있다.
+  if (!localStorage.getItem(POINTS_INFO_SEEN_KEY)) {
+    localStorage.setItem(POINTS_INFO_SEEN_KEY, "1");
+    showPointsInfoModal();
+  }
 
   initFriendSearch();
   loadFriends();
   loadFriendRequests();
+}
+
+// ---------- 포인트 안내 팝업 ----------
+const POINTS_INFO_SEEN_KEY = "points-info-seen-v1";
+const pointsInfoModal = document.getElementById("points-info-modal");
+
+function showPointsInfoModal() {
+  pointsInfoModal.style.display = "flex";
+}
+
+function hidePointsInfoModal() {
+  pointsInfoModal.style.display = "none";
+}
+
+document.getElementById("points-info-close")?.addEventListener("click", hidePointsInfoModal);
+document.querySelector("#points-info-modal .points-info-backdrop")?.addEventListener("click", hidePointsInfoModal);
+
+// 안내 카드 맨 아래 "내 포인트 내역 보기"를 누르면 그 자리에서 실제 내역(집관인증/승패 정산 등)을
+// 펼쳐 보여준다 - 매번 다시 열 때마다 새로 받아오지 않고 이 모달이 열려있는 동안엔 한 번만 불러온다.
+let pointsHistoryLoaded = false;
+document.getElementById("points-history-toggle")?.addEventListener("click", async (e) => {
+  const listEl = document.getElementById("points-history-list");
+  const isOpen = listEl.style.display !== "none";
+  if (isOpen) {
+    listEl.style.display = "none";
+    e.target.textContent = "📜 내 포인트 내역 보기";
+    return;
+  }
+  listEl.style.display = "block";
+  e.target.textContent = "📜 내 포인트 내역 숨기기";
+  if (pointsHistoryLoaded) return;
+  listEl.innerHTML = '<div class="loading">불러오는 중...</div>';
+  try {
+    const data = await authFetch("/points/history");
+    renderPointsHistory(data.history || []);
+    pointsHistoryLoaded = true;
+  } catch (err) {
+    listEl.innerHTML = `<div class="error-state">${err.message}</div>`;
+  }
+});
+
+function renderPointsHistory(history) {
+  const listEl = document.getElementById("points-history-list");
+  if (!history.length) {
+    listEl.innerHTML = '<div class="empty-state">아직 포인트 내역이 없어요.</div>';
+    return;
+  }
+  listEl.innerHTML = history
+    .map((h) => {
+      const isPlus = h.delta > 0;
+      const sign = isPlus ? "+" : "";
+      return `
+      <div class="points-history-row">
+        <div class="points-history-reason">${h.reason || "포인트 변동"}</div>
+        <div class="points-history-meta">
+          <span class="points-history-delta ${isPlus ? "good" : h.delta < 0 ? "bad" : ""}">${sign}${h.delta}P</span>
+          <span class="points-history-date">${new Date(h.at).toLocaleDateString("ko-KR", { month: "long", day: "numeric" })}</span>
+        </div>
+      </div>
+    `;
+    })
+    .join("");
 }
 
 // ---------- 받은 친구 요청 ----------
@@ -425,6 +575,7 @@ async function renderCheckinSlot(slot, matchId, teamId) {
         btn.textContent = "인증 중...";
         try {
           const result = await authFetch("/checkin", { method: "POST", body: { matchId, teamId } });
+          trackEvent("checkin");
           slot.innerHTML = `<div class="checkin-done">✅ 집관인증 완료 (+${result.pointsAwarded}P · 경기 끝나면 승패 결과로 최종 정산돼요${result.leveledUp ? " · 레벨업! 🎉" : ""})</div>`;
           await refreshMe();
         } catch (err) {
@@ -438,6 +589,10 @@ async function renderCheckinSlot(slot, matchId, teamId) {
   }
 }
 
+// 이번 세션에 한 번 그려본 뒤로는 탭을 다시 눌러도 "불러오는 중..."으로 비우지 않고 화면에
+// 남겨둔 채 조용히 새로 받아와서 갈아끼운다 - 매번 탭 전환마다 깜빡이며 로딩되는 느낌을 없앤다.
+let myTeamLoadedOnce = false;
+
 export async function loadMyTeam() {
   renderProfile();
 
@@ -447,7 +602,7 @@ export async function loadMyTeam() {
     return;
   }
 
-  el.list.innerHTML = '<div class="loading">불러오는 중...</div>';
+  if (!myTeamLoadedOnce) el.list.innerHTML = '<div class="loading">불러오는 중...</div>';
   const cards = await Promise.all(
     favorites.map(async (fav) => {
       try {
@@ -459,6 +614,7 @@ export async function loadMyTeam() {
     })
   );
   el.list.innerHTML = cards.join("");
+  myTeamLoadedOnce = true;
 
   el.list.querySelectorAll("[data-team-id]").forEach((elm) => {
     elm.addEventListener("click", (e) => {
