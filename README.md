@@ -96,6 +96,21 @@ npx wrangler deploy
 
 GitHub에 push한 뒤 Cloudflare 대시보드 **Workers Builds**에서 저장소를 연결하면, 이후 push마다 자동 빌드·배포된다.
 
+## 5. 구글플레이(TWA) 배포
+
+이 PWA를 [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap)으로 감싸서 Android 앱(TWA)으로 만든다.
+
+```powershell
+npm install -g @bubblewrap/cli
+bubblewrap init --manifest="https://<배포된 도메인>/manifest.json"   # 서명 키(keystore) 생성 + SHA-256 지문 출력
+bubblewrap build                                                     # .aab 빌드
+```
+
+`bubblewrap init`이 출력하는 `sha256_cert_fingerprints` 값과 선택한 패키지명을
+`frontend/.well-known/assetlinks.json`의 `REPLACE_WITH_TWA_PACKAGE_NAME` / `REPLACE_WITH_SHA256_CERT_FINGERPRINT`에 반영하고
+다시 배포해야 앱이 브라우저 주소창 없는 전체화면(TWA)으로 열린다(Digital Asset Links 검증).
+반영 후 `https://<배포된 도메인>/.well-known/assetlinks.json`으로 실제 값이 나오는지 꼭 확인할 것.
+
 ## API
 
 | Method | Path                          | 설명                                    |

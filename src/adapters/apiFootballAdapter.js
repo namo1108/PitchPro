@@ -600,31 +600,6 @@ export function normalizeInjuries(rawList) {
     .map(({ name, reason }) => ({ name, reason }));
 }
 
-// 국내(Betman/토토) 배당률은 API-Football에 없어서 제공 못 하고, 해외 북메이커(Bet365 우선, 없으면 첫 번째)의
-// "승/무/패"(Match Winner) 배당만 참고용으로 보여준다 - 프론트에서도 "해외 북메이커 기준"이라고 명시한다.
-const PREFERRED_BOOKMAKER_ID = 8; // Bet365
-
-export function normalizeOdds(raw) {
-  const entry = raw?.[0];
-  const bookmaker = entry?.bookmakers?.find((b) => b.id === PREFERRED_BOOKMAKER_ID) || entry?.bookmakers?.[0];
-  if (!bookmaker) return null;
-
-  const market = bookmaker.bets?.find((b) => b.name === "Match Winner");
-  if (!market) return null;
-
-  const valueFor = (name) => {
-    const found = market.values?.find((v) => v.value === name);
-    return found ? Number(found.odd) : null;
-  };
-
-  const home = valueFor("Home");
-  const draw = valueFor("Draw");
-  const away = valueFor("Away");
-  if (home === null && draw === null && away === null) return null;
-
-  return { bookmaker: bookmaker.name, home, draw, away };
-}
-
 export function normalizePlayerSeasonStats(statisticsList) {
   return (statisticsList || [])
     .filter((s) => s.games?.appearences)

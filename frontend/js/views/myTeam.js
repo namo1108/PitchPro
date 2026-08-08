@@ -4,7 +4,7 @@ import { crestImg, formatKickoff, formBadgesHtml } from "../format.js";
 import { listFavorites, toggleFavorite } from "../favorites.js";
 import { goToTeam } from "./teamDetail.js";
 import { openSoccerSchool } from "./soccerSchool.js";
-import { getCurrentUser, isLoggedIn, signup, login, logout, refreshMe, onAuthChange, authFetch } from "../auth.js";
+import { getCurrentUser, isLoggedIn, signup, login, logout, deleteAccount, refreshMe, onAuthChange, authFetch } from "../auth.js";
 import { trackEvent } from "../analytics.js";
 
 const el = {
@@ -333,12 +333,15 @@ function renderProfile() {
         <div id="friends-add-error" class="auth-error"></div>
         <div id="friends-list-wrap" class="friends-list-wrap"></div>
       </div>
+      <button id="delete-account-open-btn" class="account-delete-link">회원 탈퇴</button>
     </div>
   `;
 
   document.getElementById("logout-btn").addEventListener("click", async () => {
     await logout();
   });
+
+  document.getElementById("delete-account-open-btn").addEventListener("click", openDeleteAccountModal);
 
   document.getElementById("points-info-btn").addEventListener("click", showPointsInfoModal);
   // 로그인 후 이 프로필 카드를 처음 보는 순간 한 번 자동으로 띄워서 "뭐 하면 몇 점"인지 바로 알려준다.
@@ -367,6 +370,43 @@ function hidePointsInfoModal() {
 
 document.getElementById("points-info-close")?.addEventListener("click", hidePointsInfoModal);
 document.querySelector("#points-info-modal .points-info-backdrop")?.addEventListener("click", hidePointsInfoModal);
+
+// ---------- 회원 탈퇴 팝업 ----------
+const deleteAccountModal = document.getElementById("delete-account-modal");
+const deleteAccountPassword = document.getElementById("delete-account-password");
+const deleteAccountError = document.getElementById("delete-account-error");
+const deleteAccountConfirmBtn = document.getElementById("delete-account-confirm-btn");
+
+function openDeleteAccountModal() {
+  deleteAccountPassword.value = "";
+  deleteAccountError.textContent = "";
+  deleteAccountModal.style.display = "flex";
+}
+
+function hideDeleteAccountModal() {
+  deleteAccountModal.style.display = "none";
+}
+
+document.getElementById("delete-account-close")?.addEventListener("click", hideDeleteAccountModal);
+document.querySelector("#delete-account-modal .points-info-backdrop")?.addEventListener("click", hideDeleteAccountModal);
+
+deleteAccountConfirmBtn?.addEventListener("click", async () => {
+  const password = deleteAccountPassword.value;
+  if (!password) {
+    deleteAccountError.textContent = "비밀번호를 입력해주세요.";
+    return;
+  }
+  deleteAccountConfirmBtn.disabled = true;
+  deleteAccountError.textContent = "";
+  try {
+    await deleteAccount({ password });
+    hideDeleteAccountModal();
+  } catch (err) {
+    deleteAccountError.textContent = err.message;
+  } finally {
+    deleteAccountConfirmBtn.disabled = false;
+  }
+});
 
 // 안내 카드 맨 아래 "내 포인트 내역 보기"를 누르면 그 자리에서 실제 내역(집관인증/승패 정산 등)을
 // 펼쳐 보여준다 - 매번 다시 열 때마다 새로 받아오지 않고 이 모달이 열려있는 동안엔 한 번만 불러온다.

@@ -310,7 +310,6 @@ function predictionNote(prediction, homeName, awayName, seed) {
 // h2hMatches: 이번 두 팀의 과거 맞대결 fixture 목록(선택) - 없으면 상대전적 없이 폼/순위만으로 예측한다.
 // kleagueForms: {home, away} - API-Football 최근 폼이 비었을 때 대신 쓸 K리그 공식 최근 6경기
 // 전적(routes/analysis.js가 kleague.com에서 만들어 넘겨줌, K리그 매치가 아니면 비어있음).
-// 참고: 배당률(odds)은 비동기 API 호출이 필요해서 이 함수(순수 함수) 밖, 라우트 레이어에서 결과에 합쳐 넣는다.
 export function buildMatchAnalysis(match, teamRecents, standingsTables, teamInjuries = {}, h2hMatches = [], kleagueForms = {}) {
   const homeName = match.homeTeam.shortName || match.homeTeam.name;
   const awayName = match.awayTeam.shortName || match.awayTeam.name;
@@ -367,6 +366,5 @@ export function buildMatchAnalysis(match, teamRecents, standingsTables, teamInju
     injuryNotes,
     h2hNotes,
     prediction,
-    odds: null,
   };
 }

@@ -35,6 +35,7 @@ import {
   handleLogin,
   handleLogout,
   handleMe,
+  handleDeleteAccount,
   handleFindUsername,
   handleCheckSecurityQuestion,
   handleResetPasswordWithAnswer,
@@ -191,6 +192,9 @@ export async function routeApiRequest(request, env, ctx) {
   }
   if (segments[1] === "auth" && segments[2] === "me" && request.method === "GET") {
     return handleMe(request, env);
+  }
+  if (segments[1] === "auth" && segments[2] === "me" && request.method === "DELETE") {
+    return handleDeleteAccount(request, env);
   }
   if (segments[1] === "auth" && segments[2] === "find-username" && request.method === "POST") {
     return handleFindUsername(request, env);

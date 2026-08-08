@@ -33,7 +33,7 @@ async function loadAnalysis() {
   }
 }
 
-// 스포츠토토(베트맨) 승무패 대상이 아닌 리그/컵대회/친선경기는 억지로 분석 문구를 만들지 않고,
+// 주요 대회가 아닌 리그/컵대회/친선경기는 억지로 분석 문구를 만들지 않고,
 // 경기 상세로 바로 넘어가는 링크 목록으로만 간단히 보여준다.
 function renderLinkOnly(matches) {
   if (!matches.length) {
@@ -42,7 +42,7 @@ function renderLinkOnly(matches) {
   }
 
   el.linkOnlyWrap.innerHTML = `
-    <div class="ai-link-only-title">그 외 예정 경기 <span class="ai-link-only-hint">(베트맨 승무패 미대상 · 분석 없이 경기 정보만)</span></div>
+    <div class="ai-link-only-title">그 외 예정 경기 <span class="ai-link-only-hint">(분석 없이 경기 정보만)</span></div>
     <div class="ai-link-only-list">
       ${matches
         .map(
@@ -80,21 +80,6 @@ function predictionBar(prediction) {
   `;
 }
 
-function oddsBlock(odds) {
-  if (!odds) return "";
-  const row = (label, value) => (value ? `<div class="odds-cell"><span>${label}</span><b>${value.toFixed(2)}</b></div>` : "");
-  return `
-    <div class="ai-section ai-odds">
-      <div class="ai-section-title">💰 해외 북메이커 배당률 <span class="odds-source">(${odds.bookmaker} 기준, 국내 정식 배당률 아님)</span></div>
-      <div class="odds-row">
-        ${row("승", odds.home)}
-        ${row("무", odds.draw)}
-        ${row("패", odds.away)}
-      </div>
-    </div>
-  `;
-}
-
 function noteList(title, icon, notes) {
   if (!notes || !notes.length) return "";
   return `
@@ -107,7 +92,7 @@ function noteList(title, icon, notes) {
 
 function renderAnalysis(cards, animate) {
   if (!cards.length) {
-    el.list.innerHTML = '<div class="empty-state">베트맨 승무패 대상 예정 경기가 없습니다.</div>';
+    el.list.innerHTML = '<div class="empty-state">분석 가능한 예정 경기가 없습니다.</div>';
     return;
   }
 
@@ -131,7 +116,6 @@ function renderAnalysis(cards, animate) {
       ${noteList("순위", "📊", c.standingsNotes)}
       ${noteList("결장 이슈", "⚕", c.injuryNotes)}
       ${predictionBar(c.prediction)}
-      ${oddsBlock(c.odds)}
     </div>
   `
     )

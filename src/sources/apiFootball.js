@@ -153,7 +153,3 @@ export function getTeamTransfers(env, teamId, opts) {
 export function getTeamInjuries(env, teamId, season) {
   return request(env, "/injuries", { team: teamId, season });
 }
-
-export function getOdds(env, fixtureId) {
-  return request(env, "/odds", { fixture: fixtureId });
-}

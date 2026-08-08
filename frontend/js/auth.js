@@ -72,6 +72,14 @@ export async function logout() {
   clearSession();
 }
 
+// 회원 탈퇴 - 서버가 계정/세션/푸시 구독을 지운 뒤에만 로컬 세션도 지운다(비밀번호가 틀리면
+// fetchJSON이 에러를 던져서 여기까지 오지 않고, 로컬 세션은 그대로 로그인된 채 남는다).
+export async function deleteAccount({ password }) {
+  const token = getToken();
+  await fetchJSON("/auth/me", { method: "DELETE", body: { password }, token });
+  clearSession();
+}
+
 // 서버 기준 최신 프로필(포인트/레벨 등)로 로컬 캐시를 새로고침한다. 세션이 끊겼으면 로그아웃 처리.
 export async function refreshMe() {
   const token = getToken();

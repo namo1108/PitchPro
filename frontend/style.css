@@ -2562,54 +2562,6 @@ table.standings-table {
 }
 
 /* ---------- AI analysis ---------- */
-.toto-link-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: linear-gradient(135deg, var(--accent-soft), var(--bg-elevated));
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  margin-bottom: 16px;
-  text-decoration: none;
-  color: var(--text-primary);
-  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
-}
-
-.toto-link-banner:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
-}
-
-.toto-link-icon {
-  font-size: 22px;
-  flex-shrink: 0;
-}
-
-.toto-link-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.toto-link-title {
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.toto-link-sub {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.toto-link-arrow {
-  flex-shrink: 0;
-  color: var(--accent);
-  font-size: 16px;
-}
-
 .ai-card {
   background: linear-gradient(160deg, var(--bg-elevated), var(--bg-card));
   border: 1px solid var(--border);
@@ -2729,40 +2681,6 @@ table.standings-table {
 .prediction-note {
   font-size: 12.5px;
   color: var(--text-secondary);
-}
-
-.odds-source {
-  text-transform: none;
-  font-weight: 400;
-  color: var(--text-muted);
-  letter-spacing: normal;
-}
-
-.odds-row {
-  display: flex;
-  gap: 10px;
-}
-
-.odds-cell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 4px;
-  font-size: 12px;
-}
-
-.odds-cell span {
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.odds-cell b {
-  font-size: 14px;
 }
 
 .ai-link-only-wrap {
@@ -3579,6 +3497,26 @@ table.standings-table {
 .logout-btn:hover {
   border-color: var(--live-red);
   color: var(--live-red);
+}
+
+.account-delete-link {
+  display: block;
+  margin: 14px auto 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.account-delete-link:hover {
+  color: var(--live-red);
+}
+
+.auth-submit-btn.danger {
+  background: var(--live-red);
+  color: #ffffff;
 }
 
 .profile-level-row {

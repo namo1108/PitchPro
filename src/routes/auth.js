@@ -1,5 +1,6 @@
 import { json } from "../lib/http.js";
 import { getJSON, putJSON } from "../lib/kv.js";
+import { KV_KEYS } from "../lib/config.js";
 import { clientIp, isRateLimited, isBlockedByFailures, recordFailure, clearFailures } from "../lib/rateLimit.js";
 import {
   hashPassword,
@@ -121,6 +122,35 @@ export async function handleMe(request, env) {
   const user = await getAuthedUser(request, env);
   if (!user) return json({ detail: "로그인이 필요합니다." }, 401);
   return json({ user: { ...publicProfile(user), progress: levelProgress(user.points, user.username) } });
+}
+
+// 회원 탈퇴(셀프서비스) - 비밀번호 재확인 후 계정과 로그인 세션, 이 계정으로 등록된 푸시 구독을 지운다.
+// 커뮤니티 게시글/댓글, 친구 목록의 상호 참조, 집관인증/포인트 내역은 관리자 전용 delete-user와
+// 마찬가지로 남겨둔다(다른 이용자의 게시물·친구 목록에서 소급 편집하는 부작용이 더 크다고 판단).
+export async function handleDeleteAccount(request, env) {
+  const user = await getAuthedUser(request, env);
+  if (!user) return json({ detail: "로그인이 필요합니다." }, 401);
+
+  const body = await request.json().catch(() => null);
+  const password = String(body?.password || "");
+  if (!(await verifyPassword(password, user.passwordHash))) {
+    return json({ detail: "비밀번호가 올바르지 않습니다." }, 401);
+  }
+
+  const subKey = await env.CACHE.get(`${KV_KEYS.pushUsernameIndexPrefix}${user.username}`);
+  if (subKey) {
+    await env.CACHE.delete(subKey);
+    await env.CACHE.delete(`${KV_KEYS.pushUsernameIndexPrefix}${user.username}`);
+  }
+
+  await env.CACHE.delete(userKey(user.username));
+  if (user.nickname) await env.CACHE.delete(nicknameIndexKey(user.nickname));
+
+  const authHeader = request.headers.get("authorization") || "";
+  const match = /^Bearer\s+(.+)$/i.exec(authHeader);
+  if (match) await destroySession(env, match[1]);
+
+  return json({ status: "ok" });
 }
 
 // 아이디 찾기: 닉네임은 이미 커뮤니티/명예의 전당 등에서 공개적으로 보이는 정보라(비밀번호와 달리),

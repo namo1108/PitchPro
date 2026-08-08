@@ -12,27 +12,26 @@ const EU_WINDOWS = [
   { start: "06-10", end: "09-08" },
 ];
 
-// bettable: 스포츠토토(베트맨, betman.co.kr) "축구toto 승무패" 대상으로 알려진 대회만 true.
-// AI 분석 탭은 이 값이 true인 대회 경기만 분석 카드를 만들고, 나머지는 링크만 보여준다.
-// 베트맨의 실제 취급 종목은 시즌/주차마다 조금씩 바뀔 수 있어 이 목록은 근사치다 -
-// 실제 사이트 라인업과 다르면 이 플래그만 바꾸면 된다.
+// featured: 유럽 5대리그 + 주요 대륙대회 + K리그 등 사용자 관심이 높은 주요 대회만 true.
+// AI 분석 탭은 이 값이 true인 대회 경기만 분석 카드를 만들고(팀당 API 호출 비용이 커서 전체
+// 대회를 다 만들 수 없음), 나머지는 링크만 보여준다.
 export const COMPETITIONS = [
-  { code: "PL", name: "Premier League", emblem: "https://media.api-sports.io/football/leagues/39.png", apiFootballLeagueId: 39, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, bettable: true },
-  { code: "PD", name: "La Liga", emblem: "https://media.api-sports.io/football/leagues/140.png", apiFootballLeagueId: 140, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, bettable: true },
-  { code: "BL1", name: "Bundesliga", emblem: "https://media.api-sports.io/football/leagues/78.png", apiFootballLeagueId: 78, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, bettable: true },
-  { code: "SA", name: "Serie A", emblem: "https://media.api-sports.io/football/leagues/135.png", apiFootballLeagueId: 135, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, bettable: true },
-  { code: "FL1", name: "Ligue 1", emblem: "https://media.api-sports.io/football/leagues/61.png", apiFootballLeagueId: 61, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, bettable: true },
+  { code: "PL", name: "Premier League", emblem: "https://media.api-sports.io/football/leagues/39.png", apiFootballLeagueId: 39, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, featured: true },
+  { code: "PD", name: "La Liga", emblem: "https://media.api-sports.io/football/leagues/140.png", apiFootballLeagueId: 140, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, featured: true },
+  { code: "BL1", name: "Bundesliga", emblem: "https://media.api-sports.io/football/leagues/78.png", apiFootballLeagueId: 78, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, featured: true },
+  { code: "SA", name: "Serie A", emblem: "https://media.api-sports.io/football/leagues/135.png", apiFootballLeagueId: 135, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, featured: true },
+  { code: "FL1", name: "Ligue 1", emblem: "https://media.api-sports.io/football/leagues/61.png", apiFootballLeagueId: 61, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, featured: true },
   { code: "DED", name: "Eredivisie", emblem: "https://media.api-sports.io/football/leagues/88.png", apiFootballLeagueId: 88, apiFootballSeason: 2026, transferWindows: EU_WINDOWS },
   { code: "PPL", name: "Primeira Liga", emblem: "https://media.api-sports.io/football/leagues/94.png", apiFootballLeagueId: 94, apiFootballSeason: 2026, transferWindows: EU_WINDOWS },
   { code: "ELC", name: "Championship", emblem: "https://media.api-sports.io/football/leagues/40.png", apiFootballLeagueId: 40, apiFootballSeason: 2026, transferWindows: EU_WINDOWS },
   { code: "BSA", name: "Brasileirão", emblem: "https://media.api-sports.io/football/leagues/71.png", apiFootballLeagueId: 71, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-03" }, { start: "07-15", end: "09-18" }] },
-  { code: "CL", name: "Champions League", emblem: "https://media.api-sports.io/football/leagues/2.png", apiFootballLeagueId: 2, apiFootballSeason: 2026, hasBracket: true, bettable: true },
-  { code: "WC", name: "World Cup", emblem: "/img/emblems/worldcup.jpg", apiFootballLeagueId: 1, apiFootballSeason: 2026, hasBracket: true, bettable: true },
-  { code: "EC", name: "European Championship", emblem: "https://media.api-sports.io/football/leagues/4.png", apiFootballLeagueId: 4, apiFootballSeason: 2024, hasBracket: true, bettable: true },
-  { code: "KL1", name: "K리그1", emblem: "https://media.api-sports.io/football/leagues/292.png", apiFootballLeagueId: 292, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }], bettable: true },
+  { code: "CL", name: "Champions League", emblem: "https://media.api-sports.io/football/leagues/2.png", apiFootballLeagueId: 2, apiFootballSeason: 2026, hasBracket: true, featured: true },
+  { code: "WC", name: "World Cup", emblem: "/img/emblems/worldcup.jpg", apiFootballLeagueId: 1, apiFootballSeason: 2026, hasBracket: true, featured: true },
+  { code: "EC", name: "European Championship", emblem: "https://media.api-sports.io/football/leagues/4.png", apiFootballLeagueId: 4, apiFootballSeason: 2024, hasBracket: true, featured: true },
+  { code: "KL1", name: "K리그1", emblem: "https://media.api-sports.io/football/leagues/292.png", apiFootballLeagueId: 292, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }], featured: true },
   // promotionSpots: K리그2는 1~2위 자동 승격 + 3~6위 승격 플레이오프라 1~6위 전체가 "승격권"이다
   // (사용자 확인, 2026-07). 지정 안 한 다른 리그는 순위표 렌더링 쪽의 기존 근사 규칙(상위 4/하위 3)을 쓴다.
-  { code: "KL2", name: "K리그2", emblem: "https://media.api-sports.io/football/leagues/293.png", apiFootballLeagueId: 293, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }], bettable: true, promotionSpots: 6 },
+  { code: "KL2", name: "K리그2", emblem: "https://media.api-sports.io/football/leagues/293.png", apiFootballLeagueId: 293, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }], featured: true, promotionSpots: 6 },
   { code: "KFA", name: "코리아컵", emblem: "https://media.api-sports.io/football/leagues/294.png", apiFootballLeagueId: 294, apiFootballSeason: 2026, hasBracket: true },
   // K3/K4는 API-Football 커버리지가 순위/경기 일정 위주라 스쿼드·라인업·통계는 비어 보일 수 있음(정상 동작).
   // 등록 기간은 K리그1/2와 동일한 KFA 규정을 따른다.

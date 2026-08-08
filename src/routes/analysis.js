@@ -2,12 +2,12 @@ import { json } from "../lib/http.js";
 import { getJSON, putJSON } from "../lib/kv.js";
 import { KV_KEYS, COMPETITIONS, findCompetition } from "../lib/config.js";
 import * as apiFootball from "../sources/apiFootball.js";
-import { normalizeFixture, normalizeInjuries, normalizeOdds } from "../adapters/apiFootballAdapter.js";
+import { normalizeFixture, normalizeInjuries } from "../adapters/apiFootballAdapter.js";
 import { buildMatchAnalysis } from "../lib/analysis.js";
 import { getAdidasPointsByCode, findTeamAdidasPoint } from "../lib/kleagueAdidasPoints.js";
 import { fetchTeamRank, KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID } from "../scheduled/refreshKLeagueResults.js";
 
-const ANALYSIS_CACHE_KEY = "analysis:v10";
+const ANALYSIS_CACHE_KEY = "analysis:v11";
 // 사전 갱신 크론이 1시간 주기라(scheduled/index.js), 그 전에 캐시가 만료돼 사용자 요청이 직접
 // 무거운 계산(최대 36콜)을 떠맡는 일이 없도록 TTL을 넉넉하게 잡는다 - 80분이었는데, 쿼터가 빡빡해서
 // 사전 갱신 틱이 한 번 건너뛰어져도(isQuotaTight) 다음 틱 전에 캐시가 만료되지 않도록 120분으로 늘림
@@ -18,8 +18,9 @@ const MAX_CARDS = 6;
 const MAX_LINK_ONLY = 12;
 const CONCURRENCY = 6;
 
-// AI 분석은 스포츠토토(베트맨) 승무패 대상으로 알려진 대회(config.js의 bettable: true)만 만든다.
-// 그 외 리그/컵대회/친선경기는 문구를 억지로 만들지 않고 경기 목록에만 링크로 노출한다(handleAnalysis 하단 참고).
+// AI 분석은 주요 대회(config.js의 featured: true)만 만든다 - 팀당 조회 비용이 커서 전체 대회를
+// 다 계산할 수 없다. 그 외 리그/컵대회/친선경기는 문구를 억지로 만들지 않고 경기 목록에만 링크로
+// 노출한다(handleAnalysis 하단 참고).
 // 노출 슬롯이 8개뿐이라, 시간순으로만 뽑으면 그날 하필 빨리 킥오프하는 리그가 슬롯을 차지하고
 // 정작 K리그나 유럽 빅리그가 밀려날 수 있어 "중요도 티어" 순으로 먼저 정렬한 뒤 같은 티어 안에서만 시간순으로 줄을 세운다.
 // 0티어: K리그는 사용자 요청상 항상 최우선. 1티어: 월드컵/대륙간컵대회. 2티어: 유럽 5대리그.
@@ -28,7 +29,7 @@ const AI_ANALYSIS_TIERS = [
   ["WC", "CL", "EC"],
   ["PL", "PD", "BL1", "SA", "FL1"],
 ];
-const BETTABLE_CODES = new Set(COMPETITIONS.filter((c) => c.bettable).map((c) => c.code));
+const FEATURED_CODES = new Set(COMPETITIONS.filter((c) => c.featured).map((c) => c.code));
 
 function analysisTierRank(code) {
   const idx = AI_ANALYSIS_TIERS.findIndex((tier) => tier.includes(code));
@@ -156,16 +157,16 @@ export async function buildAnalysis(env) {
     .filter((m) => new Date(m.utcDate) <= horizon);
 
   const upcoming = withinHorizon
-    .filter((m) => BETTABLE_CODES.has(m.competition.code))
+    .filter((m) => FEATURED_CODES.has(m.competition.code))
     .sort((a, b) => {
       const rankDiff = analysisTierRank(a.competition.code) - analysisTierRank(b.competition.code);
       return rankDiff !== 0 ? rankDiff : new Date(a.utcDate) - new Date(b.utcDate);
     })
     .slice(0, MAX_CARDS);
 
-  // 베트맨 승무패 대상이 아닌 리그/컵대회/친선경기는 분석 문구 없이, 경기 상세로 넘어가는 링크 목록으로만 보여준다.
+  // 주요 대회가 아닌 리그/컵대회/친선경기는 분석 문구 없이, 경기 상세로 넘어가는 링크 목록으로만 보여준다.
   const linkOnly = withinHorizon
-    .filter((m) => !BETTABLE_CODES.has(m.competition.code))
+    .filter((m) => !FEATURED_CODES.has(m.competition.code))
     .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
     .slice(0, MAX_LINK_ONLY)
     .map((m) => ({
@@ -185,20 +186,13 @@ export async function buildAnalysis(env) {
   }
   const teamIds = Array.from(teamSeasons.keys());
 
-  // 팀 컨텍스트(최근폼/부상)·상대전적(H2H)·배당률은 서로 결과를 필요로 하지 않는 독립적인 조회라,
+  // 팀 컨텍스트(최근폼/부상)·상대전적(H2H)은 서로 결과를 필요로 하지 않는 독립적인 조회라,
   // 예전엔 이걸 순서대로(하나 끝나면 다음 시작) 기다려서 냉캐시일 때 응답이 9초 가까이 걸렸다.
-  // 셋 다 동시에 돌려서 가장 오래 걸리는 것 하나만큼만 기다리면 되게 바꿨다.
-  const [contexts, h2hList, oddsList] = await Promise.all([
+  // 둘 다 동시에 돌려서 가장 오래 걸리는 것 하나만큼만 기다리면 되게 바꿨다.
+  const [contexts, h2hList] = await Promise.all([
     mapLimit(teamIds, CONCURRENCY, (teamId) => fetchTeamContext(env, teamId, teamSeasons.get(teamId))),
     // 상대전적(H2H)도 카드마다(팀 하나가 아니라 이번 매치업 자체가 기준) 조회해서 예측 근거에 포함시킨다.
     mapLimit(upcoming, CONCURRENCY, (match) => fetchH2H(env, match.homeTeam.id, match.awayTeam.id)),
-    // 배당률은 경기당 1회 호출(북메이커 미제공 시 조용히 null).
-    mapLimit(upcoming, CONCURRENCY, (match) =>
-      apiFootball
-        .getOdds(env, match.id)
-        .then((raw) => normalizeOdds(raw.response))
-        .catch(() => null)
-    ),
   ]);
 
   const teamRecents = {};
@@ -226,9 +220,7 @@ export async function buildAnalysis(env) {
           away: kleagueFormFromRankRow(byApiFootballId.get(String(match.awayTeam.id))),
         }
       : {};
-    const card = buildMatchAnalysis(match, teamRecents, standingsTables, teamInjuries, h2hList[i], kleagueForms);
-    card.odds = oddsList[i];
-    return card;
+    return buildMatchAnalysis(match, teamRecents, standingsTables, teamInjuries, h2hList[i], kleagueForms);
   });
 
   // K리그 매치는 kleague.com 공식 파워랭킹(ADIDAS Point)을 곁들여서, 순위/최근폼 같은 범용 지표보다

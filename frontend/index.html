@@ -91,14 +91,6 @@
       <!-- AI 분석 -->
       <section id="view-ai" class="view">
         <h2 class="section-title">AI 분석</h2>
-        <a class="toto-link-banner" href="https://www.betman.co.kr" target="_blank" rel="noopener">
-          <span class="toto-link-icon">🎱</span>
-          <span class="toto-link-text">
-            <span class="toto-link-title">스포츠토토 승무패 대상 경기만 분석해요</span>
-            <span class="toto-link-sub">베트맨(공식 스포츠토토)에서 실제 경기·배당 확인하기</span>
-          </span>
-          <span class="toto-link-arrow">↗</span>
-        </a>
         <div id="ai-list" class="ai-list">
           <div class="loading">분석을 불러오는 중...</div>
         </div>
@@ -491,6 +483,23 @@
         </p>
         <button id="points-history-toggle" class="points-history-toggle">📜 내 포인트 내역 보기</button>
         <div id="points-history-list" class="points-history-list" style="display: none;"></div>
+      </div>
+    </div>
+
+    <!-- 회원 탈퇴 확인 팝업 - 나의 팀 프로필의 "회원 탈퇴" 링크로 연다. 비밀번호 재확인 후 삭제한다. -->
+    <div id="delete-account-modal" class="points-info-modal" style="display: none;">
+      <div class="points-info-backdrop"></div>
+      <div class="points-info-card">
+        <div class="points-info-header">
+          <h3>회원 탈퇴</h3>
+          <button id="delete-account-close" class="points-info-close" aria-label="닫기">✕</button>
+        </div>
+        <p class="points-info-note">
+          탈퇴하면 계정 정보와 로그인, 알림 구독이 즉시 삭제되며 되돌릴 수 없습니다. 계속하려면 비밀번호를 입력해주세요.
+        </p>
+        <input type="password" id="delete-account-password" placeholder="비밀번호" autocomplete="current-password" />
+        <div id="delete-account-error" class="auth-error"></div>
+        <button id="delete-account-confirm-btn" class="auth-submit-btn danger">탈퇴하기</button>
       </div>
     </div>
   </div>
