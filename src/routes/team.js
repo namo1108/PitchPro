@@ -34,11 +34,14 @@ function reKoreanize(result) {
 }
 
 async function buildTeam(env, teamId) {
+  // teamId 자체가 유효한지 보여주는 teamRaw만 필수로 취급한다 - 나머지(최근/예정 경기, 스쿼드, 감독)는
+  // 레이트리밋 등으로 하나만 실패해도 팀 상세 전체가 죽지 않도록 개별로 잡아서 빈 값으로 대체한다
+  // (2026-08-08, API-Football 분당 한도에 걸려 팀 상세가 통째로 502 나던 문제 - 사용자 확인).
   const [teamRaw, recentRaw, upcomingRaw, squadRaw, coachRaw] = await Promise.all([
     apiFootball.getTeam(env, teamId),
-    apiFootball.getTeamRecentFixtures(env, teamId, 10),
-    apiFootball.getTeamUpcomingFixtures(env, teamId, 20),
-    apiFootball.getSquad(env, teamId),
+    apiFootball.getTeamRecentFixtures(env, teamId, 10).catch(() => ({ response: [] })),
+    apiFootball.getTeamUpcomingFixtures(env, teamId, 20).catch(() => ({ response: [] })),
+    apiFootball.getSquad(env, teamId).catch(() => ({ response: [] })),
     apiFootball.getCoach(env, teamId).catch(() => null),
   ]);
 
