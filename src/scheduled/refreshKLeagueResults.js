@@ -121,8 +121,11 @@ async function refreshKLeagueStandings(env) {
       row.goalDifference = r.gapCnt;
     }
 
-    // 승점 -> 득실차 순으로 정렬(표준 축구 순위 규칙)하고, 등수는 그 결과 그대로 다시 매긴다.
-    table.sort((a, b) => b.points - a.points || b.goalDifference - a.goalDifference);
+    // 승점 -> 다득점 -> 득실차 순으로 정렬한다. 유럽 리그처럼 득실차를 먼저 보는 게 아니라
+    // "다득점이 득실차보다 우선"인 게 K리그만의 공식 순위 규정이다(사용자가 K리그 홈페이지 기준으로
+    // 재확인, 2026-08-08 - 이 정렬을 득실차 우선으로 잘못 넣어서 승점 동률 팀 순서가 실제 kleague.com과
+    // 어긋나는 사고가 있었다). 등수는 그 결과 그대로 다시 매긴다.
+    table.sort((a, b) => b.points - a.points || b.goalsFor - a.goalsFor || b.goalDifference - a.goalDifference);
     table.forEach((row, i) => {
       row.position = i + 1;
     });
