@@ -3,8 +3,8 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "REPLACE_WITH_TWA_PACKAGE_NAME",
-      "sha256_cert_fingerprints": ["REPLACE_WITH_SHA256_CERT_FINGERPRINT"]
+      "package_name": "com.pitchpro.app",
+      "sha256_cert_fingerprints": ["7F:F5:A0:D1:6D:BD:09:A2:51:B1:18:8B:67:C6:CF:1A:B4:81:92:CF:08:3A:4E:51:F8:A1:CC:69:06:59:FE:97"]
     }
   }
 ]
