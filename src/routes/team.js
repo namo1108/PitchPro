@@ -20,6 +20,7 @@ import {
 } from "../lib/kleaguePlayerPhotos.js";
 import { findKLeagueVenue } from "../lib/kleagueVenues.js";
 import { lookupManualK3K4Squad } from "../lib/manualK3K4Squads.js";
+import { lookupK3PhotoByNumber } from "../lib/k3PhotoOverrides.js";
 
 const TEAM_CACHE_TTL_SECONDS = 600;
 const TEAM_STALE_KEY_PREFIX = "team:stale:";
@@ -53,8 +54,12 @@ async function buildTeam(env, teamId) {
   const rawSquad = applySquadRemovals((squadRaw.response?.[0]?.players || []).map(normalizeSquadPlayer), teamId);
   const kleaguePhotos = await getKLeaguePlayerPhotoMap(env);
   const apiSquad = rawSquad.map((p) => {
-    const override = lookupKLeaguePlayerPhoto(kleaguePhotos, teamId, p.number);
-    return override ? { ...p, photo: override } : p;
+    const kleagueOverride = lookupKLeaguePlayerPhoto(kleaguePhotos, teamId, p.number);
+    if (kleagueOverride) return { ...p, photo: kleagueOverride };
+    // 일부 K3 구단은 API-Football 스쿼드 자체는 정상인데 사진만 전부 비어있어서(시흥/창원/목포 확인,
+    // 2026-08-08), 구단 공식 사이트에서 받은 사진을 등번호로 대조해 붙인다.
+    const k3Override = lookupK3PhotoByNumber(teamId, p.number);
+    return k3Override ? { ...p, photo: k3Override } : p;
   });
   // API-Football이 K3/K4는 스쿼드를 거의 안 줘서(팀 정보/일정만 있음), 비어있을 때 나무위키 기반
   // 수동 명단(manualK3K4Squads.js)으로 대체한다 - 사용자 요청, 2026-08-08.

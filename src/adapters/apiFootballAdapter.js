@@ -471,6 +471,7 @@ const COACH_OVERRIDES = {
 const COACH_PHOTO_OVERRIDES = {
   7061: "/img/coaches/rui-quinta.jpg", // 충북청주 - 루이 퀸타
   7098: "/img/coaches/gerard-nus.jpg", // 파주 시민축구단 - 제라드 누스
+  7105: "/img/k3k4players/siheung/siheung_coach.jpg", // 시흥시민축구단 - 이름/재임 정보는 API가 정상, 사진만 없음
 };
 
 export function applyCoachOverride(coach, teamId) {
@@ -489,19 +490,19 @@ const MANUAL_COACH_FALLBACKS = {
   7056: "백기홍", // 부산교통공사축구단
   18653: "한상민", // 당진시민축구단
   7083: "서보원", // 경주한수원FC
-  7111: "양현정", // 양평FC
+  7111: { name: "양현정", photo: "/img/k3k4players/coaches/yangpyeong_coach.jpg" }, // 양평FC
   16452: { name: "이창엽", photo: "/img/k3k4players/jinju/jinju_이창엽.jpg" }, // 진주시민축구단
   27863: { name: "유상수", photo: "/img/k3k4players/jincheon/jincheon_coach_유상수.jpg" }, // 진천HRFC
   7092: "곽경근", // 서울중랑축구단
   18654: { name: "송홍섭", photo: "/img/k3k4players/geoje/geoje_송홍섭.jpg" }, // 거제시민축구단
   27865: { name: "이정재", photo: "/img/k3k4players/seosan/coach_이정재.jpg" }, // 서산 파이오니아 FC (인스타그램/나무위키 소형 썸네일)
   7068: "김찬석", // 대전코레일FC
-  7059: "이영진", // 창원FC
+  7059: { name: "이영진", photo: "/img/k3k4players/changwon/changwon_coach.jpg" }, // 창원FC
   7112: "심봉섭", // 여주FC
-  7108: "윤원일", // 울산시민축구단
+  7108: { name: "윤원일", photo: "/img/k3k4players/coaches/ulsan_coach.jpg" }, // 울산시민축구단
   7075: "임다한", // FC강릉
   7064: "김우재", // 춘천시민축구단
-  7096: "최영근", // FC목포
+  7096: { name: "최영근", photo: "/img/k3k4players/mokpo/mokpo_coach.jpg" }, // FC목포
   25717: "권순형", // 전북현대모터스 B팀(나무위키 "전북 현대 모터스 N" 기준)
   27858: "이영민", // 금산인삼FC
   27860: { name: "한상구", photo: "/img/k3k4players/jecheon/jecheon_감독_한상구.jpg" }, // 제천시민축구단
