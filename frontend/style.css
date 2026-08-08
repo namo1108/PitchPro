@@ -4108,6 +4108,16 @@ table.standings-table {
   box-shadow: var(--shadow);
 }
 
+.squad-card--static {
+  cursor: default;
+}
+
+.squad-card--static:hover {
+  border-color: var(--border);
+  transform: none;
+  box-shadow: none;
+}
+
 .squad-photo {
   width: 56px;
   height: 56px;

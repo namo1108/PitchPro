@@ -79,8 +79,11 @@ const POSITION_LABEL = {
 };
 
 function squadCard(p, teamId) {
+  // manual-* id는 API-Football 선수 상세와 연결되지 않는 수동 명단(K3/K4)이라 클릭해도 갈 곳이 없다.
+  const isManual = String(p.id).startsWith("manual-");
+  const attr = isManual ? "" : `data-player-id="${p.id}"`;
   return `
-    <div class="squad-card" data-player-id="${p.id}">
+    <div class="squad-card${isManual ? " squad-card--static" : ""}" ${attr}>
       ${playerAvatarImg(p, teamId, "squad-photo")}
       <div class="squad-name">${p.name}</div>
       <div class="squad-meta">${p.number ? `#${p.number}` : ""}${p.age ? ` · ${p.age}세` : ""}</div>
