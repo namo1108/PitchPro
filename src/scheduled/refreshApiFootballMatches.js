@@ -93,7 +93,10 @@ export async function fetchAndStoreMatches(env, existing) {
       console.error(`fixtures fetch failed for ${comp.code}:`, err);
       allMatches.push(...cached);
     }
-    await sleep(300);
+    // 300ms 간격으로는 대회 29개를 순차 호출할 때(다른 크론 작업·실사용자 요청과 겹치면 더욱)
+    // 분당 요청 한도에 걸려 전체 대회가 한꺼번에 실패하는 사고가 있었다(2026-08-08, EL/ECL 추가
+    // 직후 확인 - 새 대회 자체의 문제가 아니라 이 전체 스윕이 분당 한도를 넘기고 있었음).
+    await sleep(1000);
   }
 
   // 내용이 지난 틱과 완전히 같으면(비활성 시간대 등) 굳이 다시 안 써서 KV 무료 플랜의 하루 쓰기 한도를 아낀다.
