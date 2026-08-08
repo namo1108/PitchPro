@@ -3,12 +3,17 @@ import { KV_KEYS } from "../lib/config.js";
 import * as apiFootball from "../sources/apiFootball.js";
 import { loadSubscriptions, filterInterested, sendToSubscriber } from "../lib/subscriptions.js";
 
-// 킥오프 70분 전부터 확인 시작(API-Football은 보통 킥오프 1시간 전쯤 라인업을 올림).
+// 킥오프 60분 전부터 확인 시작(사용자 요청, 2026-08-08 - API-Football은 보통 킥오프 1시간 전쯤 라인업을 올림).
 // 한 번 발표됐다고 확인되면(match.lineupsAnnounced=true) 그 경기는 다시 조회하지 않는다 -> API 절약.
 // 이 플래그는 /api/matches 응답에도 그대로 실려 나가서, 프론트가 경기 상세를 매번 다시 안 불러도
 // 목록만 보고 "라인업 발표됨"을 알 수 있다(예전엔 프론트가 30초마다 후보 경기 상세를 직접 조회해서
 // API 요청이 폭증했었음).
-const WINDOW_MAX_MS = 70 * 60 * 1000;
+const WINDOW_MAX_MS = 60 * 60 * 1000;
+// 라인업이 유독 늦게(킥오프 직전~직후) 올라오는 경기가 있는데, 예전엔 상태가 SCHEDULED/TIMED일 때만
+// 후보로 봐서 킥오프와 동시에 IN_PLAY로 넘어가버리면 그 경기는 영영 다시 확인을 안 했다 - 실제 데이터는
+// 있는데도 lineupsAnnounced가 끝까지 false로 남고 알림도 안 나간 사고(부천FC1995 vs 광주FC, 2026-08-08
+// 확인). 킥오프 후 20분까지는 계속 후보에 포함시켜 늦게 올라온 라인업도 잡아낸다.
+const POST_KICKOFF_GRACE_MS = 20 * 60 * 1000;
 const NOTIFIED_TTL_SECONDS = 6 * 60 * 60;
 const NOTIFIED_KEY_PREFIX = "lineupnotified:";
 
@@ -19,9 +24,9 @@ export async function notifyLineups(env) {
 
   const candidates = all.filter((m) => {
     if (m.lineupsAnnounced) return false; // 이미 확인 끝난 경기는 다시 안 봄
-    if (!["SCHEDULED", "TIMED"].includes(m.status)) return false;
+    if (!["SCHEDULED", "TIMED", "IN_PLAY"].includes(m.status)) return false;
     const untilKickoff = new Date(m.utcDate).getTime() - now;
-    return untilKickoff > 0 && untilKickoff <= WINDOW_MAX_MS;
+    return untilKickoff > -POST_KICKOFF_GRACE_MS && untilKickoff <= WINDOW_MAX_MS;
   });
 
   if (!candidates.length) return;

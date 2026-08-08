@@ -25,11 +25,7 @@ import { getTheme } from "../theme.js";
 
 const state = {
   dayOffset: 0,
-  lastScores: new Map(),
-  lastStatus: new Map(),
-  lineupNotified: new Set(),
   pollTimer: null,
-  hasCheckedLineupsOnce: false,
   // 이번 세션에서 이미 한 번 그려본 날짜는 탭을 오가거나 다시 새로고침해도 스켈레톤으로 안 비우고
   // 화면에 남겨둔 채 조용히 갱신한다 - 매번 탭 전환마다 깜빡이며 다시 로딩되는 느낌을 없앤다.
   loadedOffsets: new Set(),
@@ -61,12 +57,11 @@ export async function loadMatches(opts = {}) {
   // 것처럼 느껴진다.
   const alreadyLoaded = state.loadedOffsets.has(state.dayOffset);
   if (!opts.silent && !alreadyLoaded) el.matchesList.innerHTML = skeletonList(5);
+  ensureKLeagueRankMap(); // 백그라운드로 미리 채워둠(주요경기 우선순위 계산용) - 못 채워도 기존 정렬로 조용히 대체됨
   try {
     const iso = toISODate(dateWithOffset(state.dayOffset));
     const data = await fetchJSON(`/matches?date=${iso}`);
     const matches = data.matches || [];
-    checkForGoals(matches);
-    checkForLineupAnnouncements(matches);
     renderMatches(matches);
     state.loadedOffsets.add(state.dayOffset);
     if (!opts.silent && !alreadyLoaded) fadeIn(el.matchesList);
@@ -74,75 +69,6 @@ export async function loadMatches(opts = {}) {
   } catch (err) {
     if (!opts.silent && !alreadyLoaded) el.matchesList.innerHTML = `<div class="error-state">경기 정보를 불러오지 못했습니다.<br>${err.message}</div>`;
   }
-}
-
-// 즐겨찾기 팀 경기이거나 🔔로 지켜보고 있는 경기인지.
-function isWatchedMatch(m) {
-  return isWatched(m.id) || isFavorite(m.homeTeam.id) || isFavorite(m.awayTeam.id);
-}
-
-// 이전에 불러온 스코어/상태와 비교해서, 지켜보는 경기에 골이 들어가거나 시작/하프타임/종료되면 토스트+효과음을 띄운다.
-function checkForGoals(matches) {
-  const scoredEvents = [];
-  const kickoffEvents = [];
-  const halftimeEvents = [];
-  const finishedEvents = [];
-
-  matches.forEach((m) => {
-    const isLive = LIVE_STATUSES.has(m.status);
-    const isPaused = m.status === "PAUSED";
-    const isFinished = m.status === "FINISHED";
-    const home = m.score.fullTime.home ?? 0;
-    const away = m.score.fullTime.away ?? 0;
-    const prevScore = state.lastScores.get(m.id);
-    const prevStatus = state.lastStatus.get(m.id);
-    const watched = isWatchedMatch(m);
-
-    // 어느 쪽이 넣었는지(homeScored/awayScored)까지 같이 들고 있어야, 나중에 "내가 즐겨찾는 팀이 넣었는지
-    // 실점했는지"를 구분해서 세리모니와 탄식 소리를 다르게 낼 수 있다.
-    if (isLive && prevScore && (home > prevScore.home || away > prevScore.away) && watched) {
-      scoredEvents.push({ match: m, homeScored: home > prevScore.home, awayScored: away > prevScore.away });
-    }
-    if (isLive && prevStatus && !LIVE_STATUSES.has(prevStatus) && watched) {
-      kickoffEvents.push(m);
-    }
-    if (isPaused && prevStatus === "IN_PLAY" && watched) {
-      halftimeEvents.push(m);
-    }
-    if (isFinished && prevStatus && LIVE_STATUSES.has(prevStatus) && watched) {
-      finishedEvents.push(m);
-    }
-
-    if (isLive) {
-      state.lastScores.set(m.id, { home, away });
-    } else {
-      state.lastScores.delete(m.id);
-    }
-    state.lastStatus.set(m.id, m.status);
-  });
-
-  scoredEvents.forEach(({ match, homeScored }) => handleGoalDetected(match, homeScored ? "home" : "away"));
-  kickoffEvents.forEach(showKickoffToast);
-  halftimeEvents.forEach(showHalftimeToast);
-  finishedEvents.forEach(showFinishedToast);
-}
-
-// 라인업 발표 여부는 서버 크론(notifyLineups)이 이미 확인해서 목록 응답에 lineupsAnnounced로 실어주므로,
-// 여기서는 그 플래그만 보고 토스트를 띄운다(예전엔 후보 경기마다 상세를 직접 조회해서 30초마다 API 요청이
-// 몰렸었는데, 그 문제를 없애기 위해 서버 쪽 플래그를 그대로 읽는 방식으로 바꿨다).
-function checkForLineupAnnouncements(matches) {
-  // 새로고침/첫 로딩 시점엔 "새로 발표됨"이 아니라 "이미 발표돼 있던 상태"일 뿐이니, 이번 로딩에서 처음
-  // 본 발표 건들은 토스트 없이 조용히 기록만 하고, 그 다음부터 바뀌는 것만 알림으로 띄운다.
-  const isFirstCheck = !state.hasCheckedLineupsOnce;
-  state.hasCheckedLineupsOnce = true;
-
-  matches.forEach((m) => {
-    if (!m.lineupsAnnounced) return;
-    if (!isWatchedMatch(m)) return;
-    if (state.lineupNotified.has(m.id)) return;
-    state.lineupNotified.add(m.id);
-    if (!isFirstCheck) showLineupToast(m);
-  });
 }
 
 // 크론이 몇 분마다 도는 거라 elapsed 값 자체가 실시간은 아니다. 같은 값이 여러 번 반복되는 동안
@@ -501,6 +427,37 @@ function isFollowedMatch(m) {
   return isFavorite(m.homeTeam.id) || isFavorite(m.awayTeam.id);
 }
 
+// K리그 라이브 경기끼리 우선순위를 매길 때 쓸 순위표(팀 id -> 순위). 사용자 요청(2026-08-08) - 같은
+// 시간에 여러 K리그 경기가 진행 중이면 상위권 팀들의 맞대결을 주요 경기로 우선 보여준다. 순위는 하루에
+// 몇 번 안 바뀌는 데이터라 세션당 한 번만 불러와 메모이즈하고, 아직 안 채워졌으면(첫 로딩 등) 그냥
+// 기존 정렬(대회 다음 킥오프 시각순)로 조용히 넘어간다.
+let kleagueRankMap = null;
+let kleagueRankMapPromise = null;
+
+function ensureKLeagueRankMap() {
+  if (kleagueRankMap || kleagueRankMapPromise) return;
+  kleagueRankMapPromise = Promise.all([fetchJSON("/standings/KL1").catch(() => null), fetchJSON("/standings/KL2").catch(() => null)]).then(
+    ([kl1, kl2]) => {
+      const map = new Map();
+      [kl1, kl2].forEach((data) => {
+        (data?.standings || []).forEach((table) => {
+          (table.table || []).forEach((row) => map.set(String(row.team.id), row.position));
+        });
+      });
+      kleagueRankMap = map;
+    }
+  );
+}
+
+// 두 팀 순위의 평균(낮을수록 상위권). 순위표에 없는 팀이 있으면(외국 리그 등) null.
+function teamRankScore(m) {
+  if (!kleagueRankMap) return null;
+  const h = kleagueRankMap.get(String(m.homeTeam.id));
+  const a = kleagueRankMap.get(String(m.awayTeam.id));
+  if (h == null || a == null) return null;
+  return (h + a) / 2;
+}
+
 // 경기 목록 화면의 대회 그룹 정렬 우선순위: K리그 -> 챔피언스리그 -> 세계 5대리그 -> 컵대회(월드컵/유로/코리아컵),
 // 그 외 대회는 기존 순서(패치 순) 그대로, 친선경기(FRIENDLY)는 별도 규칙으로 항상 맨 아래.
 const MATCH_LIST_TIERS = [
@@ -516,18 +473,32 @@ function matchListRank(code) {
 }
 
 function pickFeaturedMatch(matches) {
+  // 내가 팔로우(즐겨찾기)한 팀의 경기가 있으면 무조건 최우선 - 예전엔 "라이브 경기가 하나라도 있으면
+  // 라이브 경기 중에서만" 골랐었는데, 그러면 내 팀 경기가 아직 킥오프 전이고 다른 경기가 먼저 라이브면
+  // 내 팀 경기가 아예 후보에서 밀려났다(사용자 요청, 2026-08-08).
+  const followedMatches = matches.filter(isFollowedMatch);
+  if (followedMatches.length) {
+    const liveFollowed = followedMatches.filter((m) => LIVE_STATUSES.has(m.status));
+    const pool = liveFollowed.length ? liveFollowed : followedMatches;
+    return pool.slice().sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))[0];
+  }
+
   const liveMatches = matches.filter((m) => LIVE_STATUSES.has(m.status));
   const pool = liveMatches.length ? liveMatches : matches;
+  const isLivePool = liveMatches.length > 0;
 
-  // 내가 팔로우(즐겨찾기)한 팀의 경기가 있으면 그중에서 우선 고른다.
-  const followedPool = pool.filter(isFollowedMatch);
-  const searchPool = followedPool.length ? followedPool : pool;
-
-  return searchPool
+  return pool
     .slice()
     .sort((a, b) => {
       const rankDiff = competitionRank(a.competition.code) - competitionRank(b.competition.code);
-      return rankDiff !== 0 ? rankDiff : new Date(a.utcDate) - new Date(b.utcDate);
+      if (rankDiff !== 0) return rankDiff;
+      // 같은 티어의 라이브 K리그 경기끼리는 순위표상 더 상위권 팀들의 맞대결을 우선한다.
+      if (isLivePool && a.competition.code === b.competition.code && (a.competition.code === "KL1" || a.competition.code === "KL2")) {
+        const scoreA = teamRankScore(a);
+        const scoreB = teamRankScore(b);
+        if (scoreA != null && scoreB != null && scoreA !== scoreB) return scoreA - scoreB;
+      }
+      return new Date(a.utcDate) - new Date(b.utcDate);
     })[0];
 }
 

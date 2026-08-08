@@ -5,7 +5,10 @@ import { normalizeFixture } from "../adapters/apiFootballAdapter.js";
 import { detectGoalsAndNotify } from "./detectGoalsAndNotify.js";
 import { notifyMatchEvents } from "./notifyMatchEvents.js";
 
-const POLL_INTERVAL_MS = 10 * 1000;
+// 5초 간격(사용자 요청, 2026-08-08 - 골 알림이 타사 앱보다 늦다는 피드백). live=all은 대회 수와
+// 무관하게 호출 1번으로 끝나는 가벼운 엔드포인트라, Ultra 플랜 분당 한도(450회) 대비 이 정도
+// 빈도(틱당 최대 10콜)는 여유가 충분하다.
+const POLL_INTERVAL_MS = 5 * 1000;
 // 크론이 1분마다 도는데, 다음 tick과 겹치지 않도록 50초 정도에서 멈춘다(Cloudflare 실행시간 여유도 남김).
 const POLL_DURATION_MS = 50 * 1000;
 
