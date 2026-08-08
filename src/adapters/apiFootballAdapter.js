@@ -479,6 +479,46 @@ export function applyCoachOverride(coach, teamId) {
   return photoOverride && coach ? { ...coach, photo: photoOverride } : coach;
 }
 
+// K3/K4는 API-Football이 감독 정보 자체를 아예 안 주는 구단이 많아서, 나무위키에서 확인한 현재 감독
+// 이름을 "API가 비어있을 때만" 채워 넣는다(사용자 요청, 2026-08-08). COACH_OVERRIDES와 달리 API가 이미
+// 뭔가 주면(설령 이름이 나무위키와 달라도) 절대 덮어쓰지 않는다 - API 쪽이 사진 등 더 풍부하고, 어느
+// 쪽이 최신인지 개별 검증이 불가능해서 "있는 데이터를 안 건드린다"가 더 안전한 기본값이기 때문.
+const MANUAL_COACH_FALLBACKS = {
+  7105: "이승희", // 시흥시민축구단
+  7099: "김준태", // 포천시민축구단
+  7056: "백기홍", // 부산교통공사축구단
+  18653: "한상민", // 당진시민축구단
+  7083: "서보원", // 경주한수원FC
+  7111: "양현정", // 양평FC
+  16452: "이창엽", // 진주시민축구단
+  27863: "유상수", // 진천HRFC
+  7092: "곽경근", // 서울중랑축구단
+  18654: "송홍섭", // 거제시민축구단
+  27865: "이정재", // 서산 파이오니아 FC
+  7068: "김찬석", // 대전코레일FC
+  7059: "이영진", // 창원FC
+  7112: "심봉섭", // 여주FC
+  7108: "윤원일", // 울산시민축구단
+  7075: "임다한", // FC강릉
+  7064: "김우재", // 춘천시민축구단
+  7096: "최영근", // FC목포
+  25717: "권순형", // 전북현대모터스 B팀(나무위키 "전북 현대 모터스 N" 기준)
+  27858: "이영민", // 금산인삼FC
+  27860: "한상구", // 제천시민축구단
+  23089: "김성일", // 남양주시민축구단
+  25720: "김종필", // 세종SA축구단
+  18656: "신기동", // 평창유나이티드축구클럽
+  25719: "정정수", // 기장군민축구단
+  27859: "오휘성", // 함안군민축구단
+  7101: "윤상철", // 평택시티즌FC
+};
+
+export function applyManualCoachFallback(coach, teamId) {
+  if (coach) return coach;
+  const name = MANUAL_COACH_FALLBACKS[String(teamId)];
+  return name ? { id: `manual-coach-${teamId}`, name, nationality: null, age: null, photo: null } : null;
+}
+
 // 이적이 확정됐는데도 스쿼드 목록에서 아직 안 빠진 선수를 수동으로 제거한다(구단 발표/보도로 확인된 건만).
 const SQUAD_REMOVALS = {
   // Chelsea -> Real Madrid, 2026-06-15 공식 발표(Real Madrid 스쿼드에는 이미 반영됨, Chelsea 쪽만 안 빠짐)

@@ -8,6 +8,7 @@ import {
   normalizeCoach,
   selectCurrentCoach,
   applyCoachOverride,
+  applyManualCoachFallback,
   applySquadRemovals,
   koreanizeTeam,
 } from "../adapters/apiFootballAdapter.js";
@@ -64,7 +65,9 @@ async function buildTeam(env, teamId) {
   const kleagueCoachPhotos = await getKLeagueCoachPhotoMap(env);
   const coachPhotoOverride = lookupKLeagueCoachPhoto(kleagueCoachPhotos, teamId);
   if (baseCoach && coachPhotoOverride) baseCoach = { ...baseCoach, photo: coachPhotoOverride };
-  const coach = applyCoachOverride(baseCoach, teamId);
+  // K3/K4는 API-Football이 감독 정보 자체가 없는 구단이 많아서, 비어있을 때만 나무위키 기반 이름으로
+  // 채운다(있는 데이터는 절대 안 건드림 - applyManualCoachFallback 참고).
+  const coach = applyManualCoachFallback(applyCoachOverride(baseCoach, teamId), teamId);
 
   return {
     team: normalizeTeam(teamInfo),
