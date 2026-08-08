@@ -147,11 +147,16 @@ async function openPost(id) {
 
 function renderPost(post) {
   const me = getCurrentUser();
-  const canDeletePost = me && me.username === post.username;
+  // 관리자(GOAT 계정, level===99 - admin.js와 동일한 판정 기준)는 이상한 글/댓글을 신고 없이도
+  // 바로 지울 수 있어야 한다(서버 canModerate는 이미 허용했었는데 이 삭제 버튼이 본인 글에만
+  // 보여서 실제로 쓸 방법이 없었다 - 사용자 요청, 2026-08-08).
+  const isAdmin = me?.progress?.level === 99;
+  const canDeletePost = me && (me.username === post.username || isAdmin);
 
   const commentsHtml = (post.comments || [])
     .map((c) => {
-      const isMine = me && me.username === c.username; // 수정/삭제 둘 다 본인 댓글에만 허용
+      const isMine = me && me.username === c.username; // 수정은 본인 댓글에만 허용(서버도 동일하게 제한)
+      const canDeleteComment = isMine || isAdmin;
       return `
       <div class="community-comment" data-comment-id="${c.id}">
         <div class="community-comment-meta">
@@ -159,8 +164,8 @@ function renderPost(post) {
           <span class="community-row-dot">·</span>
           <span class="community-row-time">${timeAgo(c.createdAt)}${c.editedAt ? " (수정됨)" : ""}</span>
           ${isMine ? '<button class="community-delete-btn" data-edit-comment>수정</button>' : ""}
-          ${isMine ? '<button class="community-delete-btn" data-delete-comment>삭제</button>' : ""}
-          ${!isMine && me ? '<button class="community-report-btn" data-report-comment>신고</button>' : ""}
+          ${canDeleteComment ? '<button class="community-delete-btn" data-delete-comment>삭제</button>' : ""}
+          ${!isMine && !isAdmin && me ? '<button class="community-report-btn" data-report-comment>신고</button>' : ""}
         </div>
         <div class="community-comment-body" data-comment-body>${escapeHtml(c.body)}</div>
       </div>
