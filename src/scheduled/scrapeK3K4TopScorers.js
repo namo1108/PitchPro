@@ -1,4 +1,5 @@
 import { putJSON } from "../lib/kv.js";
+import { lookupK3K4PlayerPhoto } from "../lib/k3k4PlayerPhotos.js";
 
 // KFA 공식 사이트가 API-Football이 주지 않는 K3/K4 득점 순위를 표로 직접 제공하고 있어서,
 // 매주 일요일 밤에 이 표를 파싱해서 가져온다(도움 순위는 이 페이지에 없어 득점만 스크랩됨).
@@ -57,7 +58,8 @@ async function scrapeOne(env, code, { url, chartId }) {
   const topScorers = state.rows
     .map((r) => ({ name: r.name.trim(), team: r.team.trim(), teamCrest: r.teamCrest, value: parseInt(r.value, 10) || 0 }))
     .filter((r) => r.name && r.value > 0)
-    .sort((a, b) => b.value - a.value);
+    .sort((a, b) => b.value - a.value)
+    .map((r) => ({ ...r, photo: lookupK3K4PlayerPhoto(r.team, r.name) }));
 
   if (!topScorers.length) throw new Error(`${code}: 파싱된 득점 데이터가 없음(사이트 구조 변경 가능성)`);
 

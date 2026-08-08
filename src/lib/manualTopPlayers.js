@@ -1,4 +1,5 @@
 import { getJSON } from "./kv.js";
+import { lookupK3K4PlayerPhoto } from "./k3k4PlayerPhotos.js";
 
 // API-Football이 K3/K4는 득점/도움 통계를 전혀 제공하지 않아서(K4는 0건, K3는 거의 없음),
 // 대한축구협회(KFA) 사이트를 매주 자동으로 스크랩한 결과(scrapeK3K4TopScorers.js)를 대신 보여준다.
@@ -29,8 +30,16 @@ export const MANUAL_TOP_PLAYERS = {
   },
 };
 
+function withPhotos(data) {
+  if (!data) return data;
+  return {
+    ...data,
+    topScorers: (data.topScorers || []).map((p) => ({ ...p, photo: p.photo ?? lookupK3K4PlayerPhoto(p.team, p.name) })),
+  };
+}
+
 export async function getManualTopPlayers(env, code) {
   const scraped = await getJSON(env, `manualtopplayers:${code}`);
-  if (scraped) return scraped;
-  return MANUAL_TOP_PLAYERS[code] || null;
+  if (scraped) return withPhotos(scraped);
+  return withPhotos(MANUAL_TOP_PLAYERS[code]) || null;
 }
