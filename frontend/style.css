@@ -2781,45 +2781,6 @@ table.standings-table {
   color: var(--accent);
 }
 
-.goal-sound-picker {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px 12px;
-  margin-bottom: 16px;
-  font-size: 13px;
-}
-
-.goal-sound-picker label {
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.goal-sound-picker select {
-  flex: 1;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  border-radius: 8px;
-  padding: 6px 8px;
-  font-size: 13px;
-}
-
-.goal-sound-preview-btn {
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
 /* ---------- 설정 ---------- */
 .settings-group {
   background: var(--bg-card);
@@ -2829,16 +2790,8 @@ table.standings-table {
   margin-bottom: 14px;
 }
 
-.settings-group .notify-btn,
-.settings-group .goal-sound-picker {
+.settings-group .notify-btn {
   margin-bottom: 0;
-}
-
-.settings-group .goal-sound-picker {
-  margin-top: 14px;
-  border: none;
-  padding: 0;
-  background: none;
 }
 
 .settings-note {
@@ -2863,7 +2816,7 @@ table.standings-table {
   padding: 10px 0;
 }
 
-.settings-group > .settings-row + .goal-sound-picker {
+.settings-group > .settings-row + .settings-row {
   border-top: 1px solid var(--border);
   padding-top: 14px;
 }

@@ -174,7 +174,8 @@ function startAutoRefresh() {
 const GOAL_SOUND_KEY = "pitchpro.goalSound";
 
 // 골 알림음 종류. "none"은 무음(진동/시각 효과만). file이 있으면 실제 mp3, 없으면 합성음(폴백용).
-export const GOAL_SOUNDS = [
+// 사용자에게는 켜고 끄는 것만 노출하고(settings.js), 어떤 소리인지는 goal1로 고정한다.
+const GOAL_SOUNDS = [
   { id: "goal1", label: "골 사운드 1", file: "/sounds/goal1.mp3" },
   { id: "goal2", label: "골 사운드 2", file: "/sounds/goal2.mp3" },
   { id: "chime", label: "차임(합성음)" },
@@ -211,10 +212,6 @@ function playFile(path, volume = 0.85) {
   } catch {
     // 오디오 재생 불가 환경이면 조용히 무시
   }
-}
-
-export function previewGoalSound() {
-  playGoalSound();
 }
 
 function playGoalSound() {

@@ -1,7 +1,7 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange } from "../router.js";
 import { getCurrentSubscription } from "../push.js";
-import { GOAL_SOUNDS, getGoalSound, setGoalSound, previewGoalSound } from "./matches.js";
+import { getGoalSound, setGoalSound } from "./matches.js";
 import { getTheme, setTheme } from "../theme.js";
 
 // 각 서버 크론(detectGoalsAndNotify.js 등)이 실제로 보내는 payload.type과 정확히 일치해야 한다
@@ -25,22 +25,17 @@ const el = {
   typeList: document.getElementById("notif-type-list"),
 };
 
-function initGoalSoundPicker() {
-  const select = document.getElementById("goal-sound-select");
-  const previewBtn = document.getElementById("goal-sound-preview");
-  if (!select || !previewBtn) return;
+// 어떤 소리인지 고르게 하지 않고, 켜고 끄는 것만 설정하게 한다(사용자 요청, 2026-08-08 -
+// 소리는 알아서 기본값으로 나오면 되고 고르는 UI 자체가 불필요하다는 피드백).
+function initGoalSoundToggle() {
+  const toggle = document.getElementById("goal-sound-toggle");
+  if (!toggle) return;
 
-  select.innerHTML = GOAL_SOUNDS.map((s) => `<option value="${s.id}">${s.label}</option>`).join("");
-  select.value = getGoalSound();
-
-  select.addEventListener("change", () => {
-    setGoalSound(select.value);
-    previewGoalSound();
-  });
-  previewBtn.addEventListener("click", () => previewGoalSound());
+  toggle.checked = getGoalSound() !== "none";
+  toggle.addEventListener("change", () => setGoalSound(toggle.checked ? "goal1" : "none"));
 }
 
-initGoalSoundPicker();
+initGoalSoundToggle();
 
 function renderTypeList(prefs) {
   el.typeList.innerHTML = NOTIFICATION_TYPES.map(
