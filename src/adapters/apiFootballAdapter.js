@@ -485,7 +485,8 @@ export function applyCoachOverride(coach, teamId) {
 // 뭔가 주면(설령 이름이 나무위키와 달라도) 절대 덮어쓰지 않는다 - API 쪽이 사진 등 더 풍부하고, 어느
 // 쪽이 최신인지 개별 검증이 불가능해서 "있는 데이터를 안 건드린다"가 더 안전한 기본값이기 때문.
 const MANUAL_COACH_FALLBACKS = {
-  7105: "이승희", // 시흥시민축구단
+  // API 감독 조회가 가끔 비어서(레이트리밋 등) 이 fallback으로 넘어올 때도 사진이 보이게 같이 채운다.
+  7105: { name: "이승희", photo: "/img/k3k4players/siheung/siheung_coach.jpg" }, // 시흥시민축구단
   7099: "김준태", // 포천시민축구단
   7056: "백기홍", // 부산교통공사축구단
   18653: "한상민", // 당진시민축구단
