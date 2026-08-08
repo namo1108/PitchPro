@@ -46,6 +46,15 @@ function summarizeForm(results) {
   return { wins, draws, losses, letters, goalsFor, goalsAgainst };
 }
 
+const RESULT_LETTER_KO = { W: "승", D: "무", L: "패" };
+
+// letters는 과거->최근 순으로 저장돼 있어 그대로 이어붙이면 "패무승패승"처럼 왼쪽이 가장 오래된
+// 경기, 오른쪽이 가장 최근 경기인 실제 흐름이 된다 - "들쭉날쭉하다" 같은 뭉뚱그린 표현 대신 이
+// 실제 순서를 문장에 넣어서 매번 그 팀만의 구체적인 근거가 되게 한다.
+function resultSequenceText(summary) {
+  return summary.letters.map((l) => RESULT_LETTER_KO[l]).join("");
+}
+
 const FORM_TEMPLATES = {
   none: [(n) => `${n}은(는) 최근 치른 경기 기록이 확인되지 않습니다.`],
   good: [
@@ -55,6 +64,7 @@ const FORM_TEMPLATES = {
     (n, s) => `${n}는 최근 ${s.letters.length}경기 무패(${s.wins}승 ${s.draws}무)에 가까운 안정적인 경기력을 보여주고 있습니다.`,
     (n, s) => `${n}는 최근 ${s.letters.length}경기에서 ${s.goalsFor}골을 넣고 ${s.goalsAgainst}골만 내주며 공수 밸런스가 좋습니다.`,
     (n, s) => `상승세의 ${n}, 최근 ${s.letters.length}경기 승률이 높아(${s.wins}승 ${s.draws}무 ${s.losses}패) 자신감이 붙어 있습니다.`,
+    (n, s) => `${n}의 최근 ${s.letters.length}경기 결과는 ${resultSequenceText(s)}로, ${s.wins}승을 쌓으며 확실한 상승세를 그리고 있습니다.`,
   ],
   bad: [
     (n, s) => `${n} 최근 ${s.letters.length}경기 ${s.wins}승 ${s.draws}무 ${s.losses}패(득실 ${s.goalsFor}-${s.goalsAgainst})로 좀처럼 반등하지 못하고 있습니다.`,
@@ -63,13 +73,17 @@ const FORM_TEMPLATES = {
     (n, s) => `${n}는 최근 경기력이 좋지 않아(${s.wins}승 ${s.draws}무 ${s.losses}패) 반등이 필요한 시점입니다.`,
     (n, s) => `${n}는 최근 ${s.letters.length}경기에서 ${s.goalsFor}골에 그치며 공격력이 무뎌진 모습입니다.`,
     (n, s) => `침체에 빠진 ${n}, 최근 ${s.letters.length}경기 ${s.losses}패로 좀처럼 승리를 챙기지 못하고 있습니다.`,
+    (n, s) => `${n}의 최근 ${s.letters.length}경기 결과는 ${resultSequenceText(s)}로, ${s.losses}패가 몰리며 좀처럼 반등의 계기를 못 찾고 있습니다.`,
   ],
+  // "들쭉날쭉하다" 식으로 뭉뚱그리지 않고, 실제 최근 결과 순서(resultSequenceText)와 득실을 그대로
+  // 문장에 담아 팀마다 다른 근거로 읽히게 한다(사용자 피드백, 2026-08-08 - 같은 문구가 자주 반복돼
+  // 사람이 직접 분석한 것처럼 안 느껴진다는 지적).
   mixed: [
-    (n, s) => `${n} 최근 ${s.letters.length}경기 ${s.wins}승 ${s.draws}무 ${s.losses}패로 다소 기복 있는 경기력을 보이고 있습니다.`,
-    (n, s) => `${n}는 최근 ${s.letters.length}경기 성적(${s.wins}승 ${s.draws}무 ${s.losses}패)이 들쭉날쭉해 예측이 쉽지 않습니다.`,
-    (n, s) => `승패를 오가는 최근 폼(${s.wins}승 ${s.draws}무 ${s.losses}패) 속에서 ${n}는 안정감을 찾는 중입니다.`,
-    (n, s) => `${n}는 최근 ${s.letters.length}경기 득실(${s.goalsFor}-${s.goalsAgainst})은 나쁘지 않지만 경기력 기복이 있습니다.`,
-    (n, s) => `이기고 지는 패턴이 반복되는 ${n}(${s.wins}승 ${s.draws}무 ${s.losses}패), 이번 경기가 흐름을 바꿀 분기점이 될 수 있습니다.`,
+    (n, s) => `${n}는 최근 ${s.letters.length}경기에서 ${resultSequenceText(s)} 흐름을 보이며(${s.wins}승 ${s.draws}무 ${s.losses}패), 이기는 경기와 무너지는 경기가 번갈아 나타나고 있습니다.`,
+    (n, s) => `${n}의 최근 폼(${resultSequenceText(s)})은 득실 ${s.goalsFor}-${s.goalsAgainst}로 나쁘지 않지만, 승리를 꾸준히 이어가지는 못하고 있습니다.`,
+    (n, s) => `최근 ${s.letters.length}경기 ${resultSequenceText(s)}를 기록한 ${n}는 ${s.wins}승 ${s.draws}무 ${s.losses}패로 경기마다 기복이 뚜렷합니다.`,
+    (n, s) => `${n}의 최근 경기 흐름(${resultSequenceText(s)})을 보면 이기는 경기와 지는 경기가 뚜렷하게 나뉘어, 아직 안정적인 리듬을 찾지 못한 모습입니다.`,
+    (n, s) => `${resultSequenceText(s)}로 이어진 ${n}의 최근 ${s.letters.length}경기는 ${s.wins}승 ${s.draws}무 ${s.losses}패, 득실 ${s.goalsFor}-${s.goalsAgainst}를 기록 중입니다.`,
   ],
 };
 
@@ -99,9 +113,11 @@ const KLEAGUE_FORM_TEMPLATES = {
   bad: [
     (n, s) => `${n}(K리그 공식 기록 기준) 최근 ${s.letters.length}경기 ${s.wins}승 ${s.draws}무 ${s.losses}패로 부진한 흐름입니다.`,
     (n, s) => `K리그 공식 기록으로 보면 ${n}는 최근 ${s.letters.length}경기 ${s.losses}패로 반등이 필요합니다.`,
+    (n, s) => `K리그 공식 기록 기준 ${n}의 최근 결과는 ${resultSequenceText(s)}로, ${s.losses}패가 몰리며 부진합니다.`,
   ],
   mixed: [
     (n, s) => `${n}(K리그 공식 기록 기준) 최근 ${s.letters.length}경기 ${s.wins}승 ${s.draws}무 ${s.losses}패로 기복이 있습니다.`,
+    (n, s) => `K리그 공식 기록 기준 ${n}의 최근 결과는 ${resultSequenceText(s)}로, 이기고 지는 경기가 섞여 있습니다.`,
   ],
 };
 
@@ -253,29 +269,39 @@ function computePrediction(homeForm, awayForm, homePos, awayPos, h2h) {
   let awayScore = formScore(awayForm);
 
   // 순위 차이는 시즌 전체 실력 차를 담고 있어 최근 5~10경기 폼보다 오히려 더 신뢰도 높은 지표라, 가중치를 크게 둔다.
-  homeScore += rankScore(homePos) * 4;
-  awayScore += rankScore(awayPos) * 4;
+  homeScore += rankScore(homePos) * 2.5;
+  awayScore += rankScore(awayPos) * 2.5;
 
   // 상대전적은 다른 시즌·다른 스쿼드일 수 있어 가중치를 낮게(폼/순위 대비 보조 지표로만) 반영한다.
   if (h2h && h2h.meetings > 0) {
-    homeScore += (h2h.homeWins - h2h.awayWins) * 0.4;
-    awayScore += (h2h.awayWins - h2h.homeWins) * 0.4;
+    homeScore += (h2h.homeWins - h2h.awayWins) * 0.3;
+    awayScore += (h2h.awayWins - h2h.homeWins) * 0.3;
   }
 
   const diff = homeScore - awayScore;
 
-  const homeStrength = Math.exp((diff + 0.35) / 3); // 약한 홈 이점 반영
-  const awayStrength = Math.exp(-diff / 3);
-  const drawStrength = 1.15;
+  // 나눔 값을 3 -> 4.5로 늘려 순위/폼 격차가 커도 "3% vs 80%"처럼 비현실적으로 쏠리지 않게 완화했다.
+  const homeStrength = Math.exp((diff + 0.25) / 4.5); // 약한 홈 이점 반영
+  const awayStrength = Math.exp(-diff / 4.5);
+  const drawStrength = 1.3;
   const total = homeStrength + awayStrength + drawStrength;
 
-  let home = Math.round((homeStrength / total) * 100);
-  let draw = Math.round((drawStrength / total) * 100);
-  let away = 100 - home - draw;
-  if (away < 0) {
-    away = 0;
-    draw = 100 - home;
-  }
+  const rawHome = (homeStrength / total) * 100;
+  const rawAway = (awayStrength / total) * 100;
+
+  // 실제 축구는 전력 차가 아무리 커도 한쪽이 90%, 10%처럼 극단적으로 갈리지 않는다(이변은 늘 나온다).
+  // 한쪽을 8%~70% 사이로 묶고, 무승부는 최소 15%를 보장한 뒤 합이 100이 되도록 재조정한다.
+  const MIN_SIDE = 8;
+  const MAX_SIDE = 70;
+  const MIN_DRAW = 15;
+  const clampedHome = Math.min(MAX_SIDE, Math.max(MIN_SIDE, rawHome));
+  const clampedAway = Math.min(MAX_SIDE, Math.max(MIN_SIDE, rawAway));
+  const clampedDraw = Math.max(MIN_DRAW, 100 - clampedHome - clampedAway);
+
+  const sum = clampedHome + clampedDraw + clampedAway;
+  const home = Math.round((clampedHome / sum) * 100);
+  const draw = Math.round((clampedDraw / sum) * 100);
+  const away = 100 - home - draw;
 
   let favor = "even";
   if (home - away >= 12) favor = "home";

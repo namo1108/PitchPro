@@ -71,7 +71,6 @@ async function fetchH2H(env, homeTeamId, awayTeamId) {
 // K리그 공식 사이트(kleague.com)의 팀 순위 데이터에는 최근 6경기 승/무/패(game01=최근)가 그대로
 // 들어있다 - API-Football 표본(최근 10경기)과 별개로, 사용자가 실제 홈페이지에서 보는 것과 동일한
 // "공식" 최근 폼을 한 번 더 보여줘서 신뢰도를 높인다. 코드/원문은 refreshKLeagueResults.js와 공유.
-const KLEAGUE_FORM_ICON = { 승: "🟢", 무: "⚪", 패: "🔴" };
 const KLEAGUE_RESULT_LETTER = { 승: "W", 무: "D", 패: "L" };
 
 // K리그 매치(KL1/KL2)가 하나라도 있으면 그 대회들의 kleague.com 팀 순위표를 한 번씩만 받아
@@ -124,12 +123,13 @@ function buildKleagueOfficialFormNotes(cards, rankByCode) {
   const kleagueCards = cards.filter((c) => c.competition.code === "KL1" || c.competition.code === "KL2");
   if (!kleagueCards.length) return;
 
+  // 동그라미 아이콘(🟢⚪🔴)은 한눈에 승/무/패가 구분되지 않는다는 피드백으로, "승승무무패패"처럼
+  // 결과를 그대로 텍스트로 이어 붙이는 방식으로 바꿨다(사용자 요청, 2026-08-08).
   const formNoteFor = (team, byApiFootballId) => {
     const r = byApiFootballId?.get(String(team.id));
     const games = ["game01", "game02", "game03", "game04", "game05", "game06"].map((k) => r?.[k]).filter(Boolean);
     if (!games.length) return null;
-    const icons = games.map((g) => KLEAGUE_FORM_ICON[g] || g).join(" ");
-    return `${team.shortName || team.name} K리그 공식 최근 ${games.length}경기(최근순): ${icons}`;
+    return `${team.shortName || team.name} K리그 공식 최근 ${games.length}경기(최근순): ${games.join("")}`;
   };
 
   for (const card of kleagueCards) {
