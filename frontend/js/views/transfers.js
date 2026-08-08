@@ -180,6 +180,9 @@ async function loadPhotosFor(items, container) {
   }
 }
 
+// leagues.js와 같은 이유로(탭을 벗어나면 router.js의 backStack은 비워지는데 상세 화면 DOM은
+// 그대로 남아있음) 탭 재진입 시 항상 목록부터 보여준다.
 onTabChange("transfers", () => {
+  showTransfersList();
   if (!state.loaded) loadTransfers();
 });

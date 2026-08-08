@@ -424,6 +424,11 @@ function renderTopPlayers(data) {
   });
 }
 
+// 다른 탭으로 옮겼다가 돌아오면 항상 목록부터 보여준다 - 탭을 벗어날 때 router.js의 backStack이
+// 초기화되면서 리그 상세로 돌아가는 뒤로가기 경로가 끊기는데, 상세 화면 자체(el.detailWrap)는
+// DOM에 그대로 남아있어서 "리그 목록" 버튼을 눌러도 히스토리가 어긋나 엉뚱한 탭으로 튀는 버그가
+// 있었다(사용자 제보, 2026-08-08). 탭 재진입 시점에 항상 목록으로 리셋해두면 이 어긋남 자체가 안 생긴다.
 onTabChange("leagues", () => {
+  showLeagueList();
   if (!state.competitions.length) loadCompetitions();
 });
