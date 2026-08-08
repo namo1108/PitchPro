@@ -46,6 +46,7 @@ const CREST_OVERRIDES = {
   7111: "/img/emblems/yangpyeong.png", // Yangpyeong (K3)
   2748: "/img/emblems/anyang.png", // FC Anyang (K리그1) - API-Football이 옛 LG시절 로고를 씀
   23089: "/img/emblems/namyangju.png", // Namyangju FC (K4)
+  7105: "/img/emblems/시흥.png", // Siheung Citizen FC (K3)
 };
 
 function safeCrest(teamId, logo) {
