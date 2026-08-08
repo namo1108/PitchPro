@@ -46,15 +46,6 @@ function summarizeForm(results) {
   return { wins, draws, losses, letters, goalsFor, goalsAgainst };
 }
 
-const RESULT_LETTER_KO = { W: "승", D: "무", L: "패" };
-
-// letters는 과거->최근 순으로 저장돼 있어 그대로 이어붙이면 "패무승패승"처럼 왼쪽이 가장 오래된
-// 경기, 오른쪽이 가장 최근 경기인 실제 흐름이 된다 - "들쭉날쭉하다" 같은 뭉뚱그린 표현 대신 이
-// 실제 순서를 문장에 넣어서 매번 그 팀만의 구체적인 근거가 되게 한다.
-function resultSequenceText(summary) {
-  return summary.letters.map((l) => RESULT_LETTER_KO[l]).join("");
-}
-
 const FORM_TEMPLATES = {
   none: [(n) => `${n}은(는) 최근 치른 경기 기록이 확인되지 않습니다.`],
   good: [
@@ -64,7 +55,6 @@ const FORM_TEMPLATES = {
     (n, s) => `${n}는 최근 ${s.letters.length}경기 무패(${s.wins}승 ${s.draws}무)에 가까운 안정적인 경기력을 보여주고 있습니다.`,
     (n, s) => `${n}는 최근 ${s.letters.length}경기에서 ${s.goalsFor}골을 넣고 ${s.goalsAgainst}골만 내주며 공수 밸런스가 좋습니다.`,
     (n, s) => `상승세의 ${n}, 최근 ${s.letters.length}경기 승률이 높아(${s.wins}승 ${s.draws}무 ${s.losses}패) 자신감이 붙어 있습니다.`,
-    (n, s) => `${n}의 최근 ${s.letters.length}경기 결과는 ${resultSequenceText(s)}로, ${s.wins}승을 쌓으며 확실한 상승세를 그리고 있습니다.`,
   ],
   bad: [
     (n, s) => `${n} 최근 ${s.letters.length}경기 ${s.wins}승 ${s.draws}무 ${s.losses}패(득실 ${s.goalsFor}-${s.goalsAgainst})로 좀처럼 반등하지 못하고 있습니다.`,
@@ -73,17 +63,16 @@ const FORM_TEMPLATES = {
     (n, s) => `${n}는 최근 경기력이 좋지 않아(${s.wins}승 ${s.draws}무 ${s.losses}패) 반등이 필요한 시점입니다.`,
     (n, s) => `${n}는 최근 ${s.letters.length}경기에서 ${s.goalsFor}골에 그치며 공격력이 무뎌진 모습입니다.`,
     (n, s) => `침체에 빠진 ${n}, 최근 ${s.letters.length}경기 ${s.losses}패로 좀처럼 승리를 챙기지 못하고 있습니다.`,
-    (n, s) => `${n}의 최근 ${s.letters.length}경기 결과는 ${resultSequenceText(s)}로, ${s.losses}패가 몰리며 좀처럼 반등의 계기를 못 찾고 있습니다.`,
   ],
-  // "들쭉날쭉하다" 식으로 뭉뚱그리지 않고, 실제 최근 결과 순서(resultSequenceText)와 득실을 그대로
-  // 문장에 담아 팀마다 다른 근거로 읽히게 한다(사용자 피드백, 2026-08-08 - 같은 문구가 자주 반복돼
-  // 사람이 직접 분석한 것처럼 안 느껴진다는 지적).
+  // "들쭉날쭉하다"만 반복되던 것 대신 간결한 승/무/패 숫자 위주 문장으로 다양하게 표현한다
+  // (사용자 피드백, 2026-08-08 - 결과 순서를 그대로 풀어쓰면 문장이 지저분해 보인다는 지적도 반영해
+  // "3승 4무 3패" 요약만 담고 승-패-무 나열은 넣지 않는다).
   mixed: [
-    (n, s) => `${n}는 최근 ${s.letters.length}경기에서 ${resultSequenceText(s)} 흐름을 보이며(${s.wins}승 ${s.draws}무 ${s.losses}패), 이기는 경기와 무너지는 경기가 번갈아 나타나고 있습니다.`,
-    (n, s) => `${n}의 최근 폼(${resultSequenceText(s)})은 득실 ${s.goalsFor}-${s.goalsAgainst}로 나쁘지 않지만, 승리를 꾸준히 이어가지는 못하고 있습니다.`,
-    (n, s) => `최근 ${s.letters.length}경기 ${resultSequenceText(s)}를 기록한 ${n}는 ${s.wins}승 ${s.draws}무 ${s.losses}패로 경기마다 기복이 뚜렷합니다.`,
-    (n, s) => `${n}의 최근 경기 흐름(${resultSequenceText(s)})을 보면 이기는 경기와 지는 경기가 뚜렷하게 나뉘어, 아직 안정적인 리듬을 찾지 못한 모습입니다.`,
-    (n, s) => `${resultSequenceText(s)}로 이어진 ${n}의 최근 ${s.letters.length}경기는 ${s.wins}승 ${s.draws}무 ${s.losses}패, 득실 ${s.goalsFor}-${s.goalsAgainst}를 기록 중입니다.`,
+    (n, s) => `${n} 최근 ${s.letters.length}경기 ${s.wins}승 ${s.draws}무 ${s.losses}패로 경기마다 결과가 크게 갈리고 있습니다.`,
+    (n, s) => `${n}는 최근 ${s.letters.length}경기(${s.wins}승 ${s.draws}무 ${s.losses}패) 동안 이기는 경기와 무너지는 경기가 번갈아 나타났습니다.`,
+    (n, s) => `${n}의 최근 폼은 득실 ${s.goalsFor}-${s.goalsAgainst}로 나쁘지 않지만, 승리를 꾸준히 이어가지는 못하고 있습니다.`,
+    (n, s) => `최근 ${s.letters.length}경기 ${s.wins}승 ${s.draws}무 ${s.losses}패를 기록한 ${n}는 경기력 기복이 뚜렷합니다.`,
+    (n, s) => `${n}는 최근 ${s.letters.length}경기에서 승리와 부진이 반복되며 ${s.wins}승 ${s.draws}무 ${s.losses}패를 기록했습니다.`,
   ],
 };
 
@@ -113,11 +102,10 @@ const KLEAGUE_FORM_TEMPLATES = {
   bad: [
     (n, s) => `${n}(K리그 공식 기록 기준) 최근 ${s.letters.length}경기 ${s.wins}승 ${s.draws}무 ${s.losses}패로 부진한 흐름입니다.`,
     (n, s) => `K리그 공식 기록으로 보면 ${n}는 최근 ${s.letters.length}경기 ${s.losses}패로 반등이 필요합니다.`,
-    (n, s) => `K리그 공식 기록 기준 ${n}의 최근 결과는 ${resultSequenceText(s)}로, ${s.losses}패가 몰리며 부진합니다.`,
   ],
   mixed: [
     (n, s) => `${n}(K리그 공식 기록 기준) 최근 ${s.letters.length}경기 ${s.wins}승 ${s.draws}무 ${s.losses}패로 기복이 있습니다.`,
-    (n, s) => `K리그 공식 기록 기준 ${n}의 최근 결과는 ${resultSequenceText(s)}로, 이기고 지는 경기가 섞여 있습니다.`,
+    (n, s) => `K리그 공식 기록 기준 ${n}는 최근 ${s.letters.length}경기 ${s.wins}승 ${s.draws}무 ${s.losses}패로 이기고 지는 경기가 섞여 있습니다.`,
   ],
 };
 
