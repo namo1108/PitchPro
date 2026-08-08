@@ -1,10 +1,13 @@
 import { getJSON, putJSON } from "../lib/kv.js";
 import { getKLeaguePlayerPhotoByIdMap } from "../lib/kleaguePlayerPhotos.js";
 
-// API-Football은 K리그2 득점/도움 통계가 매우 부실해서(선수 1명만 잡히는 등), 대신 K리그 공식 사이트
-// (kleague.com)의 개인기록 페이지를 매주 스크랩해서 보여준다. leagueId=1은 K리그1, 2는 K리그2.
+// API-Football은 K리그1/K리그2 둘 다 득점 통계가 부실해서(K리그1은 도움은 정상인데 득점(topScorers)이
+// 통째로 빈 배열로 오는 상태를 2026-08-08에 확인) 대신 K리그 공식 사이트(kleague.com)의 개인기록
+// 페이지를 매주 스크랩해서 보여준다. leagueId=1은 K리그1, 2는 K리그2.
 const YEAR = 2026;
 const TARGETS = [
+  { code: "KL1", leagueId: 1, recordType: "GOAL", key: "topScorers" },
+  { code: "KL1", leagueId: 1, recordType: "ASSIST", key: "topAssists" },
   { code: "KL2", leagueId: 2, recordType: "GOAL", key: "topScorers" },
   { code: "KL2", leagueId: 2, recordType: "ASSIST", key: "topAssists" },
 ];

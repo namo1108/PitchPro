@@ -1,8 +1,10 @@
 import { putJSON } from "../lib/kv.js";
 
-// API-Football이 lineups/squads에 주는 K리그2 선수 사진이 부실하거나 없는 경우가 있어서,
-// kleague.com 공식 선수 목록(현역만, K리그2)을 매주 스크랩해서 등번호 기준으로 대체한다.
+// API-Football이 lineups/squads에 주는 K리그 선수 사진이 부실하거나 없는 경우가 있어서,
+// kleague.com 공식 선수 목록(현역만)을 매주 스크랩해서 등번호 기준으로 대체한다. K리그2뿐 아니라
+// K리그1도 득점왕 photo 매칭(byPlayerId)에 필요해서 2026-08-08부터 같이 스크랩한다.
 const BASE_URL = "https://www.kleague.com/player.do";
+const LEAGUE_IDS = [1, 2];
 const MAX_PAGES_SAFETY = 40;
 
 function makeState() {
@@ -56,8 +58,8 @@ function attachHandlers(rewriter, state) {
     });
 }
 
-async function fetchPage(page) {
-  const url = `${BASE_URL}?type=active&leagueId=2&page=${page}`;
+async function fetchPage(leagueId, page) {
+  const url = `${BASE_URL}?type=active&leagueId=${leagueId}&page=${page}`;
   const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; PitchProBot/1.0)" } });
   if (!res.ok) throw new Error(`fetch ${url} failed: ${res.status}`);
 
@@ -83,16 +85,18 @@ export async function scrapeKLeaguePlayerPhotos(env) {
   const photoMap = {};
   const byPlayerId = {};
 
-  const first = await fetchPage(1);
-  collectRows(first, photoMap, byPlayerId);
+  for (const leagueId of LEAGUE_IDS) {
+    const first = await fetchPage(leagueId, 1);
+    collectRows(first, photoMap, byPlayerId);
 
-  const lastPage = Math.min(first.lastPage || 1, MAX_PAGES_SAFETY);
-  for (let page = 2; page <= lastPage; page++) {
-    try {
-      const state = await fetchPage(page);
-      collectRows(state, photoMap, byPlayerId);
-    } catch (err) {
-      console.error(`kleague 선수 사진 스크랩 실패(page ${page}):`, err);
+    const lastPage = Math.min(first.lastPage || 1, MAX_PAGES_SAFETY);
+    for (let page = 2; page <= lastPage; page++) {
+      try {
+        const state = await fetchPage(leagueId, page);
+        collectRows(state, photoMap, byPlayerId);
+      } catch (err) {
+        console.error(`kleague 선수 사진 스크랩 실패(leagueId ${leagueId}, page ${page}):`, err);
+      }
     }
   }
 
