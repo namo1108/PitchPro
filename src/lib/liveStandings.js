@@ -13,6 +13,12 @@ const LIVE_STATUSES = new Set(["IN_PLAY", "PAUSED"]);
 // 따라간 잠깐 동안 원래 승점" 정도지, 중복 가산은 안 생긴다.
 const MAX_LIVE_MATCH_AGE_MS = 130 * 60 * 1000;
 
+// K리그(KL1/KL2)는 승점이 같을 때 골득실보다 다득점(총 득점)을 먼저 본다 - 골득실을 먼저 보는
+// 유럽 리그들과 다른 K리그만의 순위 규정이다(사용자 확인, 2026-08-08). 이 차이를 반영하지 않으면
+// 라이브 경기 중 임시 순위가 실제 K리그 규정과 다르게 나올 수 있다(예: 화성FC가 4위가 아니라
+// 5위여야 하는데 골득실 기준으로만 정렬해 4위로 잘못 표시된 사례).
+const GOALS_BEFORE_DIFF_CODES = new Set(["KL1", "KL2"]);
+
 function resultPoints(myGoals, oppGoals) {
   if (myGoals > oppGoals) return 3;
   if (myGoals === oppGoals) return 1;
@@ -42,6 +48,10 @@ export function applyLiveDeltas(table, matches, competitionCode) {
     awayRow.playedGames += 1;
     homeRow.goalDifference += home - away;
     awayRow.goalDifference += away - home;
+    homeRow.goalsFor = (homeRow.goalsFor ?? 0) + home;
+    homeRow.goalsAgainst = (homeRow.goalsAgainst ?? 0) + away;
+    awayRow.goalsFor = (awayRow.goalsFor ?? 0) + away;
+    awayRow.goalsAgainst = (awayRow.goalsAgainst ?? 0) + home;
     if (home > away) {
       homeRow.won += 1;
       awayRow.lost += 1;
@@ -62,7 +72,10 @@ export function applyLiveDeltas(table, matches, competitionCode) {
     awayRow.live = true;
   }
 
-  rows.sort((a, b) => b.points - a.points || b.goalDifference - a.goalDifference);
+  const tiebreak = GOALS_BEFORE_DIFF_CODES.has(competitionCode)
+    ? (a, b) => b.points - a.points || (b.goalsFor ?? 0) - (a.goalsFor ?? 0) || b.goalDifference - a.goalDifference
+    : (a, b) => b.points - a.points || b.goalDifference - a.goalDifference;
+  rows.sort(tiebreak);
   rows.forEach((r, i) => {
     r.position = i + 1;
   });
