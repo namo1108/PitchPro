@@ -490,11 +490,11 @@ const MANUAL_COACH_FALLBACKS = {
   18653: "한상민", // 당진시민축구단
   7083: "서보원", // 경주한수원FC
   7111: "양현정", // 양평FC
-  16452: "이창엽", // 진주시민축구단
-  27863: "유상수", // 진천HRFC
+  16452: { name: "이창엽", photo: "/img/k3k4players/jinju/jinju_이창엽.jpg" }, // 진주시민축구단
+  27863: { name: "유상수", photo: "/img/k3k4players/jincheon/jincheon_coach_유상수.jpg" }, // 진천HRFC
   7092: "곽경근", // 서울중랑축구단
-  18654: "송홍섭", // 거제시민축구단
-  27865: "이정재", // 서산 파이오니아 FC
+  18654: { name: "송홍섭", photo: "/img/k3k4players/geoje/geoje_송홍섭.jpg" }, // 거제시민축구단
+  27865: { name: "이정재", photo: "/img/k3k4players/seosan/coach_이정재.jpg" }, // 서산 파이오니아 FC (인스타그램/나무위키 소형 썸네일)
   7068: "김찬석", // 대전코레일FC
   7059: "이영진", // 창원FC
   7112: "심봉섭", // 여주FC
@@ -504,19 +504,22 @@ const MANUAL_COACH_FALLBACKS = {
   7096: "최영근", // FC목포
   25717: "권순형", // 전북현대모터스 B팀(나무위키 "전북 현대 모터스 N" 기준)
   27858: "이영민", // 금산인삼FC
-  27860: "한상구", // 제천시민축구단
-  23089: "김성일", // 남양주시민축구단
-  25720: "김종필", // 세종SA축구단
+  27860: { name: "한상구", photo: "/img/k3k4players/jecheon/jecheon_감독_한상구.jpg" }, // 제천시민축구단
+  23089: { name: "김성일", photo: "/img/k3k4players/namyangju/namyangju_김성일.jpg" }, // 남양주시민축구단
+  25720: { name: "김종필", photo: "/img/k3k4players/sejong/sejong_coach_김종필.jpg" }, // 세종SA축구단
   18656: "신기동", // 평창유나이티드축구클럽
-  25719: "정정수", // 기장군민축구단
-  27859: "오휘성", // 함안군민축구단
+  25719: { name: "정정수", photo: "/img/k3k4players/gijang/gijang_코치_정정수.jpg" }, // 기장군민축구단
+  27859: { name: "오휘성", photo: "/img/k3k4players/haman/haman_오휘성_감독.jpg" }, // 함안군민축구단
   7101: "윤상철", // 평택시티즌FC
 };
 
 export function applyManualCoachFallback(coach, teamId) {
   if (coach) return coach;
-  const name = MANUAL_COACH_FALLBACKS[String(teamId)];
-  return name ? { id: `manual-coach-${teamId}`, name, nationality: null, age: null, photo: null } : null;
+  const entry = MANUAL_COACH_FALLBACKS[String(teamId)];
+  if (!entry) return null;
+  // 값이 문자열이면 이름만 있는 것(사진 없음), 객체면 {name, photo} 형태.
+  const { name, photo = null } = typeof entry === "string" ? { name: entry } : entry;
+  return { id: `manual-coach-${teamId}`, name, nationality: null, age: null, photo };
 }
 
 // 이적이 확정됐는데도 스쿼드 목록에서 아직 안 빠진 선수를 수동으로 제거한다(구단 발표/보도로 확인된 건만).
