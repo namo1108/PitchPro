@@ -3,6 +3,38 @@
 // 통째로 수동 명단으로 바꿀 필요 없이(manualK3K4Squads.js와 별개) 사진만 구단 공식 사이트에서 받아와
 // "팀id#등번호"로 붙인다 - API-Football 선수명이 로마자 표기라 이름으로 대조하기 어려워 번호를 키로 쓴다.
 export const K3_PHOTO_OVERRIDES = {
+  7099: { // 포천시민축구단 (pcfc2008.com) - API-Football 스쿼드 사진이 있다 없다 하는 걸 확인해서
+    // (2026-08-08~09, 같은 팀이 응답마다 17명/32명으로 오락가락) 안정적으로 항상 뜨게 등록해둔다.
+    1: "/img/k3k4players/pocheon/pocheon_1.jpg",
+    2: "/img/k3k4players/pocheon/pocheon_2.jpg",
+    5: "/img/k3k4players/pocheon/pocheon_5.jpg",
+    6: "/img/k3k4players/pocheon/pocheon_6.jpg",
+    7: "/img/k3k4players/pocheon/pocheon_7.jpg",
+    8: "/img/k3k4players/pocheon/pocheon_8.jpg",
+    9: "/img/k3k4players/pocheon/pocheon_9.jpg",
+    10: "/img/k3k4players/pocheon/pocheon_10.jpg",
+    11: "/img/k3k4players/pocheon/pocheon_11.jpg",
+    12: "/img/k3k4players/pocheon/pocheon_12.jpg",
+    13: "/img/k3k4players/pocheon/pocheon_13.jpg",
+    14: "/img/k3k4players/pocheon/pocheon_14.jpg",
+    15: "/img/k3k4players/pocheon/pocheon_15.jpg",
+    16: "/img/k3k4players/pocheon/pocheon_16.jpg",
+    17: "/img/k3k4players/pocheon/pocheon_17.jpg",
+    18: "/img/k3k4players/pocheon/pocheon_18.jpg",
+    19: "/img/k3k4players/pocheon/pocheon_19.jpg",
+    20: "/img/k3k4players/pocheon/pocheon_20.jpg",
+    21: "/img/k3k4players/pocheon/pocheon_21.jpg",
+    22: "/img/k3k4players/pocheon/pocheon_22.jpg",
+    23: "/img/k3k4players/pocheon/pocheon_23.jpg",
+    24: "/img/k3k4players/pocheon/pocheon_24.jpg",
+    25: "/img/k3k4players/pocheon/pocheon_25.jpg",
+    26: "/img/k3k4players/pocheon/pocheon_26.jpg",
+    27: "/img/k3k4players/pocheon/pocheon_27.jpg",
+    29: "/img/k3k4players/pocheon/pocheon_29.jpg",
+    30: "/img/k3k4players/pocheon/pocheon_30.jpg",
+    32: "/img/k3k4players/pocheon/pocheon_32.jpg",
+    33: "/img/k3k4players/pocheon/pocheon_33.jpg",
+  },
   7105: { // 시흥시민축구단 (fcsiheung.com)
     1: "/img/k3k4players/siheung/siheung_1.jpg",
     2: "/img/k3k4players/siheung/siheung_2.jpg",

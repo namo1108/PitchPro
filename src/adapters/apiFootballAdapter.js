@@ -472,6 +472,7 @@ const COACH_PHOTO_OVERRIDES = {
   7061: "/img/coaches/rui-quinta.jpg", // 충북청주 - 루이 퀸타
   7098: "/img/coaches/gerard-nus.jpg", // 파주 시민축구단 - 제라드 누스
   7105: "/img/k3k4players/siheung/siheung_coach.jpg", // 시흥시민축구단 - 이름/재임 정보는 API가 정상, 사진만 없음
+  7099: "/img/k3k4players/pocheon/pocheon_coach.jpg", // 포천시민축구단 - 이름/재임 정보는 API가 정상, 사진만 없음
 };
 
 export function applyCoachOverride(coach, teamId) {
@@ -487,7 +488,7 @@ export function applyCoachOverride(coach, teamId) {
 const MANUAL_COACH_FALLBACKS = {
   // API 감독 조회가 가끔 비어서(레이트리밋 등) 이 fallback으로 넘어올 때도 사진이 보이게 같이 채운다.
   7105: { name: "이승희", photo: "/img/k3k4players/siheung/siheung_coach.jpg" }, // 시흥시민축구단
-  7099: "김준태", // 포천시민축구단
+  7099: { name: "김준태", photo: "/img/k3k4players/pocheon/pocheon_coach.jpg" }, // 포천시민축구단
   7056: "백기홍", // 부산교통공사축구단
   18653: "한상민", // 당진시민축구단
   7083: "서보원", // 경주한수원FC
