@@ -6,16 +6,18 @@ import { detectGoalsAndNotify } from "./detectGoalsAndNotify.js";
 import { notifyMatchEvents } from "./notifyMatchEvents.js";
 import { detectCardsAndNotify } from "./detectCardsAndNotify.js";
 
-// 3초 간격(사용자 요청, 2026-08-09 - 여전히 지연이 느껴진다는 피드백으로 5초에서 더 줄임). live=all은
-// 대회 수와 무관하게 호출 1번으로 끝나는 가벼운 엔드포인트라, Ultra 플랜 분당 한도(450회) 대비 이
-// 빈도(틱당 최대 17콜)도 여유가 충분하다.
-const POLL_INTERVAL_MS = 3 * 1000;
+// 1초 간격(사용자 요청, 2026-08-09 - 3초도 여전히 느리다는 피드백으로 더 줄임). live=all은 대회 수와
+// 무관하게 호출 1번으로 끝나는 가벼운 엔드포인트라, Ultra 플랜 분당 한도(450회) 대비 이 빈도(틱당 최대
+// 50콜)도 여유가 충분하다. 다만 이보다 더 줄여도 체감 개선은 크지 않다 - 실제 골 발생 시각과 API-Football
+// 자체가 그걸 반영하는 시각 사이의 지연(우리가 통제 불가)이 이제 더 큰 병목이기 때문.
+const POLL_INTERVAL_MS = 1 * 1000;
 // 크론이 1분마다 도는데, 다음 tick과 겹치지 않도록 50초 정도에서 멈춘다(Cloudflare 실행시간 여유도 남김).
 const POLL_DURATION_MS = 50 * 1000;
-// 카드(경고/퇴장)는 경기당 별도 events 조회가 필요해 매 3초마다 부르기엔 비용이 크다(라이브 경기가
-// 여러 개면 특히) - 대신 이 배수마다만 확인해서, 최악의 경우 지연을 기존 최대 60초(메인 크론 주기)에서
-// 15초로 줄인다. 골/킥오프/하프타임/종료는 live=all 하나로 전체를 커버해서 비용 부담이 없어 매번 확인한다.
-const CARD_CHECK_EVERY_N_TICKS = 5;
+// 카드(경고/퇴장)는 경기당 별도 events 조회가 필요해 매초 부르기엔 비용이 크다(라이브 경기가 여러 개면
+// 특히) - 대신 경과 시간 기준으로 이 간격마다만 확인한다(폴링 간격이 바뀌어도 카드 체크 주기는 그대로
+// 유지되도록 틱 카운트 대신 시간으로 계산). 골/킥오프/하프타임/종료는 live=all 하나로 전체를 커버해서
+// 비용 부담이 없어 매번 확인한다.
+const CARD_CHECK_INTERVAL_MS = 15 * 1000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -27,7 +29,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // (두 함수 다 "이전 값과 비교해서 달라졌을 때만" 동작하므로 매번 호출해도 중복 알림은 안 나간다).
 export async function pollLiveMatches(env) {
   const deadline = Date.now() + POLL_DURATION_MS;
-  let tick = 0;
+  let lastCardCheck = 0;
 
   while (Date.now() < deadline) {
     const matchesBlob = await getJSON(env, KV_KEYS.matches);
@@ -55,10 +57,12 @@ export async function pollLiveMatches(env) {
 
       await detectGoalsAndNotify(env);
       await notifyMatchEvents(env);
-      if (tick % CARD_CHECK_EVERY_N_TICKS === 0) await detectCardsAndNotify(env);
+      if (Date.now() - lastCardCheck >= CARD_CHECK_INTERVAL_MS) {
+        lastCardCheck = Date.now();
+        await detectCardsAndNotify(env);
+      }
     }
 
-    tick++;
     await sleep(POLL_INTERVAL_MS);
   }
 }
