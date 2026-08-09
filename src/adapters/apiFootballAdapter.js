@@ -500,7 +500,7 @@ const MANUAL_COACH_FALLBACKS = {
   27865: { name: "이정재", photo: "/img/k3k4players/seosan/coach_이정재.jpg" }, // 서산 파이오니아 FC (인스타그램/나무위키 소형 썸네일)
   7068: "김찬석", // 대전코레일FC
   7059: { name: "이영진", photo: "/img/k3k4players/changwon/changwon_coach.jpg" }, // 창원FC
-  7112: "심봉섭", // 여주FC
+  7112: { name: "심봉섭", photo: "/img/k3k4players/yeoju/yeoju_coach.jpg" }, // 여주FC
   7108: { name: "윤원일", photo: "/img/k3k4players/coaches/ulsan_coach.jpg" }, // 울산시민축구단
   7075: "임다한", // FC강릉
   7064: "김우재", // 춘천시민축구단
