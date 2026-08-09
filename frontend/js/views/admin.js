@@ -18,6 +18,15 @@ function buildTestPayload(type) {
         body: "토트넘 1 - 0 첼시 · ⌄ 펼쳐서 확인",
         image: `/api/notif-image/goal?team=${enc(SAMPLE_TEAM_A.name)}&crest=${enc(SAMPLE_TEAM_A.crest)}&scorer=${enc("손흥민")}&minute=74`,
       };
+    case "yellowcard":
+      return {
+        type: "yellowcard",
+        title: "🟨 경고! 벤 데이비스",
+        body: "첼시 · 41'",
+        image: `/api/notif-image/goal?team=${enc(SAMPLE_TEAM_B.name)}&crest=${enc(SAMPLE_TEAM_B.crest)}&scorer=${enc(
+          "벤 데이비스"
+        )}&minute=41&badge=${enc("YELLOW CARD")}&color=${enc("#f5c542")}`,
+      };
     case "redcard":
       return {
         type: "redcard",
@@ -30,7 +39,7 @@ function buildTestPayload(type) {
     case "kickoff":
       return {
         type: "kickoff",
-        title: "⏱ 경기 시작",
+        title: "⚽💨 경기 시작",
         body: "토트넘 vs 첼시 킥오프!",
         image: `/api/notif-image/status?homeTeam=${enc(SAMPLE_TEAM_A.name)}&homeCrest=${enc(SAMPLE_TEAM_A.crest)}&awayTeam=${enc(
           SAMPLE_TEAM_B.name
@@ -44,6 +53,15 @@ function buildTestPayload(type) {
         image: `/api/notif-image/status?homeTeam=${enc(SAMPLE_TEAM_A.name)}&homeCrest=${enc(SAMPLE_TEAM_A.crest)}&awayTeam=${enc(
           SAMPLE_TEAM_B.name
         )}&awayCrest=${enc(SAMPLE_TEAM_B.crest)}&badge=${enc("5 MIN")}`,
+      };
+    case "halftime":
+      return {
+        type: "halftime",
+        title: "⏸ 전반전 종료",
+        body: "토트넘 1 - 0 첼시 · 전반 종료",
+        image: `/api/notif-image/status?homeTeam=${enc(SAMPLE_TEAM_A.name)}&homeCrest=${enc(SAMPLE_TEAM_A.crest)}&awayTeam=${enc(
+          SAMPLE_TEAM_B.name
+        )}&awayCrest=${enc(SAMPLE_TEAM_B.crest)}&homeScore=1&awayScore=0&badge=${enc("HT")}&color=${enc("#9ca3af")}`,
       };
     case "fulltime":
       return {

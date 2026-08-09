@@ -141,7 +141,7 @@ export const KV_KEYS = {
   // 우리 내부 경기 id -> KFA layer_popup 상세 조회 식별자(idx/sIdx/div) 매핑.
   kfaGameRefs: "kfa:gamerefs:v1",
   // 경기당 이미 알림 보낸 퇴장(선수+시각)을 기록해두는 중복방지용 저장소. 하루 지나면 만료시켜 정리한다.
-  notifiedRedCards: "cards:notified:v1",
+  notifiedCards: "cards:notified:v1",
   // 리그 검색에서 국가대표팀도 찾을 수 있도록 캐시해두는 국가대표팀 목록(성인 남자만).
   nationalTeams: "teams:national:v1",
   // 팬 커뮤니티 게시판. index는 최신순 요약 목록(글 본문/댓글은 안 담음 - 목록 조회가 무거워지지 않게),
@@ -176,6 +176,7 @@ export const NOTIFICATION_TYPES = [
   { id: "kickoff" },
   { id: "halftime" },
   { id: "fulltime" },
+  { id: "yellowcard" },
   { id: "redcard" },
   { id: "lineup" },
   { id: "transfer" },

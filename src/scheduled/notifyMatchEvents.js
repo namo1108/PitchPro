@@ -31,15 +31,15 @@ function statusImage(m, badgeText, badgeColor, includeScore) {
 const EVENT_COPY = {
   kickoff: {
     type: "kickoff",
-    title: "⏱ 경기 시작",
+    title: "⚽💨 경기 시작",
     body: (m) => `${teamLabel(m.homeTeam)} vs ${teamLabel(m.awayTeam)} 킥오프!`,
     image: (m) => statusImage(m, "KICK OFF", "#24e583", false),
   },
   halftime: {
     type: "halftime",
-    title: "🟨 전반전 종료",
+    title: "⏸ 전반전 종료",
     body: (m) => `${teamLabel(m.homeTeam)} ${scoreLabel(m)} ${teamLabel(m.awayTeam)} · 전반 종료`,
-    image: (m) => statusImage(m, "HT", "#f5c542", true),
+    image: (m) => statusImage(m, "HT", "#9ca3af", true),
   },
   fulltime: {
     type: "fulltime",
