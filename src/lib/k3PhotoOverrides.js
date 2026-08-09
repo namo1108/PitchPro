@@ -3,6 +3,34 @@
 // 통째로 수동 명단으로 바꿀 필요 없이(manualK3K4Squads.js와 별개) 사진만 구단 공식 사이트에서 받아와
 // "팀id#등번호"로 붙인다 - API-Football 선수명이 로마자 표기라 이름으로 대조하기 어려워 번호를 키로 쓴다.
 export const K3_PHOTO_OVERRIDES = {
+  7108: { // 울산시민축구단 (ulsancitizen.com) - 안정성 확보용(API가 이미 대부분 채워주지만 등번호로 고정)
+    1: "/img/k3k4players/ulsan2/ulsan_1.jpg",
+    3: "/img/k3k4players/ulsan2/ulsan_3.jpg",
+    4: "/img/k3k4players/ulsan2/ulsan_4.jpg",
+    5: "/img/k3k4players/ulsan2/ulsan_5.jpg",
+    6: "/img/k3k4players/ulsan2/ulsan_6.jpg",
+    7: "/img/k3k4players/ulsan2/ulsan_7.jpg",
+    8: "/img/k3k4players/ulsan2/ulsan_8.jpg",
+    9: "/img/k3k4players/ulsan2/ulsan_9.jpg",
+    10: "/img/k3k4players/ulsan2/ulsan_10.jpg",
+    11: "/img/k3k4players/ulsan2/ulsan_11.jpg",
+    12: "/img/k3k4players/ulsan2/ulsan_12.jpg",
+    13: "/img/k3k4players/ulsan2/ulsan_13.jpg",
+    14: "/img/k3k4players/ulsan2/ulsan_14.jpg",
+    16: "/img/k3k4players/ulsan2/ulsan_16.jpg",
+    17: "/img/k3k4players/ulsan2/ulsan_17.jpg",
+    18: "/img/k3k4players/ulsan2/ulsan_18.jpg",
+    19: "/img/k3k4players/ulsan2/ulsan_19.jpg",
+    21: "/img/k3k4players/ulsan2/ulsan_21.jpg",
+    22: "/img/k3k4players/ulsan2/ulsan_22.jpg",
+    24: "/img/k3k4players/ulsan2/ulsan_24.jpg",
+    25: "/img/k3k4players/ulsan2/ulsan_25.jpg",
+    26: "/img/k3k4players/ulsan2/ulsan_26.jpg",
+    29: "/img/k3k4players/ulsan2/ulsan_29.jpg",
+    31: "/img/k3k4players/ulsan2/ulsan_31.jpg",
+    47: "/img/k3k4players/ulsan2/ulsan_47.jpg",
+    77: "/img/k3k4players/ulsan2/ulsan_77.jpg",
+  },
   7099: { // 포천시민축구단 (pcfc2008.com) - API-Football 스쿼드 사진이 있다 없다 하는 걸 확인해서
     // (2026-08-08~09, 같은 팀이 응답마다 17명/32명으로 오락가락) 안정적으로 항상 뜨게 등록해둔다.
     1: "/img/k3k4players/pocheon/pocheon_1.jpg",
