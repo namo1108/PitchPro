@@ -56,6 +56,8 @@ function attachHandlers(rewriter, state) {
     });
 }
 
+const HANGUL_RE = /[가-힣]/;
+
 async function scrapeOne({ leagueId, recordType }, photoByPlayerId) {
   const url = `https://www.kleague.com/record/player.do?leagueId=${leagueId}&year=${YEAR}&recordType=${recordType}`;
   const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (compatible; PitchProBot/1.0)" } });
@@ -68,6 +70,7 @@ async function scrapeOne({ leagueId, recordType }, photoByPlayerId) {
 
   return state.rows
     .map((r) => ({
+      playerId: r.playerId,
       name: r.name.trim(),
       team: r.team.trim(),
       teamCrest: r.teamCrest,
@@ -77,6 +80,28 @@ async function scrapeOne({ leagueId, recordType }, photoByPlayerId) {
     .filter((r) => r.name && r.value > 0)
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
+}
+
+// kleague.com이 가끔(원인 불명, 2026-08-09 확인) 같은 선수를 한글 이름("야고") 대신 영문 풀네임
+// ("Yago Cariello Ribeiro")으로 서빙할 때가 있다 - 한 번이라도 한글로 확인된 선수는 playerId 기준으로
+// 기억해뒀다가, 이후 스크랩에서 한글이 아닌 이름이 오면 예전 한글 이름으로 대체한다.
+async function applyKoreanNameMemory(env, rows) {
+  const memory = (await getJSON(env, "kleague:playernames:v1")) || {};
+  let memoryChanged = false;
+  const fixed = rows.map((r) => {
+    if (!r.playerId) return r;
+    if (HANGUL_RE.test(r.name)) {
+      if (memory[r.playerId] !== r.name) {
+        memory[r.playerId] = r.name;
+        memoryChanged = true;
+      }
+      return r;
+    }
+    const known = memory[r.playerId];
+    return known ? { ...r, name: known } : r;
+  });
+  if (memoryChanged) await putJSON(env, "kleague:playernames:v1", memory);
+  return fixed;
 }
 
 export async function scrapeKLeagueTopPlayers(env) {
@@ -91,7 +116,8 @@ export async function scrapeKLeagueTopPlayers(env) {
       byCode[target.code] = { topScorers: existing?.topScorers || [], topAssists: existing?.topAssists || [] };
     }
     try {
-      byCode[target.code][target.key] = await scrapeOne(target, photoByPlayerId);
+      const rows = await scrapeOne(target, photoByPlayerId);
+      byCode[target.code][target.key] = (await applyKoreanNameMemory(env, rows)).map(({ playerId, ...rest }) => rest);
       anyChanged = true;
       console.log(`K리그 순위 스크랩 OK: ${target.code}/${target.key} (${byCode[target.code][target.key].length}명)`);
     } catch (err) {
