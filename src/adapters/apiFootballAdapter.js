@@ -464,7 +464,16 @@ const COACH_OVERRIDES = {
   // 사진은 API-Football coachs?search=Alonso로 찾은 그의 실제 coach 레코드(id 6801, 레버쿠젠/레알마드리드
   // 재임 시절 등록분)에서 가져온 것 - 같은 소스라 별도로 이미지를 호스팅할 필요가 없다(확인일 2026-07-26).
   49: { id: "override-alonso", name: "Xabi Alonso", nationality: "Spain", age: null, photo: "https://media.api-sports.io/football/coachs/6801.png" },
+  // 김해FC: API가 최명성으로 주는데 현재 감독은 손현준(사용자 확인, 2026-08-09).
+  7076: { id: "override-son-hyun-jun", name: "손현준", nationality: "Korea Republic", age: null, photo: null },
+  // 대구FC: API가 감독 정보 자체를 안 줌, 현재 감독은 최성용(사용자 확인, 2026-08-09).
+  2747: { id: "override-choi-sung-yong", name: "최성용", nationality: "Korea Republic", age: null, photo: null },
 };
+
+// 감독이 공석인 게 확인된 팀 - API/수동 폴백 어느 쪽이 뭘 주든 무조건 "없음"으로 표시한다.
+const COACH_VACANT_TEAMS = new Set([
+  2757, // 성남FC - 현재 감독 공석(사용자 확인, 2026-08-09) - API는 전임 전경준을 그대로 주고 있어 무시해야 함.
+]);
 
 // 이름/재임 정보는 API-Football이 맞게 주는데 사진만 깨진 방패 아이콘 플레이스홀더인 경우(확인일 2026-07-13).
 // 전체 감독 정보를 덮어쓸 필요는 없어서 사진만 별도로 교체한다.
@@ -476,6 +485,7 @@ const COACH_PHOTO_OVERRIDES = {
 };
 
 export function applyCoachOverride(coach, teamId) {
+  if (COACH_VACANT_TEAMS.has(Number(teamId))) return null;
   if (COACH_OVERRIDES[String(teamId)]) return COACH_OVERRIDES[String(teamId)];
   const photoOverride = COACH_PHOTO_OVERRIDES[String(teamId)];
   return photoOverride && coach ? { ...coach, photo: photoOverride } : coach;
