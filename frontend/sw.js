@@ -63,6 +63,8 @@ self.addEventListener("push", (event) => {
   const isConcede = payload.type === "concede";
   const isVarCancel = payload.type === "var_cancel";
   const isRedCard = payload.type === "redcard";
+  const isYellowCard = payload.type === "yellowcard";
+  const isCard = isRedCard || isYellowCard;
   const isLineup = payload.type === "lineup";
   const isKickoff = payload.type === "kickoff";
   const isKickoffSoon = payload.type === "kickoff_soon";
@@ -72,23 +74,24 @@ self.addEventListener("push", (event) => {
   const isFriend = payload.type === "friend_request" || payload.type === "friend_accept";
   const isTransfer = payload.type === "transfer";
 
-  // badge는 /img/badge-icon-96.png 하나만 실제로 존재한다("/img/pitch-badge-96.png"는 파일이 없어서
-  // 라인업/친구 알림에서 배지가 깨져 있었다) - 종류와 무관하게 이 파일 하나로 통일한다.
   let icon = "/img/goal-icon-96.png";
-  const badge = "/img/badge-icon-96.png";
   if (isGoal || isConcede) icon = "/img/goal-icon-192.png";
   if (isLineup) icon = "/img/lineup-icon-192.png";
   if (isFriend) icon = "/img/pitch-icon-192.png";
   if (isWhistle || isVarCancel) icon = "/img/whistle-icon-192.png";
   if (isTransfer) icon = "/img/transfer-icon-192.png";
   if (isRedCard) icon = "/img/redcard-icon-192.png";
+  if (isYellowCard) icon = "/img/yellowcard-icon-192.png";
+
+  // badge는 안드로이드 상태표시줄용이라 OS가 알파 채널만 보고 단색 실루엣으로 다시 칠한다 - 색은
+  // 어차피 안 보이니 "모양"만으로 종류를 구분한다. 카드류(경고/퇴장)만 공이 아닌 카드 실루엣을 쓰고,
+  // 나머지는 기존 공 모양 배지 하나로 통일한다(종류별 실루엣을 전부 만들 정도로 득이 크지 않음).
+  const badge = isCard ? "/img/badge-card-96.png" : "/img/badge-icon-96.png";
 
   event.waitUntil(
     self.registration.showNotification(payload.title || "PITCH PRO", {
       body: payload.body || "",
       icon,
-      // badge는 안드로이드 상태표시줄용 -> OS가 알파 채널만 보고 단색으로 다시 칠하기 때문에
-      // 배경이 불투명한 이미지를 쓰면 그냥 네모난 덩어리로 보인다. 투명 배경 실루엣을 따로 쓴다.
       badge,
       vibrate: isGoal
         ? [80, 40, 80, 40, 80, 40, 260]
