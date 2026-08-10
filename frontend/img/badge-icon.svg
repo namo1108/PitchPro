@@ -1,3 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <path fill-rule="evenodd" fill="#ffffff" d="M32 4a28 28 0 100 56 28 28 0 000-56zM32 20l8 6-3 10h-10l-3-10z"/>
+  <!-- 배지는 OS가 알파(모양)만 보고 단색으로 다시 칠하는 실루엣이라 색/그라디언트는 표현이 안 된다
+       (goal-icon-96.png 같은 컬러 아이콘을 배지에 그대로 쓸 수 없는 이유). 대신 축구공 특유의
+       오각형+이음선 패턴을 "구멍"으로 뚫어서, 단색 실루엣만으로도 공처럼 보이게 했다. -->
+  <mask id="cut">
+    <rect width="64" height="64" fill="#ffffff"/>
+    <polygon points="32,22.5 41.06,28.94 37.61,39.5 26.39,39.5 22.94,28.94" fill="#000000"/>
+    <line x1="32" y1="22.5" x2="32" y2="6.5" stroke="#000000" stroke-width="3.4" stroke-linecap="round"/>
+    <line x1="41.06" y1="28.94" x2="54.5" y2="19.2" stroke="#000000" stroke-width="3.4" stroke-linecap="round"/>
+    <line x1="37.61" y1="39.5" x2="42.6" y2="55.7" stroke="#000000" stroke-width="3.4" stroke-linecap="round"/>
+    <line x1="26.39" y1="39.5" x2="21.4" y2="55.7" stroke="#000000" stroke-width="3.4" stroke-linecap="round"/>
+    <line x1="22.94" y1="28.94" x2="9.5" y2="19.2" stroke="#000000" stroke-width="3.4" stroke-linecap="round"/>
+  </mask>
+  <circle cx="32" cy="32" r="28" fill="#ffffff" mask="url(#cut)"/>
 </svg>
