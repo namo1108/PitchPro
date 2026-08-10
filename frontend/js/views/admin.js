@@ -124,8 +124,12 @@ document.getElementById("admin-backup-btn")?.addEventListener("click", async (e)
     const a = document.createElement("a");
     a.href = url;
     a.download = `pitchpro-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    // 안드로이드 앱(TWA)처럼 다운로드가 비동기 다운로드 매니저로 넘어가는 환경에서는 URL을 바로
+    // 지우면 넘겨받기 전에 무효화돼서 다운로드가 조용히 실패한다 - 넉넉히 늦춰서 지운다.
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
     resultBox.className = "auth-find-result ok";
     resultBox.textContent = "다운로드했어요. 안전한 곳에 보관해두세요.";
   } catch (err) {
