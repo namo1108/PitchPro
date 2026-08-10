@@ -25,6 +25,7 @@ const el = {
   submitBtn: document.getElementById("auth-submit-btn"),
   errorBox: document.getElementById("auth-error"),
   tabs: document.querySelectorAll(".auth-form-tab"),
+  agreeTerms: document.getElementById("auth-agree-terms"),
 };
 
 // 축구교실은 순수 정적 콘텐츠(규칙/포지션/포메이션/용어)라 로그인 여부와 무관하게 항상 눌러야 하므로,
@@ -40,6 +41,12 @@ function setAuthMode(mode) {
   authMode = mode;
   el.tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.mode === mode));
   el.signupFields.style.display = mode === "signup" ? "block" : "none";
+  // 회원가입 전용 필드를 감싼 el.signupFields를 display:none으로 숨겨도, 그 안의 약관 동의
+  // 체크박스는 required 속성이 남아있으면 크롬이 "보이지 않는 요소"로 제외해주지 않고 여전히
+  // 폼 검증 대상으로 취급한다 - 그래서 로그인 모드에선 체크 안 한 채 조용히 제출 자체가 막혀서
+  // 로그인 버튼을 눌러도 아무 반응이 없는 것처럼 보이는 버그가 있었다(2026-08-10 제보). 화면에
+  // 안 보이게만 하지 말고 required 자체를 떼어내야 한다.
+  el.agreeTerms.required = mode === "signup";
   el.submitBtn.textContent = mode === "signup" ? "회원가입" : "로그인";
   el.errorBox.textContent = "";
   if (mode === "signup") {

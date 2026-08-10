@@ -166,7 +166,11 @@
                 <input type="text" id="auth-security-answer" placeholder="가장 좋아하는(응원하는) 축구선수는? (비번 찾기용, 선택)" />
                 <p class="auth-security-hint">나중에 비밀번호를 잃어버렸을 때 본인 확인용이에요. 안 넣으면 비번을 잃어버렸을 때 자가 복구가 안 돼요.</p>
                 <label class="auth-agree-row">
-                  <input type="checkbox" id="auth-agree-terms" class="auth-agree-checkbox" required />
+                  <!-- required는 정적으로 안 붙이고 myTeam.js의 setAuthMode()가 회원가입 모드일 때만
+                       붙인다 - 로그인 모드에선 이 필드 전체가 display:none으로 숨겨지는데, 크롬이 숨김
+                       처리된 요소도 required면 폼 검증 대상에서 안 뺘줘서 로그인 자체가 조용히 막히는
+                       버그가 있었다(2026-08-10). -->
+                  <input type="checkbox" id="auth-agree-terms" class="auth-agree-checkbox" />
                   <span><a href="/terms.html" target="_blank" rel="noopener">이용약관</a> 및 <a href="/privacy.html" target="_blank" rel="noopener">개인정보처리방침</a>에 동의합니다.</span>
                 </label>
               </div>
