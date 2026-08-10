@@ -87,9 +87,19 @@ self.addEventListener("push", (event) => {
   if (isYellowCard) icon = "/img/yellowcard-icon-192.png";
 
   // badge는 안드로이드 상태표시줄용이라 OS가 알파 채널만 보고 단색 실루엣으로 다시 칠한다 - 색은
-  // 어차피 안 보이니 "모양"만으로 종류를 구분한다. 카드류(경고/퇴장)만 공이 아닌 카드 실루엣을 쓰고,
-  // 나머지는 기존 공 모양 배지 하나로 통일한다(종류별 실루엣을 전부 만들 정도로 득이 크지 않음).
-  const badge = isCard ? "/img/badge-card-96.png" : "/img/badge-icon-96.png";
+  // 어차피 안 보이니 "모양"만으로 종류를 구분해야 한다. 처음엔 카드류만 따로 만들고 나머지는 전부
+  // 공 모양 하나로 통일했는데, 실점/킥오프/하프타임/종료/골취소/이적/라인업까지 다 같은 공 모양이면
+  // 사용자가 구분을 못 한다는 피드백(2026-08-10)을 받아 종류별로 실루엣을 다 따로 만들었다.
+  let badge = "/img/badge-icon-96.png"; // 골 - 기본값
+  if (isCard) badge = "/img/badge-card-96.png";
+  else if (isConcede) badge = "/img/badge-concede-96.png";
+  else if (isKickoff) badge = "/img/badge-kickoff-96.png";
+  else if (isKickoffSoon) badge = "/img/badge-kickoffsoon-96.png";
+  else if (isHalftime) badge = "/img/badge-halftime-96.png";
+  else if (isFulltime) badge = "/img/badge-fulltime-96.png";
+  else if (isVarCancel) badge = "/img/badge-varcancel-96.png";
+  else if (isTransfer) badge = "/img/badge-transfer-96.png";
+  else if (isLineup) badge = "/img/badge-lineup-96.png";
 
   event.waitUntil(
     self.registration.showNotification(payload.title || "PITCH PRO", {
