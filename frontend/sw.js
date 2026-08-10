@@ -70,7 +70,7 @@ self.addEventListener("push", (event) => {
   const isKickoffSoon = payload.type === "kickoff_soon";
   const isHalftime = payload.type === "halftime";
   const isFulltime = payload.type === "fulltime";
-  const isWhistle = isKickoff || isKickoffSoon || isHalftime || isFulltime;
+  const isWhistle = isKickoff || isFulltime;
   const isFriend = payload.type === "friend_request" || payload.type === "friend_accept";
   const isTransfer = payload.type === "transfer";
 
@@ -78,7 +78,10 @@ self.addEventListener("push", (event) => {
   if (isGoal || isConcede) icon = "/img/goal-icon-192.png";
   if (isLineup) icon = "/img/lineup-icon-192.png";
   if (isFriend) icon = "/img/pitch-icon-192.png";
-  if (isWhistle || isVarCancel) icon = "/img/whistle-icon-192.png";
+  if (isWhistle) icon = "/img/whistle-icon-192.png";
+  if (isKickoffSoon) icon = "/img/fiveminutes-icon-192.png";
+  if (isHalftime) icon = "/img/pause-icon-192.png";
+  if (isVarCancel) icon = "/img/varcancel-icon-192.png";
   if (isTransfer) icon = "/img/transfer-icon-192.png";
   if (isRedCard) icon = "/img/redcard-icon-192.png";
   if (isYellowCard) icon = "/img/yellowcard-icon-192.png";

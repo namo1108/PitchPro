@@ -20,6 +20,41 @@
       // 무시(시크릿 모드 등에서 localStorage 접근이 막혀도 기본 다크로 그냥 진행)
     }
   </script>
+  <script>
+    // 임시 진단용 - 콘솔을 못 여는 환경(설치된 앱 등)에서 어떤 화면 기능이 "눌러도 반응 없음"으로
+    // 보고될 때, 실제로는 어딘가 스크립트 에러가 나서 그 이후 모듈이 아예 안 돌고 있는 경우가 많다.
+    // 그 원인을 화면에서 바로 보이게 잡아준다. 원인 찾은 뒤엔 이 블록은 지워도 된다.
+    (function () {
+      var shown = false;
+      function showBanner(message) {
+        if (shown) return;
+        shown = true;
+        var box = document.createElement("div");
+        box.style.cssText =
+          "position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#3a0d0d;color:#ffd9d9;" +
+          "font:12px/1.5 monospace;padding:10px 12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;" +
+          "box-shadow:0 4px 16px rgba(0,0,0,0.4);max-height:40vh;overflow:auto;";
+        box.textContent = "⚠ 스크립트 오류(화면 캡처해서 알려주세요):\n" + message;
+        var closeBtn = document.createElement("button");
+        closeBtn.textContent = "닫기";
+        closeBtn.style.cssText = "display:block;margin-top:8px;padding:4px 10px;";
+        closeBtn.onclick = function () {
+          box.remove();
+        };
+        box.appendChild(closeBtn);
+        document.body ? document.body.appendChild(box) : window.addEventListener("DOMContentLoaded", function () {
+          document.body.appendChild(box);
+        });
+      }
+      window.addEventListener("error", function (e) {
+        showBanner((e.message || "unknown error") + "\n" + (e.filename || "") + ":" + (e.lineno || "") + ":" + (e.colno || ""));
+      });
+      window.addEventListener("unhandledrejection", function (e) {
+        var reason = e.reason;
+        showBanner("(promise) " + (reason && reason.stack ? reason.stack : String(reason)));
+      });
+    })();
+  </script>
 </head>
 <body>
   <div class="app">
@@ -311,8 +346,10 @@
           <input type="text" id="admin-test-username" placeholder="보낼 아이디 (기본: 내 계정)" />
           <select id="admin-test-type">
             <option value="goal">⚽ 골</option>
+            <option value="concede">😢 실점</option>
             <option value="yellowcard">🟨 경고</option>
             <option value="redcard">🟥 퇴장</option>
+            <option value="var_cancel">🚫 골 취소(VAR)</option>
             <option value="kickoff">⚽💨 경기 시작</option>
             <option value="kickoff_soon">⏱ 5분 후 킥오프</option>
             <option value="halftime">⏸ 전반전 종료</option>
@@ -321,6 +358,7 @@
             <option value="plain">🔔 텍스트만(이미지 없음)</option>
           </select>
           <button id="admin-test-send-btn" class="auth-submit-btn">테스트 알림 보내기</button>
+          <button id="admin-test-send-all-btn" class="auth-submit-btn">종류별로 전부 순서대로 보내기</button>
           <div id="admin-test-result" class="auth-find-result"></div>
         </div>
 

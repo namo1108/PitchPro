@@ -18,6 +18,22 @@ function buildTestPayload(type) {
         body: "토트넘 1 - 0 첼시 · ⌄ 펼쳐서 확인",
         image: `/api/notif-image/goal?team=${enc(SAMPLE_TEAM_A.name)}&crest=${enc(SAMPLE_TEAM_A.crest)}&scorer=${enc("손흥민")}&minute=74`,
       };
+    case "concede":
+      return {
+        type: "concede",
+        title: "😢 실점... 콜윌",
+        body: "첼시 0 - 1 토트넘 · ⌄ 펼쳐서 확인",
+        image: `/api/notif-image/goal?team=${enc(SAMPLE_TEAM_A.name)}&crest=${enc(SAMPLE_TEAM_A.crest)}&scorer=${enc("콜윌")}&minute=12`,
+      };
+    case "var_cancel":
+      return {
+        type: "var_cancel",
+        title: "🚫 골 취소(VAR)",
+        body: "토트넘 1 - 0 첼시 · 스코어가 정정됐습니다",
+        image: `/api/notif-image/status?homeTeam=${enc(SAMPLE_TEAM_A.name)}&homeCrest=${enc(SAMPLE_TEAM_A.crest)}&awayTeam=${enc(
+          SAMPLE_TEAM_B.name
+        )}&awayCrest=${enc(SAMPLE_TEAM_B.crest)}&homeScore=1&awayScore=0&badge=${enc("CANCELLED")}&color=${enc("#ef4444")}`,
+      };
     case "yellowcard":
       return {
         type: "yellowcard",
@@ -85,6 +101,48 @@ function buildTestPayload(type) {
       return { type: "goal", title: "🔔 테스트 알림", body: "이미지 없는 텍스트 알림 테스트입니다." };
   }
 }
+
+// index.html의 <select id="admin-test-type"> 옵션과 같은 순서 - 새 아이콘 넣고 나서 종류별로
+// 하나씩 고르지 않고 한 번에 쭉 받아보며 비교할 수 있게 만든 용도라, 여기 순서가 곧 알림이 오는 순서다.
+const ALL_TEST_TYPES = [
+  "goal",
+  "concede",
+  "yellowcard",
+  "redcard",
+  "var_cancel",
+  "kickoff",
+  "kickoff_soon",
+  "halftime",
+  "fulltime",
+  "transfer",
+];
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+document.getElementById("admin-test-send-all-btn")?.addEventListener("click", async (e) => {
+  const resultBox = document.getElementById("admin-test-result");
+  const username = document.getElementById("admin-test-username").value.trim() || getCurrentUser()?.username;
+  if (!username) return;
+  e.target.disabled = true;
+  try {
+    for (let i = 0; i < ALL_TEST_TYPES.length; i++) {
+      const type = ALL_TEST_TYPES[i];
+      resultBox.className = "auth-find-result";
+      resultBox.textContent = `(${i + 1}/${ALL_TEST_TYPES.length}) ${type} 보내는 중...`;
+      await authFetch("/admin/test-push", { method: "POST", body: { username, ...buildTestPayload(type) } });
+      // 너무 몰아서 보내면 안드로이드가 여러 개를 한 그룹으로 접어버려 아이콘을 비교하기 어려워진다 -
+      // 폰에서 하나씩 펼쳐볼 수 있게 텀을 둔다.
+      await sleep(2500);
+    }
+    resultBox.className = "auth-find-result ok";
+    resultBox.textContent = `"${username}" 계정으로 ${ALL_TEST_TYPES.length}종류 다 보냈어요. 폰에서 순서대로 확인해보세요.`;
+  } catch (err) {
+    resultBox.className = "auth-find-result error";
+    resultBox.textContent = err.message;
+  } finally {
+    e.target.disabled = false;
+  }
+});
 
 document.getElementById("admin-test-send-btn")?.addEventListener("click", async (e) => {
   const resultBox = document.getElementById("admin-test-result");
