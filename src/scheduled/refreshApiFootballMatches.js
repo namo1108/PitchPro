@@ -35,6 +35,10 @@ function competitionUrgency(comp, existingByCode) {
   if (matches.some((m) => m.status === "IN_PLAY" || m.status === "PAUSED")) return 0;
   if (matches.some((m) => ["SCHEDULED", "TIMED"].includes(m.status) && new Date(m.utcDate).getTime() < now)) return 1;
   if (matches.some((m) => ["SCHEDULED", "TIMED"].includes(m.status) && new Date(m.utcDate).getTime() - now <= UPCOMING_BUFFER_MS)) return 1;
+  // 연기(POSTPONED)된 경기는 "아직 결론이 안 난 상태"라 계속 지켜봐야 하는데, 여기서 안 걸러지면
+  // urgency 2(당분간 조용함)로 떨어져서 다른 대회가 라이브라 활성 시간대인 동안은 계속 재조회를 건너뛴다
+  // - 그러면 나중에 실제로 속개돼도(유벤투스전 사례, 2026-08-11 제보) 영영 캐시가 안 바뀐다.
+  if (matches.some((m) => m.status === "POSTPONED")) return 1;
   return 2;
 }
 

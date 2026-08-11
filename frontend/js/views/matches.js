@@ -413,7 +413,7 @@ function showFinishedToast(m) {
 // 그 다음은 대회 격 순서로 월드컵 > 대륙간컵대회(챔피언스리그/유로) > 세계 상위 리그 > 컵대회.
 const COMPETITION_TIERS = [
   ["WC"], // 월드컵
-  ["CL", "EC"], // 대륙간컵대회
+  ["CL", "EC", "ACL"], // 대륙간컵대회
   ["PL", "PD", "BL1", "SA", "FL1", "DED", "PPL", "ELC", "BSA", "KL1", "KL2"], // 세계 상위 리그
   ["KFA"], // 컵대회
 ];
@@ -462,7 +462,7 @@ function teamRankScore(m) {
 // 그 외 대회는 기존 순서(패치 순) 그대로, 친선경기(FRIENDLY)는 별도 규칙으로 항상 맨 아래.
 const MATCH_LIST_TIERS = [
   ["KL1", "KL2"],
-  ["CL"],
+  ["CL", "ACL"],
   ["PL", "PD", "BL1", "SA", "FL1"],
   ["WC", "EC", "KFA"],
 ];

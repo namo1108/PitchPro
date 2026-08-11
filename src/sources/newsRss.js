@@ -2,12 +2,14 @@ import { XMLParser } from "fast-xml-parser";
 
 const parser = new XMLParser({ ignoreAttributes: false });
 
-// 해외 소식은 BBC(영문), 국내는 이적/영입 보도가 빠른 스포츠동아 축구 섹션을 함께 쓴다.
-// 사용자 다수가 국내(한국어) 독자라 국내 영입 기사가 뉴스 탭에 바로 보이는 게 중요하다.
+// 해외 소식은 BBC(영문), 국내는 이적/영입 보도가 빠른 스포츠동아 + 포털(네이버 등)에도 함께 실리는
+// 스포츠경향 축구 섹션을 같이 쓴다. 사용자 다수가 국내(한국어) 독자라 국내 영입 기사가 뉴스 탭에
+// 바로 보이는 게 중요하다.
 export const NEWS_FEEDS = [
   { source: "bbc", url: "https://feeds.bbci.co.uk/sport/football/rss.xml" },
   // https(TLS)가 아니라 http로만 응답하는 피드라 그대로 http로 요청한다.
   { source: "donga", url: "http://rss.donga.com/sportsdonga/soccer.xml" },
+  { source: "khan", url: "https://sports.khan.co.kr/rss/soccer" },
 ];
 
 export async function fetchNewsFeed(feedUrl) {

@@ -28,6 +28,10 @@ export const COMPETITIONS = [
   { code: "CL", name: "Champions League", emblem: "https://media.api-sports.io/football/leagues/2.png", apiFootballLeagueId: 2, apiFootballSeason: 2026, hasBracket: true, featured: true },
   { code: "EL", name: "Europa League", emblem: "https://media.api-sports.io/football/leagues/3.png", apiFootballLeagueId: 3, apiFootballSeason: 2026, hasBracket: true },
   { code: "ECL", name: "유로파 컨퍼런스리그", emblem: "https://media.api-sports.io/football/leagues/848.png", apiFootballLeagueId: 848, apiFootballSeason: 2026, hasBracket: true },
+  // 2024-25시즌부터 개편된 대회명(옛 AFC 챔피언스리그 -> Elite, 옛 AFC컵 -> Two). K리그 구단들이
+  // 직접 출전하는 대회라 유로파리그보다 국내 팬 관심도가 높아 featured로 잡는다.
+  { code: "ACL", name: "AFC 챔피언스리그 엘리트", emblem: "https://media.api-sports.io/football/leagues/17.png", apiFootballLeagueId: 17, apiFootballSeason: 2026, hasBracket: true, featured: true },
+  { code: "ACL2", name: "AFC 챔피언스리그 투", emblem: "https://media.api-sports.io/football/leagues/18.png", apiFootballLeagueId: 18, apiFootballSeason: 2026, hasBracket: true },
   { code: "WC", name: "World Cup", emblem: "/img/emblems/worldcup.jpg", apiFootballLeagueId: 1, apiFootballSeason: 2026, hasBracket: true, featured: true },
   { code: "EC", name: "European Championship", emblem: "https://media.api-sports.io/football/leagues/4.png", apiFootballLeagueId: 4, apiFootballSeason: 2024, hasBracket: true, featured: true },
   { code: "KL1", name: "K리그1", emblem: "https://media.api-sports.io/football/leagues/292.png", apiFootballLeagueId: 292, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }], featured: true },
@@ -57,6 +61,10 @@ export const COMPETITIONS = [
   // id 10 "Friendlies"로 묶어서 제공한다(유소년/여자 대표팀 경기도 섞여 있지만 팀 검색과 마찬가지로
   // 여기선 성인 남자 대표팀 경기 위주로 노출). 친선경기라 순위표/득점왕 개념이 없어 리그 탭엔 안 보여준다.
   { code: "INTFRIENDLY", name: "국가대표 친선경기", emblem: "https://media.api-sports.io/football/leagues/10.png", apiFootballLeagueId: 10, apiFootballSeason: 2026, hideFromLeagueTab: true },
+  // 월드컵 아시아 지역예선: 친선경기(INTFRIENDLY)만 등록해뒀더니 예선전은 캐시에 없어서 "다음 경기"엔
+  // 뜨는데(팀 상세는 API-Football 실시간 조회라 대회 등록 여부와 무관) 정작 집관인증은 "경기를 찾을 수
+  // 없습니다"로 실패하는 문제가 있었다(2026-08-11 제보) - 친선경기와 마찬가지로 등록해서 캐시에 포함시킨다.
+  { code: "WCQAFC", name: "월드컵 아시아 지역예선", emblem: "https://media.api-sports.io/football/leagues/30.png", apiFootballLeagueId: 30, apiFootballSeason: 2026, hideFromLeagueTab: true },
   // 아시안컵: 대한민국 대표팀의 실제 다음 예정 경기(확인일 2026-07-25 기준 2027년 1월)가 이 대회라,
   // 국가대표팀도 집관인증이 되려면(경기 목록 캐시에 있어야 체크인 가능) 여기에 등록해둬야 한다.
   { code: "ACUP", name: "아시안컵", emblem: "https://media.api-sports.io/football/leagues/7.png", apiFootballLeagueId: 7, apiFootballSeason: 2027, hasBracket: true },

@@ -22,7 +22,8 @@ export function normalizeNewsItem({ item: raw, source }) {
   return {
     title: typeof raw.title === "string" ? raw.title : raw.title?.["#text"] || "",
     link: typeof raw.link === "string" ? raw.link : raw.link?.["#text"] || "",
-    pubDate: raw.pubDate || null,
+    // 스포츠경향(khan)은 <pubDate> 없이 Dublin Core의 <dc:date>만 준다.
+    pubDate: raw.pubDate || raw["dc:date"] || null,
     description: stripHtml(rawDescription),
     image,
     source: source || "bbc",

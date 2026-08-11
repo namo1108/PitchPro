@@ -9,7 +9,7 @@ import { isFavorite } from "../favorites.js";
 // 대회 27개를 한 줄짜리 긴 리스트로 두면 원하는 리그를 찾기 힘들어서, 지역/성격별로 묶어
 // 트리(아코디언)로 접었다 펼치게 한다. 코드에 없는 대회는 자동으로 "기타"에 담긴다.
 const LEAGUE_GROUPS = [
-  { title: "국제대회", codes: ["WC", "EC", "CL", "ACUP"] },
+  { title: "국제대회", codes: ["WC", "EC", "CL", "ACL", "ACL2", "ACUP"] },
   { title: "국내(K리그)", codes: ["KL1", "KL2", "KFA", "K3", "K4"] },
   { title: "유럽 5대리그", codes: ["PL", "PD", "BL1", "SA", "FL1"] },
   { title: "유럽 기타", codes: ["DED", "PPL", "ELC", "NOR", "DEN", "SCO"] },

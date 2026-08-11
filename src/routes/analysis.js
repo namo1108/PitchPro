@@ -26,7 +26,7 @@ const CONCURRENCY = 6;
 // 0티어: K리그는 사용자 요청상 항상 최우선. 1티어: 월드컵/대륙간컵대회. 2티어: 유럽 5대리그.
 const AI_ANALYSIS_TIERS = [
   ["KL1", "KL2"],
-  ["WC", "CL", "EC"],
+  ["WC", "CL", "EC", "ACL"],
   ["PL", "PD", "BL1", "SA", "FL1"],
 ];
 const FEATURED_CODES = new Set(COMPETITIONS.filter((c) => c.featured).map((c) => c.code));
