@@ -504,7 +504,7 @@
           <div class="points-info-row">
             <span class="points-info-icon">🤝</span>
             <span class="points-info-label">무승부</span>
-            <span class="points-info-value">최종 +5P 유지</span>
+            <span class="points-info-value">최종 +2P</span>
           </div>
           <div class="points-info-row">
             <span class="points-info-icon">😢</span>
@@ -524,9 +524,39 @@
         </div>
         <p class="points-info-note">
           집관인증은 킥오프 30분 전부터 30분 후까지만 할 수 있어요. 인증하는 순간엔 승패를 모르니 우선 참여 포인트(5P)를 주고,
-          경기가 끝나면 결과에 따라 자동으로 최종 포인트로 정산돼요. 컵대회에서 무승부 뒤 승부차기로 갈리면 무승부(+5P) 대신
+          경기가 끝나면 결과에 따라 자동으로 최종 포인트로 정산돼요. 컵대회에서 무승부 뒤 승부차기로 갈리면 무승부(+2P) 대신
           승부차기 결과로 정산돼요(승리 +3P / 패배 +2P).
         </p>
+        <!-- 레벨은 pointsForLevel(level) = 50 * level * (level-1) 공식(src/lib/auth.js)의 실제 값 그대로 -
+             공식이 바뀌면 여기 숫자도 같이 고쳐야 한다. -->
+        <h3 class="points-info-subtitle">🎖 레벨 안내</h3>
+        <div class="points-info-rows">
+          <div class="points-info-row">
+            <span class="points-info-icon">Lv.1</span>
+            <span class="points-info-label">축구 입문자</span>
+            <span class="points-info-value">0P~</span>
+          </div>
+          <div class="points-info-row">
+            <span class="points-info-icon">Lv.2</span>
+            <span class="points-info-label">이적설 레이더</span>
+            <span class="points-info-value">100P~</span>
+          </div>
+          <div class="points-info-row">
+            <span class="points-info-icon">Lv.3</span>
+            <span class="points-info-label">전술 분석가</span>
+            <span class="points-info-value">300P~</span>
+          </div>
+          <div class="points-info-row">
+            <span class="points-info-icon">Lv.4</span>
+            <span class="points-info-label">방구석 스카우터</span>
+            <span class="points-info-value">600P~</span>
+          </div>
+          <div class="points-info-row">
+            <span class="points-info-icon">Lv.5</span>
+            <span class="points-info-label">축구에 미친자</span>
+            <span class="points-info-value good">1000P~</span>
+          </div>
+        </div>
         <button id="points-history-toggle" class="points-history-toggle">📜 내 포인트 내역 보기</button>
         <div id="points-history-list" class="points-history-list" style="display: none;"></div>
       </div>

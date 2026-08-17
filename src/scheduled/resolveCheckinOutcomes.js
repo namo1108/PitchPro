@@ -2,6 +2,7 @@ import { getJSON, putJSON } from "../lib/kv.js";
 import {
   KV_KEYS,
   POINTS_CHECKIN_WIN,
+  POINTS_CHECKIN_DRAW,
   POINTS_CHECKIN_LOSS,
   POINTS_CHECKIN_SHOOTOUT_WIN,
   POINTS_CHECKIN_SHOOTOUT_LOSS,
@@ -43,8 +44,8 @@ export async function resolveCheckinOutcomes(env) {
         finalPoints = POINTS_CHECKIN_LOSS;
         reason = `${cheeredTeamName} 경기 패배`;
       } else {
-        // 정규시간(+연장) 무승부 - 컵대회처럼 승부차기까지 갔으면 무승부 취급(참여 포인트 유지) 대신
-        // 승부차기 승패로 정산한다. 승부차기 스코어가 없으면(리그 경기 등) 그냥 무승부로 유지.
+        // 정규시간(+연장) 무승부 - 컵대회처럼 승부차기까지 갔으면 무승부 취급 대신 승부차기
+        // 승패로 정산한다. 승부차기 스코어가 없으면(리그 경기 등) 무승부(2점)로 정산한다.
         const penHome = match.score?.penalty?.home;
         const penAway = match.score?.penalty?.away;
         const hasShootout = penHome !== null && penHome !== undefined && penAway !== null && penAway !== undefined;
@@ -54,8 +55,8 @@ export async function resolveCheckinOutcomes(env) {
           finalPoints = myPens > oppPens ? POINTS_CHECKIN_SHOOTOUT_WIN : POINTS_CHECKIN_SHOOTOUT_LOSS;
           reason = myPens > oppPens ? `${cheeredTeamName} 승부차기 승리` : `${cheeredTeamName} 승부차기 패배`;
         } else {
-          finalPoints = record.awardedPoints;
-          reason = null;
+          finalPoints = POINTS_CHECKIN_DRAW;
+          reason = `${cheeredTeamName} 경기 무승부`;
         }
       }
 

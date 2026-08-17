@@ -212,14 +212,18 @@ export const REFRESH_INTERVALS_MS = {
 
 // 집관인증(선택 기능): 킥오프 -30분 ~ +30분 사이에만 인증 가능.
 // 인증하는 시점엔 경기가 막 시작하거나 시작 전이라 승패를 알 수 없으므로, 우선 참여 포인트(5점)만 주고
-// 경기가 끝나면(resolveCheckinOutcomes) 승리(10점)/무승부(5점 유지)/패배(-5점)로 최종 정산한다.
+// 경기가 끝나면(resolveCheckinOutcomes) 승리(10점)/무승부(2점)/패배(-5점)로 최종 정산한다
+// (2026-08-17 사용자 요청으로 무승부를 참여점수 유지(5점)에서 2점으로 낮춤).
 export const CHECKIN_WINDOW_MINUTES_BEFORE = 30;
 export const CHECKIN_WINDOW_MINUTES_AFTER = 30;
 export const POINTS_CHECKIN_BASE = 5;
 export const POINTS_CHECKIN_WIN = 10;
+export const POINTS_CHECKIN_DRAW = 2;
 export const POINTS_CHECKIN_LOSS = -5;
-// 컵대회에서 정규시간+연장까지 무승부라 승부차기로 승부가 갈리면, 무승부 취급(5점 유지)이 아니라
-// 승부차기 결과로 정산한다 - 정규시간 승리(10점)보다는 낮고 무승부(5점)보다는 유불리가 갈리게.
+// 컵대회에서 정규시간+연장까지 무승부라 승부차기로 승부가 갈리면, 무승부 취급이 아니라 승부차기
+// 결과로 정산한다 - 정규시간 승리(10점)보다는 낮게. 승부차기 패배(2점)는 이제 무승부(2점)와 같은
+// 값이 됐는데, 승부차기까지 간 접전을 진 것과 그냥 무승부를 굳이 더 세분화할 필요는 없어 보여
+// 일단 그대로 둔다(다르게 하고 싶으면 알려달라고 사용자에게 안내).
 export const POINTS_CHECKIN_SHOOTOUT_WIN = 3;
 export const POINTS_CHECKIN_SHOOTOUT_LOSS = 2;
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;

@@ -4847,6 +4847,8 @@ table.standings-table {
 .points-info-icon {
   font-size: 17px;
   flex-shrink: 0;
+  min-width: 34px;
+  text-align: center;
 }
 
 .points-info-label {
@@ -4875,6 +4877,12 @@ table.standings-table {
   font-size: 12px;
   line-height: 1.5;
   color: var(--text-muted);
+}
+
+.points-info-subtitle {
+  margin: 18px 0 10px;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .points-history-toggle {
