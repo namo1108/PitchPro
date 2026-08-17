@@ -922,6 +922,14 @@ body {
   background: var(--gradient-brand);
 }
 
+.competition-header-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
 .competition-header-name {
   flex: 1;
   min-width: 0;
@@ -942,6 +950,9 @@ body {
 .competition-header-arrow {
   color: var(--text-muted);
   transition: transform 0.2s var(--ease);
+  /* 화살표만 눌러서 접고 펴게 분리한 뒤로(나머지 헤더는 리그 순위로 이동) 탭 영역이 좁아져서 여백을 둔다. */
+  padding: 6px 2px 6px 10px;
+  margin: -6px -2px -6px 0;
 }
 
 .competition-group.collapsed .competition-header-arrow {

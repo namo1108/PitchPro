@@ -1,5 +1,5 @@
 import { fetchJSON } from "../api.js";
-import { pushDetail, onTabChange } from "../router.js";
+import { pushDetail, onTabChange, openLeagueStandings } from "../router.js";
 import {
   STATUS_KO,
   LIVE_STATUSES,
@@ -561,7 +561,9 @@ function renderMatches(matches) {
 
     const header = document.createElement("div");
     header.className = "competition-header";
-    header.innerHTML = `${emblemImg(group.info, "competition-emblem")}<span class="competition-header-name">${group.info.name}</span><span class="competition-header-count">${group.matches.length}</span><span class="competition-header-arrow">▾</span>`;
+    // 헤더 대부분(엠블럼+이름)을 누르면 그 리그 순위로 넘어가고, 화살표만 따로 눌러야 목록을
+    // 접었다 펼 수 있게 나눴다(둘 다 같은 영역이면 "순위 보기"와 "접기"가 서로 충돌함).
+    header.innerHTML = `<span class="competition-header-link">${emblemImg(group.info, "competition-emblem")}<span class="competition-header-name">${group.info.name}</span></span><span class="competition-header-count">${group.matches.length}</span><span class="competition-header-arrow">▾</span>`;
     groupEl.appendChild(header);
 
     const body = document.createElement("div");
@@ -571,8 +573,11 @@ function renderMatches(matches) {
       .forEach((m) => body.appendChild(renderMatchRow(m)));
     groupEl.appendChild(body);
 
-    // 대회 헤더를 눌러서 그 안의 경기 목록을 접었다 펼 수 있게(리그 많은 날 스크롤 부담을 줄임).
-    header.addEventListener("click", () => {
+    header.querySelector(".competition-header-link").addEventListener("click", () => openLeagueStandings(group.info.code));
+
+    // 화살표를 눌러서 그 안의 경기 목록을 접었다 펼 수 있게(리그 많은 날 스크롤 부담을 줄임).
+    header.querySelector(".competition-header-arrow").addEventListener("click", (e) => {
+      e.stopPropagation();
       const collapsed = groupEl.classList.toggle("collapsed");
       body.style.display = collapsed ? "none" : "";
     });

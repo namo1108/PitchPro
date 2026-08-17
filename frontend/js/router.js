@@ -79,6 +79,18 @@ window.addEventListener("popstate", (event) => {
   }
 });
 
+// 경기 탭의 대회 헤더에서 리그 탭의 순위 상세로 바로 넘어가기 위한 연결 고리 - matches.js가
+// leagues.js를 직접 import하면 leagues.js도 이미 matches.js를 import하고 있어(loadMatchDetail)
+// 순환 참조가 생기니(auth.js/api.js 분리와 같은 이유), 여기 router 계층에서 콜백만 중개한다.
+let leagueStandingsOpener = null;
+export function setLeagueStandingsOpener(fn) {
+  leagueStandingsOpener = fn;
+}
+export function openLeagueStandings(code) {
+  document.querySelector('.nav-btn[data-view="leagues"]')?.click();
+  leagueStandingsOpener?.(code);
+}
+
 const onNavChange = [];
 export function onTabChange(view, handler) {
   onNavChange.push({ view, handler });

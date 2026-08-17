@@ -1,5 +1,5 @@
 import { fetchJSON } from "../api.js";
-import { onTabChange, pushSubView } from "../router.js";
+import { onTabChange, pushSubView, setLeagueStandingsOpener } from "../router.js";
 import { crestImg, emblemImg, playerAvatarImg, fadeIn, skeletonList } from "../format.js";
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
@@ -198,8 +198,20 @@ function showLeagueList() {
   stopStandingsPoll();
 }
 
+// 경기 탭의 대회 헤더를 눌러 리그 순위로 바로 넘어오는 진입점 - 리그 탭을 안 거쳐도(첫 방문이라
+// state.competitions가 비어있어도) 목록을 먼저 채운 뒤 곧바로 해당 리그 상세를 연다.
+async function goToLeagueStandings(code) {
+  if (!state.loaded) await loadCompetitions();
+  openLeague(code);
+}
+setLeagueStandingsOpener(goToLeagueStandings);
+
 function openLeague(code) {
   const comp = state.competitions.find((c) => c.code === code);
+  // 친선경기류(FRIENDLY/INTFRIENDLY/WCQAFC 등 hideFromLeagueTab)는 /api/competitions 응답 자체에서
+  // 빠져있어 순위표 개념이 없다 - 경기 탭 헤더 클릭이 goToLeagueStandings로 아무 코드나 넘길 수
+  // 있으니, 못 찾으면 그냥 조용히 무시한다(TypeError로 화면을 깨뜨리지 않음).
+  if (!comp) return;
   el.detailHeader.innerHTML = `${emblemImg(comp, "league-detail-emblem")}<span>${comp.name}</span>`;
   el.list.style.display = "none";
   el.searchInput.style.display = "none";
