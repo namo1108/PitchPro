@@ -8,13 +8,17 @@ import { getAdidasPointsByCode, findTeamAdidasPoint } from "../lib/kleagueAdidas
 import { fetchTeamRank, KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID } from "../scheduled/refreshKLeagueResults.js";
 
 const ANALYSIS_CACHE_KEY = "analysis:v11";
-// 사전 갱신 크론이 1시간 주기라(scheduled/index.js), 그 전에 캐시가 만료돼 사용자 요청이 직접
-// 무거운 계산(최대 36콜)을 떠맡는 일이 없도록 TTL을 넉넉하게 잡는다 - 80분이었는데, 쿼터가 빡빡해서
-// 사전 갱신 틱이 한 번 건너뛰어져도(isQuotaTight) 다음 틱 전에 캐시가 만료되지 않도록 120분으로 늘림
-// (사용자 제보: "AI 분석 열 때 딜레이가 있다" - 콜드캐시로 직접 계산을 떠맡는 순간이 그 지연이다).
-const ANALYSIS_CACHE_TTL_SECONDS = 7200; // 120분
-// 2026-07-26 쿼터 소진 재발 이후 8 -> 6으로 한 번 더 줄임(카드당 최대 6콜 x 6장 = 36콜/갱신).
-const MAX_CARDS = 6;
+// 사전 갱신 크론 주기(scheduled/index.js)의 2배로 넉넉하게 잡아서, 쿼터가 빡빡해 사전 갱신 틱이
+// 한 번 건너뛰어져도(isQuotaTight) 다음 틱 전에 캐시가 만료되지 않게 한다(사용자 제보: "AI 분석
+// 열 때 딜레이가 있다" - 콜드캐시로 직접 계산을 떠맡는 순간이 그 지연이다).
+// 2026-08-11 카드 수를 6 -> 20으로 대폭 늘리면서(사용자 요청, "심화 분석이 승부처") 갱신 1회당
+// 비용도 그만큼 커져서 - 사전 갱신 주기를 1시간 -> 90분으로 늘려 하루 총 호출량을 상쇄했다
+// (기존 60분 주기/120분 TTL과 같은 "TTL = 주기 x 2" 비율 유지).
+const ANALYSIS_CACHE_TTL_SECONDS = 10800; // 180분
+// 2026-08-11 사용자 요청으로 6 -> 20 (카드당 최대 6콜 x 20장 = 120콜/갱신 + 링크 전용 최대 12콜
+// ≈ 132콜/갱신, 90분 주기면 하루 최대 약 2,100콜 - Pro 플랜 일일 한도 7,500의 30% 미만으로 억제).
+// 프론트(aiAnalysis.js)는 카드가 많아진 만큼 기본은 접어두고 눌러서 펼치는 방식으로 바꿨다.
+const MAX_CARDS = 20;
 const MAX_LINK_ONLY = 12;
 const CONCURRENCY = 6;
 

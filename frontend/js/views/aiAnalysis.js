@@ -90,6 +90,9 @@ function noteList(title, icon, notes) {
   `;
 }
 
+// 카드를 6장에서 20장까지 늘리기로 하면서(2026-08-11) 전부 펼쳐두면 스크롤이 너무 길어져,
+// 팀/예측만 기본으로 보여주고 나머지 세부 근거(폼/상대전적/순위/결장 등)는 접어뒀다가 눌러서
+// 펼치는 방식으로 바꿨다 - 여러 경기를 훑어보다가 관심 가는 것만 깊게 파고들 수 있게.
 function renderAnalysis(cards, animate) {
   if (!cards.length) {
     el.list.innerHTML = '<div class="empty-state">분석 가능한 예정 경기가 없습니다.</div>';
@@ -109,13 +112,19 @@ function renderAnalysis(cards, animate) {
         <span class="ai-card-vs">vs</span>
         <div class="ai-card-team" data-team-id="${c.awayTeam.id}">${crestImg(c.awayTeam, "team-crest")}<span>${c.awayTeam.shortName || c.awayTeam.name}</span></div>
       </div>
-      ${noteList("K리그 공식 파워랭킹", "🏆", c.officialNotes)}
-      ${noteList("K리그 공식 최근 기록", "📋", c.kleagueOfficialNotes)}
-      ${noteList("최근 폼", "📈", c.formNotes)}
-      ${noteList("상대전적", "🆚", c.h2hNotes)}
-      ${noteList("순위", "📊", c.standingsNotes)}
-      ${noteList("결장 이슈", "⚕", c.injuryNotes)}
       ${predictionBar(c.prediction)}
+      <button type="button" class="ai-card-toggle">
+        <span class="ai-card-toggle-label">자세히 보기</span>
+        <span class="ai-card-toggle-arrow">▾</span>
+      </button>
+      <div class="ai-card-details">
+        ${noteList("K리그 공식 파워랭킹", "🏆", c.officialNotes)}
+        ${noteList("K리그 공식 최근 기록", "📋", c.kleagueOfficialNotes)}
+        ${noteList("최근 폼", "📈", c.formNotes)}
+        ${noteList("상대전적", "🆚", c.h2hNotes)}
+        ${noteList("순위", "📊", c.standingsNotes)}
+        ${noteList("결장 이슈", "⚕", c.injuryNotes)}
+      </div>
     </div>
   `
     )
@@ -124,6 +133,13 @@ function renderAnalysis(cards, animate) {
   if (animate) fadeIn(el.list);
   el.list.querySelectorAll("[data-team-id]").forEach((elm) => {
     elm.addEventListener("click", () => goToTeam(elm.dataset.teamId));
+  });
+  el.list.querySelectorAll(".ai-card-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const card = btn.closest(".ai-card");
+      const expanded = card.classList.toggle("expanded");
+      btn.querySelector(".ai-card-toggle-label").textContent = expanded ? "접기" : "자세히 보기";
+    });
   });
 }
 
