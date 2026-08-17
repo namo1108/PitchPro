@@ -4,6 +4,7 @@
 import { pushDetail } from "../router.js";
 import { escapeHtml } from "../format.js";
 import { getCurrentUser, onAuthChange, getToken, authFetch } from "../auth.js";
+import { API } from "../api.js";
 
 const SAMPLE_TEAM_A = { name: "토트넘", crest: "https://media.api-sports.io/football/teams/47.png" };
 const SAMPLE_TEAM_B = { name: "첼시", crest: "https://media.api-sports.io/football/teams/49.png" };
@@ -172,7 +173,7 @@ document.getElementById("admin-backup-btn")?.addEventListener("click", async (e)
   resultBox.className = "auth-find-result";
   resultBox.textContent = "백업 만드는 중...";
   try {
-    const res = await fetch("/api/admin/backup-export", { headers: { authorization: `Bearer ${getToken()}` } });
+    const res = await fetch(`${API}/admin/backup-export`, { headers: { authorization: `Bearer ${getToken()}` } });
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       throw new Error(body?.detail || `백업 실패 (${res.status})`);

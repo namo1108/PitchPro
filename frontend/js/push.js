@@ -1,4 +1,4 @@
-import { fetchJSON } from "./api.js";
+import { fetchJSON, API } from "./api.js";
 import { listFavorites } from "./favorites.js";
 import { getToken } from "./auth.js";
 
@@ -150,7 +150,7 @@ async function fetchJSONPost(path, body) {
   const token = getToken();
   const headers = { "content-type": "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API}${path}`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
