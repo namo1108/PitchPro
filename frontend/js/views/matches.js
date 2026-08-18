@@ -1614,6 +1614,30 @@ el.nextDay.addEventListener("click", () => {
   state.dayOffset += 1;
   loadMatches();
 });
+
+// 경기 목록을 좌우로 스와이프해도 이전/다음 날짜로 넘어가게(fotmob처럼). 세로 스크롤과 헷갈리지
+// 않도록 수평 이동이 수직 이동보다 충분히 클 때만 날짜를 바꾼다.
+let matchesTouchStartX = 0;
+let matchesTouchStartY = 0;
+el.matchesList.addEventListener(
+  "touchstart",
+  (e) => {
+    matchesTouchStartX = e.touches[0].clientX;
+    matchesTouchStartY = e.touches[0].clientY;
+  },
+  { passive: true }
+);
+el.matchesList.addEventListener(
+  "touchend",
+  (e) => {
+    const dx = e.changedTouches[0].clientX - matchesTouchStartX;
+    const dy = e.changedTouches[0].clientY - matchesTouchStartY;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    state.dayOffset += dx < 0 ? 1 : -1;
+    loadMatches();
+  },
+  { passive: true }
+);
 el.refreshBtn.addEventListener("click", () => {
   el.refreshBtn.classList.add("spinning");
   loadMatches().finally(() => {

@@ -121,11 +121,21 @@ export function initPushButton() {
 
 // 이미 구독 중인 상태에서 즐겨찾기 팀이 바뀌면(구독 시점 이후 추가/삭제), 서버의 teamIds도 다시 맞춘다.
 // 안 그러면 구독할 때 즐겨찾기가 비어 있던 경우 팀 골 알림이 영영 안 온다.
+//
+// 아직 구독 중이 아니면(=첫 즐겨찾기 팀 추가), 여기서 바로 알림 권한을 요청한다 - "즐겨찾기 팀
+// 등록"이라는 사용자의 진짜 클릭에서 곧바로 이어지는 동기 호출이라 브라우저의 user-activation이
+// 살아있어 권한 팝업이 자연스럽게 뜬다("🔔 골 알림 받기" 버튼을 따로 눌러야 하는 불편을 없앤다).
+// 단, 브라우저는 권한을 코드로 "자동 허용"시키는 건 절대 허용하지 않는다 - 사용자가 그 네이티브
+// 팝업에서 직접 허용/거부를 선택해야 하며, 우리가 할 수 있는 건 그 팝업이 뜨는 타이밍뿐이다.
 window.addEventListener("favorites-changed", async () => {
   const reg = await getRegistration();
   if (!reg) return;
   const existing = await reg.pushManager.getSubscription();
-  if (!existing) return;
+
+  if (!existing) {
+    if (Notification.permission === "default") await ensureSubscribed();
+    return;
+  }
 
   const teamIds = listFavorites().map((t) => t.id);
   await fetchJSONPost("/push/subscribe", { subscription: existing.toJSON(), teamIds }).catch(() => {});

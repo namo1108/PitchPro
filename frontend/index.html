@@ -578,6 +578,18 @@
         <button id="delete-account-confirm-btn" class="auth-submit-btn danger">탈퇴하기</button>
       </div>
     </div>
+
+    <!-- 업데이트 소식 팝업 - updateNotes.js가 버전 문자열을 보고 새 버전일 때만 앱 시작 시 한 번 띄운다. -->
+    <div id="update-notes-modal" class="points-info-modal" style="display: none;">
+      <div class="points-info-backdrop"></div>
+      <div class="points-info-card">
+        <div class="points-info-header">
+          <h3 id="update-notes-title">🎉 업데이트 소식</h3>
+          <button id="update-notes-close" class="points-info-close" aria-label="닫기">✕</button>
+        </div>
+        <ul id="update-notes-list" class="update-notes-list"></ul>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="/js/app.js"></script>

@@ -18,6 +18,7 @@ import { loadViewState } from "./viewState.js";
 import { refreshMe } from "./auth.js";
 import { initOnboarding } from "./onboarding.js";
 import { initInstallBanner } from "./install.js";
+import { initUpdateNotes } from "./updateNotes.js";
 
 // 경기/뉴스/리그/AI분석/즐겨찾기(골 알림 포함)는 로그인 없이도 그대로 쓸 수 있어야 한다(나의 팀 탭
 // 안내문 참고) - 로그인은 집관인증/친구/명예의전당 같은 선택 기능에만 필요하므로 앱 시작을 막지 않는다.
@@ -44,3 +45,4 @@ if (lastView?.view === "detail" && lastView.matchId) {
 initPushButton();
 initOnboarding();
 initInstallBanner();
+initUpdateNotes();

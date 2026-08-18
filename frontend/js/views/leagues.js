@@ -350,6 +350,14 @@ function tableRowsHtml(table, comp) {
     .join("");
 }
 
+// 2026시즌 기준(K리그 하나로 승강제 개편안) 요약 - 리그마다 규정이 달라 표 위에 한 줄로 간단히
+// 알려준다. 정확한 세부 조건(라이선스 보유 여부 등)은 생략하고 사용자가 궁금해할 핵심만 담는다.
+const PROMOTION_RULE_NOTE = {
+  KL2: "⬆ 1~2위 자동 승격, 3~6위는 승격 플레이오프로 K리그1 진출을 다퉈요.",
+  K3: "⬆ 우승팀이 K리그2 클럽 라이선스를 보유하면 K리그2 최하위팀과 승강전을 치러요.",
+  K4: "⬆ 우승 시 자동 승격, 2위는 K3리그 최하위팀과 승격 플레이오프를 치러요.",
+};
+
 // MLS처럼 리그가 컨퍼런스(조)로 나뉘어 있으면 표가 여러 개 온다 - 그룹명 소제목과 함께 각각 따로 그린다.
 // 대부분의 리그는 그룹이 하나뿐이라 이 경우엔 기존과 동일하게 소제목 없이 표 하나만 보여준다.
 function renderTables(tables, silent, comp) {
@@ -360,8 +368,9 @@ function renderTables(tables, silent, comp) {
   }
 
   const showGroupTitle = nonEmpty.length > 1;
+  const ruleNote = PROMOTION_RULE_NOTE[comp?.code];
 
-  el.standingsWrap.innerHTML = nonEmpty
+  const tablesHtml = nonEmpty
     .map((table) => {
       const anyLive = table.table.some((row) => row.live);
       return `
@@ -378,6 +387,8 @@ function renderTables(tables, silent, comp) {
       `;
     })
     .join("");
+
+  el.standingsWrap.innerHTML = (ruleNote ? `<div class="promotion-rule-note">${ruleNote}</div>` : "") + tablesHtml;
 
   if (!silent) fadeIn(el.standingsWrap);
   el.standingsWrap.querySelectorAll("[data-team-id]").forEach((cell) => {

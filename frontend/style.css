@@ -1711,6 +1711,17 @@ table.standings-table {
   margin-bottom: 8px;
 }
 
+.promotion-rule-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
 .pos-cell {
   display: flex;
   align-items: center;
@@ -4885,6 +4896,23 @@ table.standings-table {
   margin: 18px 0 10px;
   font-size: 14px;
   font-weight: 800;
+}
+
+.update-notes-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.update-notes-list li {
+  padding: 10px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  border-bottom: 1px solid var(--border);
+}
+
+.update-notes-list li:last-child {
+  border-bottom: none;
 }
 
 .points-history-toggle {
