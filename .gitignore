@@ -8,3 +8,5 @@ node_modules/
 .dev.vars
 
 *.ait
+toss-app/node_modules/
+toss-app/dist/

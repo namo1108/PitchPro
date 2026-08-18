@@ -553,6 +553,30 @@ body {
   padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
 }
 
+/* 앱인토스 빌드 전용 - 토스 미니앱 브랜딩 가이드가 탭바를 화면에 딱 붙은 바가 아니라 가장자리에서
+   살짝 띄운 "플로팅" 형태로 쓰도록 요구해서(2026-08-18 심사 반려 사유), 이 빌드에만 덧씌운다.
+   toss-app/copy-assets.cjs가 앱인토스용 dist/index.html에만 <html data-toss-app="1">을 심어주므로,
+   일반 웹/PWA/안드로이드 앱에는 이 규칙이 전혀 적용되지 않는다. */
+html[data-toss-app] .bottom-nav {
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  max-width: calc(900px - 32px);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  padding: 6px 4px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+html[data-toss-app] .content {
+  padding-bottom: calc(94px + env(safe-area-inset-bottom, 0px));
+}
+
+html[data-toss-app] .more-menu {
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: 78px;
+}
+
 .section-title {
   font-size: 18px;
   font-weight: 800;
