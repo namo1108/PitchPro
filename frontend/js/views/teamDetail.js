@@ -13,7 +13,7 @@ import {
   resultClass,
   formBadgesHtml,
 } from "../format.js";
-import { isFavorite, toggleFavorite } from "../favorites.js";
+import { isFavorite, toggleFavorite, MAX_FAVORITES } from "../favorites.js";
 import { goToPlayer } from "./playerDetail.js";
 import { loadMatchDetail } from "./matches.js";
 import { saveViewState } from "../viewState.js";
@@ -223,9 +223,17 @@ function renderTeamDetail(teamId, data) {
   }
 
   document.getElementById("favorite-toggle").addEventListener("click", (e) => {
-    const nowFavorite = toggleFavorite({ id: teamId, name: team.name, crest: team.crest });
-    e.target.textContent = nowFavorite ? "★ 즐겨찾기됨" : "☆ 즐겨찾기";
-    e.target.classList.toggle("active", nowFavorite);
+    const { favorited, blocked } = toggleFavorite({ id: teamId, name: team.name, crest: team.crest, isNational: team.isNational });
+    if (blocked === "national") {
+      alert("국가대표팀은 '나의 팀'에 추가할 수 없어요.");
+      return;
+    }
+    if (blocked === "limit") {
+      alert(`'나의 팀'은 최대 ${MAX_FAVORITES}개까지만 등록할 수 있어요. 기존 팀을 먼저 빼주세요.`);
+      return;
+    }
+    e.target.textContent = favorited ? "★ 즐겨찾기됨" : "☆ 즐겨찾기";
+    e.target.classList.toggle("active", favorited);
   });
 
   el.content.querySelectorAll(".team-tab-btn").forEach((btn) => {

@@ -77,7 +77,8 @@ el.teamSearchInput?.addEventListener("input", () => {
       const data = await fetchJSON(`/teams/search?q=${encodeURIComponent(q)}`);
       // 느린 응답이 나중에 도착해 더 최신 검색 결과를 덮어쓰지 않도록, 그사이 새 요청이 있었으면 버린다.
       if (requestId !== teamSearchRequestId) return;
-      renderTeamResults(data.teams || []);
+      // 국가대표팀은 "나의 팀"에 못 넣게 해서(2026-08-17) 최애팀 검색 결과에서도 아예 뺀다.
+      renderTeamResults((data.teams || []).filter((t) => t.competitionName !== "국가대표"));
     } catch {
       if (requestId === teamSearchRequestId) el.teamResultsBox.innerHTML = "";
     }

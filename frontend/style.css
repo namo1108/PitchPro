@@ -4799,6 +4799,8 @@ table.standings-table {
   position: relative;
   width: 100%;
   max-width: 360px;
+  max-height: 85vh;
+  overflow-y: auto;
   background: var(--bg-card);
   border: 1px solid var(--border-strong);
   border-radius: 18px;

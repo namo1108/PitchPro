@@ -398,6 +398,9 @@ export function normalizeTeam(raw) {
     venue: raw.venue?.name || null,
     venueCity: raw.venue?.city || null,
     venueCapacity: raw.venue?.capacity || null,
+    // API-Football이 국가대표팀에 자체적으로 표시해주는 값 - 국대는 "나의 팀" 즐겨찾기에서
+    // 빼기로 해서(2026-08-17 사용자 요청) 프론트가 즐겨찾기 버튼을 막을 때 이 값을 본다.
+    isNational: !!raw.team.national,
   };
 }
 
