@@ -5,6 +5,7 @@ import { normalizeFixture } from "../adapters/apiFootballAdapter.js";
 import { detectGoalsAndNotify } from "./detectGoalsAndNotify.js";
 import { notifyMatchEvents } from "./notifyMatchEvents.js";
 import { detectCardsAndNotify } from "./detectCardsAndNotify.js";
+import { alertAdminOfFailure } from "../lib/adminAlert.js";
 
 // 1초 간격(사용자 요청, 2026-08-09 - 3초도 여전히 느리다는 피드백으로 더 줄임). live=all은 대회 수와
 // 무관하게 호출 1번으로 끝나는 가벼운 엔드포인트라, Ultra 플랜 분당 한도(450회) 대비 이 빈도(틱당 최대
@@ -41,6 +42,11 @@ export async function pollLiveMatches(env) {
       liveRaw = await apiFootball.getLiveFixtures(env, { retries: 1 });
     } catch (err) {
       console.error("live=all fetch failed:", err);
+      // 라이브 경기가 있는 동안 이 호출이 막히면(레이트리밋 등) 골/카드 감지가 그 몇 초~몇 분간
+      // 통째로 끊긴다 - 다른 크론 실패처럼 조용히 캐시로 폴백할 데이터 자체가 없어서 더 치명적이다.
+      if (/rateLimit/.test(err.message)) {
+        await alertAdminOfFailure(env, "livepoll-ratelimit", err).catch(() => {});
+      }
       await sleep(POLL_INTERVAL_MS);
       continue;
     }

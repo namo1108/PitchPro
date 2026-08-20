@@ -3,6 +3,7 @@ import { normalizeFixture } from "../adapters/apiFootballAdapter.js";
 import { putJSON, getJSON, shouldRun } from "../lib/kv.js";
 import { hasLiveOrImminentMatches } from "../lib/matchWindow.js";
 import { KV_KEYS, COMPETITIONS, MATCH_WINDOW_DAYS_BEFORE, MATCH_WINDOW_DAYS_AFTER, MATCH_SCHEDULE_END_DATE } from "../lib/config.js";
+import { alertAdminOfFailure } from "../lib/adminAlert.js";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -82,12 +83,15 @@ export async function fetchAndStoreMatches(env, existing) {
   const isActive = existing?.matches?.length ? hasLiveOrImminentMatches(existing.matches) : true;
 
   const allMatches = [];
+  let attempted = 0;
+  let rateLimited = 0;
   for (const comp of orderedCompetitions) {
     const cached = existingByCode.get(comp.code) || [];
     if (isActive && cached.length && urgencyByCode.get(comp.code) === 2) {
       allMatches.push(...cached);
       continue;
     }
+    attempted++;
     try {
       const raw = await apiFootball.getFixturesByLeague(env, comp.apiFootballLeagueId, comp.apiFootballSeason, from, to, {
         retries: 1,
@@ -95,12 +99,24 @@ export async function fetchAndStoreMatches(env, existing) {
       allMatches.push(...(raw.response || []).map(normalizeFixture));
     } catch (err) {
       console.error(`fixtures fetch failed for ${comp.code}:`, err);
+      if (/rateLimit/.test(err.message)) rateLimited++;
       allMatches.push(...cached);
     }
     // 300ms 간격으로는 대회 29개를 순차 호출할 때(다른 크론 작업·실사용자 요청과 겹치면 더욱)
     // 분당 요청 한도에 걸려 전체 대회가 한꺼번에 실패하는 사고가 있었다(2026-08-08, EL/ECL 추가
     // 직후 확인 - 새 대회 자체의 문제가 아니라 이 전체 스윕이 분당 한도를 넘기고 있었음).
     await sleep(1000);
+  }
+
+  // 이 틱에서 시도한 대회 절반 이상이 레이트리밋으로 실패하면(2026-08-20 확인 - 전 대회가 한꺼번에
+  // 실패하면서 그 몇 분 동안 골/카드/라인업 알림이 전부 조용히 끊겼는데 아무 데도 안 남았음), 각
+  // 리그가 캐시로 알아서 폴백해서 겉으론 에러 없이 넘어가 버린다 - 관리자에게 최소한 알려는 준다.
+  if (attempted > 0 && rateLimited / attempted >= 0.5) {
+    await alertAdminOfFailure(
+      env,
+      "matches-ratelimit",
+      new Error(`${rateLimited}/${attempted}개 대회 조회가 API-Football 레이트리밋으로 실패 - 그동안 실시간 알림이 끊겼을 수 있음`)
+    ).catch(() => {});
   }
 
   // 내용이 지난 틱과 완전히 같으면(비활성 시간대 등) 굳이 다시 안 써서 KV 무료 플랜의 하루 쓰기 한도를 아낀다.
