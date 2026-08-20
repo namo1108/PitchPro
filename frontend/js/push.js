@@ -122,9 +122,13 @@ export function initPushButton() {
 // 이미 구독 중인 상태에서 즐겨찾기 팀이 바뀌면(구독 시점 이후 추가/삭제), 서버의 teamIds도 다시 맞춘다.
 // 안 그러면 구독할 때 즐겨찾기가 비어 있던 경우 팀 골 알림이 영영 안 온다.
 //
-// 아직 구독 중이 아니면(=첫 즐겨찾기 팀 추가), 여기서 바로 알림 권한을 요청한다 - "즐겨찾기 팀
-// 등록"이라는 사용자의 진짜 클릭에서 곧바로 이어지는 동기 호출이라 브라우저의 user-activation이
-// 살아있어 권한 팝업이 자연스럽게 뜬다("🔔 골 알림 받기" 버튼을 따로 눌러야 하는 불편을 없앤다).
+// 아직 구독 중이 아니면(=첫 즐겨찾기 팀 추가, 또는 이미 권한은 있는데 구독 자체가 어떤 이유로든
+// 사라진 경우) 여기서 바로 재구독을 시도한다 - "즐겨찾기 팀 등록"이라는 사용자의 진짜 클릭에서
+// 곧바로 이어지는 동기 호출이라 브라우저의 user-activation이 살아있어 권한 팝업이 필요하면 자연
+// 스럽게 뜬다("🔔 골 알림 받기" 버튼을 따로 눌러야 하는 불편을 없앤다).
+// 2026-08-20 수정 - 처음엔 permission이 "default"(한 번도 안 물어봄)일 때만 시도했는데, 이미
+// "granted" 상태인데 구독 객체만 사라진 경우(구독 만료, 저장공간 초기화 등)를 놓쳐서 즐겨찾기를
+// 다시 추가해도 재구독이 전혀 안 되는 사고가 있었다 - "denied"(명시적으로 거부)만 제외한다.
 // 단, 브라우저는 권한을 코드로 "자동 허용"시키는 건 절대 허용하지 않는다 - 사용자가 그 네이티브
 // 팝업에서 직접 허용/거부를 선택해야 하며, 우리가 할 수 있는 건 그 팝업이 뜨는 타이밍뿐이다.
 window.addEventListener("favorites-changed", async () => {
@@ -133,7 +137,7 @@ window.addEventListener("favorites-changed", async () => {
   const existing = await reg.pushManager.getSubscription();
 
   if (!existing) {
-    if (Notification.permission === "default") await ensureSubscribed();
+    if (Notification.permission !== "denied") await ensureSubscribed();
     return;
   }
 
