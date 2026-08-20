@@ -101,31 +101,42 @@ self.addEventListener("push", (event) => {
   else if (isTransfer) badge = "/img/badge-transfer-96.png";
   else if (isLineup) badge = "/img/badge-lineup-96.png";
 
+  const baseOptions = {
+    body: payload.body || "",
+    icon,
+    badge,
+    vibrate: isGoal
+      ? [80, 40, 80, 40, 80, 40, 260]
+      : isConcede
+      ? [220, 100, 220]
+      : isRedCard
+      ? [60, 60, 60, 60, 60, 60, 260]
+      : isVarCancel || isWhistle
+      ? [150, 80, 150]
+      : [120, 60, 120],
+    tag: payload.matchId || undefined,
+    renotify: !!payload.matchId,
+    // 설정 탭에서 "알림 소리 끄기"를 켜면 서버가 payload.silent를 실어 보낸다 - true면 OS가
+    // 소리/진동 없이 조용히 알림만 띄운다(vibrate 배열이 있어도 silent가 우선한다).
+    silent: !!payload.silent,
+    data: { matchId: payload.matchId },
+  };
+
+  // 골 알림은 서버가 그때그때 득점팀 엠블럼+득점자+시간으로 그려주는 이미지 URL을 같이 보낸다
+  // (payload.image) - 안드로이드에서 알림을 펼치면 큰 사진처럼 보인다. 없으면 그냥 생략(일부
+  // 알림 종류는 이미지가 없음).
+  //
+  // 2026-08-20 확인 - 삼성인터넷(갤럭시 기본 브라우저, TWA 호스트로도 쓰일 수 있음)은 image 옵션이
+  // 있으면 showNotification 자체가 조용히 아무것도 안 띄우는 걸로 보인다(크롬은 정상). 그래서 먼저
+  // image를 포함해서 시도하고, 실패하면(또는 이 브라우저가 그냥 조용히 무시하면) image 없이 한 번 더
+  // 시도해서 최소한 제목/본문이라도 뜨게 한다.
   event.waitUntil(
-    self.registration.showNotification(payload.title || "PITCH PRO", {
-      body: payload.body || "",
-      icon,
-      badge,
-      vibrate: isGoal
-        ? [80, 40, 80, 40, 80, 40, 260]
-        : isConcede
-        ? [220, 100, 220]
-        : isRedCard
-        ? [60, 60, 60, 60, 60, 60, 260]
-        : isVarCancel || isWhistle
-        ? [150, 80, 150]
-        : [120, 60, 120],
-      tag: payload.matchId || undefined,
-      renotify: !!payload.matchId,
-      // 설정 탭에서 "알림 소리 끄기"를 켜면 서버가 payload.silent를 실어 보낸다 - true면 OS가
-      // 소리/진동 없이 조용히 알림만 띄운다(vibrate 배열이 있어도 silent가 우선한다).
-      silent: !!payload.silent,
-      // 골 알림은 서버가 그때그때 득점팀 엠블럼+득점자+시간으로 그려주는 이미지 URL을 같이 보낸다
-      // (payload.image) - 안드로이드에서 알림을 펼치면 큰 사진처럼 보인다. 없으면 그냥 생략(일부
-      // 알림 종류는 이미지가 없음).
-      ...(payload.image ? { image: payload.image } : {}),
-      data: { matchId: payload.matchId },
-    })
+    self.registration
+      .showNotification(payload.title || "PITCH PRO", {
+        ...baseOptions,
+        ...(payload.image ? { image: payload.image } : {}),
+      })
+      .catch(() => self.registration.showNotification(payload.title || "PITCH PRO", baseOptions))
   );
 });
 
