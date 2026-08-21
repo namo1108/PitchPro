@@ -18,10 +18,10 @@ const indexPath = path.join(DEST, "index.html");
 let indexHtml = fs.readFileSync(indexPath, "utf8");
 indexHtml = indexHtml.replace("<html lang=\"ko\">", '<html lang="ko" data-toss-app="1">');
 
-// 토스 알림(Notification.requestAgreement)은 @apps-in-toss/web-framework SDK가 필요한데, 이
-// 패키지는 valibot 등을 bare import하는 ESM이라 번들러 없이는 브라우저에서 못 읽는다 - 이 파일
-// 하나만 esbuild로 미리 번들링해서 앱인토스 빌드에만 끼워 넣는다(일반 웹 빌드는 이 스크립트 자체가
-// 없어 아무 영향이 없다 - frontend/js/push.js는 window.__pitchProTossNotify 존재 여부만 확인함).
+// 2026-08-22: toss-notifications.js(@apps-in-toss/web-framework 번들)를 끼워 넣었더니 앱인토스
+// 안에서 경기 화면/뉴스 등 전체가 먹통이 되는 사고가 있어서 일단 다시 뺐다 - 원인(SDK 초기화 코드가
+// 실제 토스 런타임 밖 다른 이유로 페이지 전체를 깨뜨리는 것으로 추정)을 제대로 잡을 때까지는 번들
+// 자체는 만들어두되(esbuild import는 유지) 실제 로드는 하지 않는다.
 esbuild.buildSync({
   entryPoints: [path.join(__dirname, "src", "toss-notifications.js")],
   bundle: true,
@@ -29,10 +29,6 @@ esbuild.buildSync({
   target: "es2020",
   outfile: path.join(DEST, "js", "toss-notifications.js"),
 });
-indexHtml = indexHtml.replace(
-  '<script type="module" src="/js/app.js"></script>',
-  '<script type="module" src="/js/toss-notifications.js"></script>\n  <script type="module" src="/js/app.js"></script>'
-);
 
 fs.writeFileSync(indexPath, indexHtml);
 
