@@ -18,6 +18,21 @@ export function isPushSupported() {
   return "serviceWorker" in navigator && "PushManager" in window;
 }
 
+// 앱인토스 빌드에서만 <html data-toss-app="1">이 심어진다(toss-app/copy-assets.cjs 참고).
+export function isTossApp() {
+  return document.documentElement.hasAttribute("data-toss-app");
+}
+
+// 토스 SDK(@apps-in-toss/web-framework)는 valibot 등을 bare import하는 ESM이라 번들러 없는 우리
+// 정적 프론트에서 그냥 import할 수 없다 - 그래서 toss-app/copy-assets.cjs가 esbuild로 별도
+// 번들링해서 앱인토스 빌드에만 끼워 넣고(toss-notifications.js), window에 함수 하나만 노출해둔다.
+// 일반 웹/PWA/안드로이드 빌드에는 이 스크립트 자체가 없어 함수도 없으므로 항상 안전하게 호출 전
+// 존재 여부를 확인한다.
+export function tryTossNotify() {
+  if (typeof window.__pitchProTossNotify !== "function") return false;
+  return window.__pitchProTossNotify();
+}
+
 async function getRegistration() {
   if (!isPushSupported()) return null;
   if (!swRegistration) swRegistration = await navigator.serviceWorker.register("/sw.js");
@@ -92,8 +107,17 @@ function syncNotifyButton(subscribed) {
 
 export function initPushButton() {
   const btn = document.getElementById("notify-btn");
-  if (!btn || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-    if (btn) btn.disabled = true;
+  if (!btn) return;
+
+  if (!isPushSupported()) {
+    // 토스 미니앱은 표준 푸시가 없으니 버튼을 꺼두는 대신, 토스 자체 알림 동의 화면을 띄운다.
+    // 이미 동의했으면 requestAgreement가 onEvent로 "alreadyAgreed"만 조용히 알려줄 뿐이라
+    // 버튼 자체를 "켜짐"으로 바꿔줄 방법이 없어서(별도 조회 API 없음), 문구는 그대로 둔다.
+    if (isTossApp()) {
+      btn.addEventListener("click", () => tryTossNotify());
+    } else {
+      btn.disabled = true;
+    }
     return;
   }
 
@@ -140,7 +164,12 @@ export function initPushButton() {
 // 팝업에서 직접 허용/거부를 선택해야 하며, 우리가 할 수 있는 건 그 팝업이 뜨는 타이밍뿐이다.
 window.addEventListener("favorites-changed", async () => {
   const reg = await getRegistration();
-  if (!reg) return;
+  if (!reg) {
+    // 앱인토스(토스 미니앱)는 서비스워커/푸시 자체가 없어 위 getRegistration이 항상 null인데,
+    // 대신 토스 자체 알림 동의 화면(Notification.requestAgreement)으로 같은 역할을 한다.
+    if (isTossApp()) tryTossNotify();
+    return;
+  }
   const existing = await reg.pushManager.getSubscription();
 
   if (!existing) {

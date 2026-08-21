@@ -131,6 +131,11 @@ export const KV_KEYS = {
   pushSubscriptionsIndex: "push:subs:index",
   pushSubscriptionPrefix: "push:sub:",
   pushUsernameIndexPrefix: "push:byusername:",
+  // 앱인토스(토스 미니앱)는 웹 표준 푸시(Service Worker/PushManager) 자체를 지원하지 않아서, 토스
+  // 자체 스마트발송 API(mTLS 인증, templateSetCode 기반)로 별도 경로를 둔다 - push:sub:*와 구조는
+  // 비슷하지만 브라우저 구독 객체 대신 토스가 주는 익명 키(anonKey)로 수신자를 식별한다.
+  tossSubscriptionPrefix: "toss:sub:",
+  tossUsernameIndexPrefix: "toss:byusername:",
   prevScores: "scores:prev:v1",
   prevStatuses: "status:prev:v1",
   lastRunPrefix: "lastrun:",

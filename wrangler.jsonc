@@ -10,6 +10,11 @@
   "kv_namespaces": [
     { "binding": "CACHE", "id": "4a82ab329c014cf781586986df945dbc" }
   ],
+  // 앱인토스(토스 미니앱) 스마트발송 API는 일반 API 키가 아니라 mTLS(상호 인증서) 인증만 지원해서,
+  // fetch()에 일반 헤더로는 인증할 수 없다 - Cloudflare의 mTLS 인증서 바인딩을 통해서만 호출 가능하다.
+  "mtls_certificates": [
+    { "binding": "TOSS_MTLS", "certificate_id": "848dc95d-68f1-46c1-a337-fc244d037480" }
+  ],
   // Cloudflare Cron Trigger의 최소 단위(1분)까지 당겼다. 이보다 더 빠른 골/상태변화 감지는
   // src/scheduled/pollLiveMatches.js가 각 tick 안에서 라이브 경기가 있는 동안 10초 간격으로
   // 추가로 반복 조회해서 보완한다(2026-07-19, API-Football Pro 플랜 일 7500회 여유 확인 후 적용).

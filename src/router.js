@@ -25,6 +25,7 @@ import {
   handleSetPreferences,
   handleTestPush,
 } from "./routes/push.js";
+import { handleTossSubscribe, handleTossWatchMatch } from "./routes/toss.js";
 import {
   handleGoalNotificationImage,
   handleMatchStatusNotificationImage,
@@ -180,6 +181,12 @@ export async function routeApiRequest(request, env, ctx) {
   }
   if (segments[1] === "admin" && segments[2] === "test-push" && request.method === "POST") {
     return handleTestPush(request, env);
+  }
+  if (segments[1] === "toss" && segments[2] === "subscribe" && request.method === "POST") {
+    return handleTossSubscribe(request, env);
+  }
+  if (segments[1] === "toss" && segments[2] === "watch-match" && request.method === "POST") {
+    return handleTossWatchMatch(request, env);
   }
   if (segments[1] === "auth" && segments[2] === "signup" && request.method === "POST") {
     return handleSignup(request, env);

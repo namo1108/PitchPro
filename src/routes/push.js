@@ -2,6 +2,7 @@ import { json } from "../lib/http.js";
 import { KV_KEYS, NOTIFICATION_TYPES } from "../lib/config.js";
 import { getAuthedUser } from "../lib/auth.js";
 import { sendPushToUsername } from "../lib/push.js";
+import { sendTossPushToUsername } from "../lib/tossPush.js";
 
 async function hashEndpoint(endpoint) {
   const data = new TextEncoder().encode(endpoint);
@@ -144,13 +145,22 @@ export async function handleTestPush(request, env) {
   const body = await request.json();
   if (!body?.username) return json({ detail: "username이 필요합니다." }, 400);
 
-  const sent = await sendPushToUsername(env, body.username, {
+  const payload = {
     type: body.type || "goal",
     title: body.title || "🔔 테스트 알림",
     body: body.body || "이 알림이 보이면 백그라운드 푸시가 정상 동작하는 거예요.",
     ...(body.image ? { image: body.image } : {}),
-  });
+  };
 
-  if (!sent) return json({ detail: "구독을 찾을 수 없거나 발송에 실패했습니다 (자세한 사유는 wrangler tail 로그 참고)." }, 404);
-  return json({ status: "ok" });
+  // 같은 계정이 웹 푸시/토스 미니앱 양쪽 다 구독해뒀을 수 있어서 둘 다 시도하고, 둘 중 하나라도
+  // 성공하면 성공으로 본다 - 어느 쪽으로 갔는지는 응답에 같이 실어서 관리자 화면에서 구분할 수 있게 한다.
+  const [webPushSent, tossSent] = await Promise.all([
+    sendPushToUsername(env, body.username, payload),
+    sendTossPushToUsername(env, body.username, payload),
+  ]);
+
+  if (!webPushSent && !tossSent) {
+    return json({ detail: "구독을 찾을 수 없거나 발송에 실패했습니다 (자세한 사유는 wrangler tail 로그 참고)." }, 404);
+  }
+  return json({ status: "ok", webPushSent, tossSent });
 }
