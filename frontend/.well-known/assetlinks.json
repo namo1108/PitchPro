@@ -4,7 +4,10 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.pitchpro.live",
-      "sha256_cert_fingerprints": ["7F:F5:A0:D1:6D:BD:09:A2:51:B1:18:8B:67:C6:CF:1A:B4:81:92:CF:08:3A:4E:51:F8:A1:CC:69:06:59:FE:97"]
+      "sha256_cert_fingerprints": [
+        "7F:F5:A0:D1:6D:BD:09:A2:51:B1:18:8B:67:C6:CF:1A:B4:81:92:CF:08:3A:4E:51:F8:A1:CC:69:06:59:FE:97",
+        "42:4D:E4:51:C9:6C:36:A0:0F:54:08:2B:18:F9:C3:6B:1F:53:95:4C:51:AA:AB:E2:F5:7E:80:49:FE:5C:02:AB"
+      ]
     }
   }
 ]
