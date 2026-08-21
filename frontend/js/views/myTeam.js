@@ -1,6 +1,6 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange } from "../router.js";
-import { crestImg, formatKickoff, formBadgesHtml } from "../format.js";
+import { crestImg, formatMatchDateTime, formBadgesHtml } from "../format.js";
 import { listFavorites, toggleFavorite } from "../favorites.js";
 import { goToTeam } from "./teamDetail.js";
 import { openSoccerSchool } from "./soccerSchool.js";
@@ -688,7 +688,7 @@ export async function loadMyTeam() {
 function renderCard(fav, data) {
   const next = data?.upcomingMatches?.[0];
   const nextHtml = next
-    ? `<div class="myteam-next">다음 경기: ${next.homeTeam.shortName || next.homeTeam.name} vs ${next.awayTeam.shortName || next.awayTeam.name} · ${formatKickoff(next.utcDate)}</div>`
+    ? `<div class="myteam-next">다음 경기: ${next.homeTeam.shortName || next.homeTeam.name} vs ${next.awayTeam.shortName || next.awayTeam.name} · ${formatMatchDateTime(next.utcDate)}</div>`
     : '<div class="myteam-next">예정된 경기 정보 없음</div>';
 
   const form = formBadgesHtml(data?.recentMatches, fav.id, 5);
