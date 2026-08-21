@@ -712,6 +712,14 @@ html[data-toss-app] .more-menu {
   opacity: 1;
 }
 
+.watch-bell-unsupported {
+  opacity: 0.2;
+}
+
+.watch-bell-unsupported:hover {
+  transform: none;
+}
+
 .hero-match-card {
   position: relative;
   overflow: hidden;

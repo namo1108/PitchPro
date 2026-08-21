@@ -11,8 +11,15 @@ function urlBase64ToUint8Array(base64String) {
 
 let swRegistration = null;
 
+// 앱인토스(토스 미니앱) WebView처럼 서비스워커/푸시 자체를 지원하지 않는 환경이 있다 - 이 경우
+// "권한이 없어서" 실패하는 게 아니라 애초에 기능 자체가 없는 거라, 호출부가 다른 안내 문구를
+// 보여줄 수 있게 구분해서 노출한다.
+export function isPushSupported() {
+  return "serviceWorker" in navigator && "PushManager" in window;
+}
+
 async function getRegistration() {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  if (!isPushSupported()) return null;
   if (!swRegistration) swRegistration = await navigator.serviceWorker.register("/sw.js");
   return swRegistration;
 }

@@ -18,7 +18,7 @@ import {
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
 import { isWatched, toggleWatch } from "../watchlist.js";
-import { setMatchWatch } from "../push.js";
+import { setMatchWatch, isPushSupported } from "../push.js";
 import { isFavorite } from "../favorites.js";
 import { saveViewState } from "../viewState.js";
 import { getTheme } from "../theme.js";
@@ -593,6 +593,19 @@ function watchBellHtml(matchId) {
 }
 
 function attachWatchBells(root) {
+  // 앱인토스(토스 미니앱) WebView처럼 서비스워커/푸시 자체가 없는 환경에서는 눌러봐야 항상 실패하니,
+  // 매번 토글 -> 실패 -> 되돌리기를 반복시키지 말고 처음부터 흐리게 표시하고 바로 안내만 띄운다.
+  if (!isPushSupported()) {
+    root.querySelectorAll("[data-watch-id]").forEach((bellEl) => {
+      bellEl.classList.add("watch-bell-unsupported");
+      bellEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        alert("이 환경(토스 앱 등)에서는 경기 알림 기능을 지원하지 않아요. 웹사이트나 안드로이드 앱에서 이용해주세요.");
+      });
+    });
+    return;
+  }
+
   root.querySelectorAll("[data-watch-id]").forEach((bellEl) => {
     bellEl.addEventListener("click", async (e) => {
       e.stopPropagation();
