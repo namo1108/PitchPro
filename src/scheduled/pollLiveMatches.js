@@ -1,5 +1,5 @@
 import { getJSON, putJSON } from "../lib/kv.js";
-import { KV_KEYS } from "../lib/config.js";
+import { KV_KEYS, COMPETITIONS } from "../lib/config.js";
 import * as apiFootball from "../sources/apiFootball.js";
 import { normalizeFixture } from "../adapters/apiFootballAdapter.js";
 import { detectGoalsAndNotify } from "./detectGoalsAndNotify.js";
@@ -20,6 +20,14 @@ const POLL_DURATION_MS = 50 * 1000;
 // 비용 부담이 없어 매번 확인한다.
 const CARD_CHECK_INTERVAL_MS = 15 * 1000;
 
+// live=all은 리그 구분 없이 전세계 라이브 경기를 다 반환하는데(2026-08-22 확인 - 동시에 67개, 대부분
+// COMPETITIONS에 없는 해외 하부/유스 리그), 이 루프의 "계속 돌 이유가 있는지" 판단을 전세계 기준으로
+// 하면 지구 어딘가는 항상 경기가 있어 사실상 하루 종일 멈추지 않는다 - API-Football 분당 호출 한도를
+// 이 루프 혼자서(최대 분당 50콜) 갉아먹는 주범이었다. 우리가 실제로 다루는 대회에 라이브 경기가 있을
+// 때만 이 빠른 폴링을 계속한다(매치 자체 캐시/알림 대상 필터링과는 무관 - 그건 이미 detectCardsAndNotify
+// 등에서 구독자 기준으로 한 번 더 거른다).
+const TRACKED_CODES = new Set(COMPETITIONS.map((c) => c.code));
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Cloudflare Cron Trigger는 1분보다 촘촘히는 못 돌리는데, 골/상태변화 알림을 그보다 훨씬 빠르게
@@ -35,7 +43,7 @@ export async function pollLiveMatches(env) {
   while (Date.now() < deadline) {
     const matchesBlob = await getJSON(env, KV_KEYS.matches);
     const cached = matchesBlob?.matches || [];
-    if (!cached.some((m) => m.status === "IN_PLAY" || m.status === "PAUSED")) return; // 라이브 경기가 없으면 더 돌 필요 없음
+    if (!cached.some((m) => (m.status === "IN_PLAY" || m.status === "PAUSED") && TRACKED_CODES.has(m.competition.code))) return; // 우리 대회 중 라이브 경기가 없으면 더 돌 필요 없음
 
     let liveRaw;
     try {
