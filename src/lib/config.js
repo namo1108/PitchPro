@@ -204,6 +204,13 @@ export const COMMUNITY_BODY_MAX_LENGTH = 3000;
 export const COMMUNITY_COMMENT_MAX_LENGTH = 500;
 
 export const DETAIL_CACHE_TTL_SECONDS = 300;
+// 라이브 경기는 최신 상태를 보여줘야 해서 예전엔 아예 캐싱을 안 했는데, 그러다 보니 페이지를 여는
+// 그 순간 라인업/통계/이벤트 조회 중 하나라도 레이트리밋 등으로 실패하면(재시도 없음) 그대로 빈 값이
+// 나갔다 - 같은 경기를 몇 초 뒤 새로고침하면 되긴 하지만 사용자 입장에선 "데이터가 안 온다"로 보인다
+// (2026-08-22 제보: 같은 라이브 경기를 7~9초 간격으로 다시 불러도 lineups가 0/2를 오갔음). 완전히
+// 성공한 응답만 아주 짧게 캐싱해서, 다음 요청이 하필 레이트리밋에 걸린 순간이어도 방금 성공한
+// 값을 대신 보여주게 한다(신선도는 이 정도 지연이면 체감상 문제 없음).
+export const LIVE_DETAIL_CACHE_TTL_SECONDS = 15;
 
 export const REFRESH_INTERVALS_MS = {
   news: 20 * 60 * 1000,

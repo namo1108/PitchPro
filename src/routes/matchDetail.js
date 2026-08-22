@@ -1,6 +1,6 @@
 import { json } from "../lib/http.js";
 import { getJSON, putJSON } from "../lib/kv.js";
-import { KV_KEYS, DETAIL_CACHE_TTL_SECONDS, findBroadcastLink } from "../lib/config.js";
+import { KV_KEYS, DETAIL_CACHE_TTL_SECONDS, LIVE_DETAIL_CACHE_TTL_SECONDS, findBroadcastLink } from "../lib/config.js";
 import { findKLeagueVenue } from "../lib/kleagueVenues.js";
 import * as apiFootball from "../sources/apiFootball.js";
 import {
@@ -171,6 +171,7 @@ export async function handleMatchDetail(request, env, id) {
   // 마지막 순서라 그랬을 뿐, 서로 결과를 필요로 하지 않는 독립적인 조회라 병렬로 불러도 된다).
   // 동시에 불러서 가장 느린 호출 하나만큼만 기다리면 되게 바꿨다.
   let ratingsMap = {};
+  let hadFetchError = false;
 
   const fetchTasks = [
     apiFootball
@@ -179,7 +180,10 @@ export async function handleMatchDetail(request, env, id) {
         match.lineups = normalizeLineups(lineupsRaw.response);
         match.tacticalNote = buildTacticalNote(match.lineups, match.homeTeam.id, match.homeTeam.name, match.awayTeam.name);
       })
-      .catch((err) => console.error("fixture lineups fetch failed:", err)),
+      .catch((err) => {
+        console.error("fixture lineups fetch failed:", err);
+        hadFetchError = true;
+      }),
   ];
 
   if (isLive || isFinished) {
@@ -191,19 +195,28 @@ export async function handleMatchDetail(request, env, id) {
           match.cardEvents = normalizeCardEvents(eventsRaw.response);
           match.substitutions = normalizeSubstitutionEvents(eventsRaw.response);
         })
-        .catch((err) => console.error("fixture events fetch failed:", err)),
+        .catch((err) => {
+          console.error("fixture events fetch failed:", err);
+          hadFetchError = true;
+        }),
       apiFootball
         .getFixtureStatistics(env, id)
         .then((statsRaw) => {
           match.statistics = normalizeStatistics(statsRaw.response);
         })
-        .catch((err) => console.error("fixture statistics fetch failed:", err)),
+        .catch((err) => {
+          console.error("fixture statistics fetch failed:", err);
+          hadFetchError = true;
+        }),
       apiFootball
         .getFixturePlayers(env, id)
         .then((playersRaw) => {
           ratingsMap = normalizePlayerRatings(playersRaw.response);
         })
-        .catch((err) => console.error("fixture player ratings fetch failed:", err))
+        .catch((err) => {
+          console.error("fixture player ratings fetch failed:", err);
+          hadFetchError = true;
+        })
     );
   }
 
@@ -254,6 +267,8 @@ export async function handleMatchDetail(request, env, id) {
 
   if (isFinished) {
     await putJSON(env, cacheKey, match, { expirationTtl: DETAIL_CACHE_TTL_SECONDS });
+  } else if (isLive && !hadFetchError) {
+    await putJSON(env, cacheKey, match, { expirationTtl: LIVE_DETAIL_CACHE_TTL_SECONDS });
   }
   return json(match);
 }
