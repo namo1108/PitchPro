@@ -22,16 +22,22 @@ export async function notifyLineups(env) {
   const all = matchesBlob?.matches || [];
   const now = Date.now();
 
+  const subscriptions = await loadSubscriptions(env);
+
+  // pollLiveMatches.js가 live=all로 전세계 라이브 경기를 전부 캐시에 합쳐두기 때문에, 여기서
+  // 상태/시간대만 보고 후보를 걸러내면 아무도 구독 안 한 해외 하부리그 경기까지 매 틱 라인업을
+  // 조회하게 된다(detectCardsAndNotify.js의 watchedLive와 같은 이유로 API-Football 레이트리밋을
+  // 갉아먹는 주범 중 하나였음, 2026-08-22). 구독자가 실제로 관심 있는 경기만 조회한다.
   const candidates = all.filter((m) => {
     if (m.lineupsAnnounced) return false; // 이미 확인 끝난 경기는 다시 안 봄
     if (!["SCHEDULED", "TIMED", "IN_PLAY"].includes(m.status)) return false;
     const untilKickoff = new Date(m.utcDate).getTime() - now;
-    return untilKickoff > -POST_KICKOFF_GRACE_MS && untilKickoff <= WINDOW_MAX_MS;
+    if (untilKickoff <= -POST_KICKOFF_GRACE_MS || untilKickoff > WINDOW_MAX_MS) return false;
+    return filterInterested(subscriptions, m).length > 0;
   });
 
   if (!candidates.length) return;
 
-  const subscriptions = await loadSubscriptions(env);
   let matchesChanged = false;
 
   for (const match of candidates) {

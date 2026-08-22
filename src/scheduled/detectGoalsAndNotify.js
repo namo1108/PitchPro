@@ -125,6 +125,11 @@ export async function detectGoalsAndNotify(env) {
   if (subscriptions.length === 0) return;
 
   for (const { match, scoringTeamId, otherTeamId, count } of scoredEvents) {
+    // live=all이 전세계 라이브 경기를 전부 캐시에 합쳐두기 때문에(pollLiveMatches.js), 아무도 구독
+    // 안 한 해외 경기의 골까지 매번 득점자 조회(getFixtureEvents)를 하면 레이트리밋만 갉아먹는다
+    // (2026-08-22) - 관심있는 구독자가 없으면 이벤트 조회 자체를 건너뛴다.
+    if (filterInterested(subscriptions, match).length === 0) continue;
+
     const home = match.score.fullTime.home;
     const away = match.score.fullTime.away;
     const teamGoals = await getTeamGoalEvents(env, match.id, scoringTeamId);
