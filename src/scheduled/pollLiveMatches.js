@@ -19,6 +19,10 @@ const POLL_DURATION_MS = 50 * 1000;
 // 유지되도록 틱 카운트 대신 시간으로 계산). 골/킥오프/하프타임/종료는 live=all 하나로 전체를 커버해서
 // 비용 부담이 없어 매번 확인한다.
 const CARD_CHECK_INTERVAL_MS = 15 * 1000;
+// 레이트리밋에 걸린 직후에도 바로 다음 초에 또 부르면(POLL_INTERVAL_MS) 분당 한도가 회복될 틈이 없이
+// 계속 실패만 반복한다(2026-08-22, 여러 대회가 동시 라이브인 토요일 오후에 몇 분간 지속 확인) - 레이트
+// 리밋 응답을 받으면 이 구간만큼은 더 길게 쉬어서 한도가 돌아올 시간을 준다.
+const RATE_LIMIT_BACKOFF_MS = 5 * 1000;
 
 // live=all은 리그 구분 없이 전세계 라이브 경기를 다 반환하는데(2026-08-22 확인 - 동시에 67개, 대부분
 // COMPETITIONS에 없는 해외 하부/유스 리그), 이 루프의 "계속 돌 이유가 있는지" 판단을 전세계 기준으로
@@ -52,10 +56,11 @@ export async function pollLiveMatches(env) {
       console.error("live=all fetch failed:", err);
       // 라이브 경기가 있는 동안 이 호출이 막히면(레이트리밋 등) 골/카드 감지가 그 몇 초~몇 분간
       // 통째로 끊긴다 - 다른 크론 실패처럼 조용히 캐시로 폴백할 데이터 자체가 없어서 더 치명적이다.
-      if (/rateLimit/.test(err.message)) {
+      const isRateLimit = /rateLimit/.test(err.message);
+      if (isRateLimit) {
         await alertAdminOfFailure(env, "livepoll-ratelimit", err).catch(() => {});
       }
-      await sleep(POLL_INTERVAL_MS);
+      await sleep(isRateLimit ? RATE_LIMIT_BACKOFF_MS : POLL_INTERVAL_MS);
       continue;
     }
 
