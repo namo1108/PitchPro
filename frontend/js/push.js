@@ -109,15 +109,13 @@ export function initPushButton() {
   const btn = document.getElementById("notify-btn");
   if (!btn) return;
 
+  // 2026-08-22 - 이 버튼에 토스 알림 동의 요청을 연결했더니(favorites-changed/matches.js의
+  // isTossApp 분기와 동시에 존재할 때만) 토스 미니앱 전체가 먹통이 되는 재현되는 사고가 있었다
+  // (여러 번 비교 테스트로 확인, 정확한 원인은 못 찾음 - 세 지점을 각각 넣었을 땐 멀쩡한데 셋을
+  // 합치면 깨짐). 즐겨찾기 시 자동으로 뜨는 동의 화면(favorites-changed 참고)으로도 같은 목적을
+  // 달성하니, 이 버튼은 안전하게 그냥 꺼둔다.
   if (!isPushSupported()) {
-    // 토스 미니앱은 표준 푸시가 없으니 버튼을 꺼두는 대신, 토스 자체 알림 동의 화면을 띄운다.
-    // 이미 동의했으면 requestAgreement가 onEvent로 "alreadyAgreed"만 조용히 알려줄 뿐이라
-    // 버튼 자체를 "켜짐"으로 바꿔줄 방법이 없어서(별도 조회 API 없음), 문구는 그대로 둔다.
-    if (isTossApp()) {
-      btn.addEventListener("click", () => tryTossNotify());
-    } else {
-      btn.disabled = true;
-    }
+    if (btn) btn.disabled = true;
     return;
   }
 
