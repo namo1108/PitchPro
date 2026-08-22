@@ -32,6 +32,14 @@ const state = {
   // 경기 상세는 목록 캐시로 먼저 한 번(라인업/스탯 없음) 그리고, 전체 조회가 끝나면 다시 그린다 -
   // 같은 경기를 다시 그릴 때는 그 사이 사용자가 눌러둔 탭(라인업 등)을 유지해야 한다(renderMatchDetail 참고).
   detailMatchId: null,
+  // /api/matches는 live=all로 전세계 라이브 경기를 다 캐시에 합쳐서(pollLiveMatches.js) 코드에 없는
+  // 변방 리그(해외 하부/유스 리그 등)까지 그대로 섞여 나온다 - 목록이 그 리그 수만큼 늘어나 원하는
+  // 경기를 찾기 힘들다는 제보(2026-08-22)로, 기본은 아는 리그(=/competitions에 등록된 대회)만 보여주고
+  // 나머지는 "다른 리그 보기"에서 사용자가 직접 고른 것만 추가로 보여준다. 마지막으로 받은 원본
+  // matches를 들고 있어야 리그 선택이 바뀔 때 새로고침 없이 바로 다시 그릴 수 있다.
+  lastMatches: null,
+  extraLeagueCodes: loadExtraLeagueCodes(),
+  pickerOpen: false,
 };
 
 const el = {
@@ -44,6 +52,43 @@ const el = {
   dateInput: document.getElementById("date-picker-input"),
   detailContent: document.getElementById("match-detail-content"),
 };
+
+const EXTRA_LEAGUES_KEY = "pitchpro.extraLeagues";
+
+function loadExtraLeagueCodes() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(EXTRA_LEAGUES_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveExtraLeagueCodes() {
+  try {
+    localStorage.setItem(EXTRA_LEAGUES_KEY, JSON.stringify([...state.extraLeagueCodes]));
+  } catch {
+    // 저장 실패해도(용량 초과 등) 이번 세션 안에서 선택 자체는 정상 동작하니 조용히 무시.
+  }
+}
+
+// /competitions는 config.js에 등록된(=이름 있는) 대회만 돌려준다. 이 목록에 없는 코드는 전부
+// live=all이 섞어온 변방 리그로 보고 기본 목록에서 뺀다. 탭 진입마다 새로 부를 필요 없어 한 번만
+// 받아서 모듈 레벨에 캐싱한다.
+// renderMatches는 여러 곳(최초 로드/자동 갱신/리그 선택 토글)에서 동기적으로 다시 불릴 수 있어서
+// async로 만들지 않고, 최초 한 번만 fetch를 기다린 뒤(loadMatches에서 await) 이 변수를 읽게 한다.
+// null이면 "아직 못 받음 또는 실패" -> 필터링 없이 예전처럼 전부 보여준다(fail-open).
+let curatedCodes = null;
+let curatedCodesPromise = null;
+function ensureCuratedCodes() {
+  if (!curatedCodesPromise) {
+    curatedCodesPromise = fetchJSON("/competitions")
+      .then((data) => {
+        curatedCodes = new Set((data.competitions || []).map((c) => c.code));
+      })
+      .catch(() => {}); // 실패하면 curatedCodes는 null로 남아 필터링을 건너뛴다.
+  }
+  return curatedCodesPromise;
+}
 
 export function setDayOffset(offset) {
   state.dayOffset = offset;
@@ -60,8 +105,9 @@ export async function loadMatches(opts = {}) {
   ensureKLeagueRankMap(); // 백그라운드로 미리 채워둠(주요경기 우선순위 계산용) - 못 채워도 기존 정렬로 조용히 대체됨
   try {
     const iso = toISODate(dateWithOffset(state.dayOffset));
-    const data = await fetchJSON(`/matches?date=${iso}`);
+    const [data] = await Promise.all([fetchJSON(`/matches?date=${iso}`), ensureCuratedCodes()]);
     const matches = data.matches || [];
+    state.lastMatches = matches;
     renderMatches(matches);
     state.loadedOffsets.add(state.dayOffset);
     if (!opts.silent && !alreadyLoaded) fadeIn(el.matchesList);
@@ -545,10 +591,31 @@ function renderMatches(matches) {
     groups.get(key).matches.push(m);
   });
 
+  // 코드에 없는(=/competitions에 없는) 변방 리그는 기본적으로 접어서 숨긴다 - 단, 즐겨찾기한 팀이나
+  // 🔔로 개별 지정한 경기가 그 리그에 있으면 사용자가 실제로 원해서 보는 경기이니 숨기지 않는다.
+  // curatedCodes가 아직 안 왔으면(null, 최초 프리페치 실패 등) 필터링 없이 예전처럼 전부 보여준다.
+  // "다른 리그 보기" 패널은 선택을 껐다 켰다 할 수 있어야 하므로, 변방 리그는 선택 여부와 무관하게
+  // 전부 pickerCandidates에 넣어두고(체크박스 상태만 선택 여부를 반영), 실제 목록에 보일지는
+  // visibleGroups에서 따로 판단한다.
+  const alwaysShow = (m) => isFavorite(m.homeTeam.id) || isFavorite(m.awayTeam.id) || isWatched(m.id);
+  const pickerCandidates = [];
+  const visibleGroups = [];
+  for (const group of groups.values()) {
+    const isCurated = !curatedCodes || curatedCodes.has(group.info.code);
+    if (isCurated) {
+      visibleGroups.push(group);
+      continue;
+    }
+    pickerCandidates.push(group);
+    if (state.extraLeagueCodes.has(group.info.code) || group.matches.some(alwaysShow)) {
+      visibleGroups.push(group);
+    }
+  }
+
   // 친선경기는 대회가 아니라 부가적인 목록이라 순서와 상관없이 항상 맨 아래, 그 위로는
   // K리그 -> 챔스 -> 5대리그 -> 컵대회 순으로 그룹을 재배열한다(Array.sort는 안정 정렬이라
   // 같은 우선순위 안에서는 기존 순서를 유지한다).
-  const orderedGroups = [...groups.values()].sort((a, b) => {
+  const orderedGroups = visibleGroups.sort((a, b) => {
     const aFriendly = a.info.code === "FRIENDLY" ? 1 : 0;
     const bFriendly = b.info.code === "FRIENDLY" ? 1 : 0;
     if (aFriendly !== bFriendly) return aFriendly - bFriendly;
@@ -584,6 +651,52 @@ function renderMatches(matches) {
 
     el.matchesList.appendChild(groupEl);
   });
+
+  if (pickerCandidates.length) el.matchesList.appendChild(renderLeaguePicker(pickerCandidates));
+}
+
+// 코드에 없는(변방) 리그 중 오늘 실제로 경기가 있는 것만 후보로 모아 "다른 리그 보기"에 체크박스로
+// 보여준다 - 이미 선택해서 목록에 보이는 리그도 여기 그대로 남겨둬서 체크를 풀어 다시 숨길 수 있다.
+function renderLeaguePicker(pickerCandidates) {
+  const wrap = document.createElement("div");
+  wrap.className = "league-picker";
+
+  const toggle = document.createElement("button");
+  toggle.className = `league-picker-toggle ${state.pickerOpen ? "open" : ""}`;
+  toggle.innerHTML = `<span>+ 다른 리그 보기</span><span class="league-group-count">${pickerCandidates.length}</span><span class="league-group-toggle-arrow">▾</span>`;
+  toggle.addEventListener("click", () => {
+    state.pickerOpen = !state.pickerOpen;
+    if (state.lastMatches) renderMatches(state.lastMatches);
+  });
+  wrap.appendChild(toggle);
+
+  if (state.pickerOpen) {
+    const body = document.createElement("div");
+    body.className = "league-picker-body";
+    pickerCandidates
+      .slice()
+      .sort((a, b) => b.matches.length - a.matches.length)
+      .forEach((group) => {
+        const checked = state.extraLeagueCodes.has(group.info.code);
+        const row = document.createElement("label");
+        row.className = "league-picker-row";
+        row.innerHTML = `<input type="checkbox" data-league-code="${group.info.code}" ${checked ? "checked" : ""} />${emblemImg(group.info, "league-row-emblem")}<span class="league-row-name">${group.info.name}</span><span class="league-group-count">${group.matches.length}</span>`;
+        body.appendChild(row);
+      });
+    wrap.appendChild(body);
+
+    body.querySelectorAll("[data-league-code]").forEach((checkbox) => {
+      checkbox.addEventListener("change", (e) => {
+        const code = e.target.dataset.leagueCode;
+        if (e.target.checked) state.extraLeagueCodes.add(code);
+        else state.extraLeagueCodes.delete(code);
+        saveExtraLeagueCodes();
+        if (state.lastMatches) renderMatches(state.lastMatches);
+      });
+    });
+  }
+
+  return wrap;
 }
 
 // 경기별 알림 벨(★즐겨찾기와 무관하게 이 경기 하나만 골 알림)의 공용 마크업.
