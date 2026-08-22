@@ -68,9 +68,11 @@ export async function fetchAndStoreMatches(env, existing) {
   const to = [isoDateOffset(MATCH_WINDOW_DAYS_AFTER), MATCH_SCHEDULE_END_DATE].sort().at(-1);
 
   const existingByCode = new Map();
+  const liveById = new Map();
   for (const m of existing?.matches || []) {
     if (!existingByCode.has(m.competition.code)) existingByCode.set(m.competition.code, []);
     existingByCode.get(m.competition.code).push(m);
+    if (m.status === "IN_PLAY" || m.status === "PAUSED") liveById.set(m.id, m);
   }
 
   const urgencyByCode = new Map(COMPETITIONS.map((c) => [c.code, competitionUrgency(c, existingByCode)]));
@@ -119,8 +121,25 @@ export async function fetchAndStoreMatches(env, existing) {
     ).catch(() => {});
   }
 
-  // 내용이 지난 틱과 완전히 같으면(비활성 시간대 등) 굳이 다시 안 써서 KV 무료 플랜의 하루 쓰기 한도를 아낀다.
-  if (JSON.stringify(allMatches) === JSON.stringify(existing?.matches || [])) return;
+  // 리그별 스윕(이 함수)과 라이브 빠른 폴링(pollLiveMatches.js의 live=all, 1초 간격)이 같은 경기를
+  // 서로 다른 타이밍에 갱신하다 보니, 스윕 쪽 API-Football 응답이 한 틱 뒤처진 스코어를 들고 오면
+  // 진행 중이던 경기의 스코어가 순간적으로 "줄어든 것처럼" 캐시에 덮어써진다 - 골 감지 크론은 이걸
+  // "진짜로 두 틱 연속 관찰된 새 값"으로 오인해 골 취소 알림을 보내고, 곧이어 빠른 폴링이 다시 원래
+  // 값으로 되돌리면 그것도 두 틱 연속으로 관찰돼 골 알림을 또 보낸다 - 이 반복이 사용자에게 "골/골
+  // 취소가 계속 반복해서 온다"로 보였다(2026-08-22, K4 기장군민 vs 진주시민, 레이트리밋으로 두 조회
+  // 경로가 동시에 불안정했던 구간에서 확인). 그래서 스윕이 어떤 경기를 여전히 IN_PLAY/PAUSED로
+  // 보고하면(즉 종료 등 실제 상태 전이가 아니면) 스코어만큼은 더 실시간인 빠른 폴링 쪽 값을 그대로
+  // 유지한다 - 상태 전이(FINISHED 등)는 이 스윕이 유일한 감지 경로라 그대로 반영되게 둔다.
+  const merged = allMatches.map((m) => {
+    const prevLive = liveById.get(m.id);
+    if (prevLive && (m.status === "IN_PLAY" || m.status === "PAUSED")) {
+      return { ...m, score: prevLive.score };
+    }
+    return m;
+  });
 
-  await putJSON(env, KV_KEYS.matches, { matches: allMatches, lastUpdated: new Date().toISOString() });
+  // 내용이 지난 틱과 완전히 같으면(비활성 시간대 등) 굳이 다시 안 써서 KV 무료 플랜의 하루 쓰기 한도를 아낀다.
+  if (JSON.stringify(merged) === JSON.stringify(existing?.matches || [])) return;
+
+  await putJSON(env, KV_KEYS.matches, { matches: merged, lastUpdated: new Date().toISOString() });
 }
