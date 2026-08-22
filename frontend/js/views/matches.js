@@ -18,7 +18,7 @@ import {
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
 import { isWatched, toggleWatch } from "../watchlist.js";
-import { setMatchWatch, isPushSupported, isTossApp } from "../push.js";
+import { setMatchWatch, isPushSupported, isTossApp, tryTossWatchMatch } from "../push.js";
 import { isFavorite } from "../favorites.js";
 import { saveViewState } from "../viewState.js";
 import { getTheme } from "../theme.js";
@@ -593,20 +593,36 @@ function watchBellHtml(matchId) {
 }
 
 function attachWatchBells(root) {
-  // 앱인토스(토스 미니앱) WebView처럼 서비스워커/푸시 자체가 없는 환경에서는 눌러봐야 항상 실패하니,
-  // 매번 토글 -> 실패 -> 되돌리기를 반복시키지 말고 처음부터 흐리게 표시하고 바로 안내만 띄운다.
+  // 앱인토스(토스 미니앱)는 표준 푸시가 없지만, 토스 자체 알림 동의 화면(watch-match)으로 경기별
+  // 지켜보기를 지원한다 - 그 외(표준 푸시 자체가 없는 다른 환경)에서만 "지원 안 함"으로 안내한다.
+  if (isTossApp()) {
+    root.querySelectorAll("[data-watch-id]").forEach((bellEl) => {
+      bellEl.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const matchId = bellEl.dataset.watchId;
+        const nowWatched = toggleWatch(matchId);
+        bellEl.classList.toggle("active", nowWatched);
+        bellEl.textContent = nowWatched ? "🔔" : "🔕";
+
+        const ok = await tryTossWatchMatch(matchId, nowWatched);
+        if (!ok) {
+          const reverted = toggleWatch(matchId);
+          bellEl.classList.toggle("active", reverted);
+          bellEl.textContent = reverted ? "🔔" : "🔕";
+        }
+      });
+    });
+    return;
+  }
+
+  // 그 외 표준 푸시 자체를 지원 안 하는 환경은 눌러봐야 항상 실패하니, 매번 토글 -> 실패 -> 되돌리기를
+  // 반복시키지 말고 처음부터 흐리게 표시하고 바로 안내만 띄운다.
   if (!isPushSupported()) {
     root.querySelectorAll("[data-watch-id]").forEach((bellEl) => {
       bellEl.classList.add("watch-bell-unsupported");
       bellEl.addEventListener("click", (e) => {
         e.stopPropagation();
-        // 토스는 경기 하나만 콕 집어 지켜보는 기능은 없지만, 즐겨찾기한 팀 알림은 별도로 지원한다
-        // (나의 팀 탭 참고) - 그래서 "아예 안 됨"이 아니라 대안을 안내한다.
-        alert(
-          isTossApp()
-            ? "토스 앱에서는 경기별 개별 알림은 지원하지 않아요. '나의 팀'에서 즐겨찾기하면 그 팀 알림을 받을 수 있어요."
-            : "이 환경에서는 경기 알림 기능을 지원하지 않아요. 웹사이트나 안드로이드 앱에서 이용해주세요."
-        );
+        alert("이 환경에서는 경기 알림 기능을 지원하지 않아요. 웹사이트나 안드로이드 앱에서 이용해주세요.");
       });
     });
     return;

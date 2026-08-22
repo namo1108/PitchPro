@@ -49,3 +49,38 @@ window.__pitchProTossNotify = function requestTossNotificationAgreement() {
   });
   return true;
 };
+
+// 경기 화면의 🔔 벨(matches.js attachWatchBells)이 이 이름을 찾아 호출한다 - 즐겨찾기 팀과
+// 무관하게 이 경기 하나만 콕 집어 알림받도록 서버(toss:sub:* 레코드의 matchIds)에 등록한다.
+// 동의 화면이 아직 안 떴으면 여기서 같이 띄운다(웹 푸시의 setMatchWatch가 구독이 없으면 자동으로
+// 만들어주는 것과 같은 역할) - Promise<boolean>으로 성공 여부를 돌려줘야 벨 UI가 실패 시 되돌릴 수 있다.
+window.__pitchProTossWatchMatch = function requestTossWatchMatch(matchId, watch) {
+  if (!Notification.requestAgreement.isSupported()) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    Notification.requestAgreement({
+      options: { templateCode: TEMPLATE_CODE },
+      onEvent: async (result) => {
+        if (result.type !== "newAgreement" && result.type !== "alreadyAgreed") {
+          resolve(false);
+          return;
+        }
+        try {
+          const { hash } = await User.getAnonymousKey();
+          const res = await fetch(`${API_BASE}/toss/watch-match`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ anonKey: hash, matchId, watch }),
+          });
+          resolve(res.ok);
+        } catch (err) {
+          console.error("토스 경기별 알림 등록 실패:", err);
+          resolve(false);
+        }
+      },
+      onError: (err) => {
+        console.error("토스 알림 동의 요청 실패:", err);
+        resolve(false);
+      },
+    });
+  });
+};

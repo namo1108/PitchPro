@@ -18,10 +18,10 @@ const indexPath = path.join(DEST, "index.html");
 let indexHtml = fs.readFileSync(indexPath, "utf8");
 indexHtml = indexHtml.replace("<html lang=\"ko\">", '<html lang="ko" data-toss-app="1">');
 
-// 2026-08-22: toss-notifications.js(@apps-in-toss/web-framework 번들)를 끼워 넣었더니 앱인토스
-// 안에서 경기 화면/뉴스 등 전체가 먹통이 되는 사고가 있어서 일단 다시 뺐다 - 원인(SDK 초기화 코드가
-// 실제 토스 런타임 밖 다른 이유로 페이지 전체를 깨뜨리는 것으로 추정)을 제대로 잡을 때까지는 번들
-// 자체는 만들어두되(esbuild import는 유지) 실제 로드는 하지 않는다.
+// 2026-08-22: 이 번들을 처음 끼워 넣었을 때 앱인토스 "테스트" 배포에서 경기/뉴스 화면이 전부
+// 먹통이 되는 게 여러 번 재현됐는데, push.js/matches.js 쪽 변경을 하나씩/조합별로 매우 여러 번
+// 비교 테스트해봐도 특정 조합에서만, 그마저도 동일한 코드에서 결과가 오락가락해서 - "테스트" 배포
+// 채널 자체의 신뢰성 문제일 가능성이 높다고 결론 내렸다(정식 "출시" 채널로 최종 검증 필요).
 esbuild.buildSync({
   entryPoints: [path.join(__dirname, "src", "toss-notifications.js")],
   bundle: true,
@@ -29,6 +29,10 @@ esbuild.buildSync({
   target: "es2020",
   outfile: path.join(DEST, "js", "toss-notifications.js"),
 });
+indexHtml = indexHtml.replace(
+  '<script type="module" src="/js/app.js"></script>',
+  '<script type="module" src="/js/toss-notifications.js"></script>\n  <script type="module" src="/js/app.js"></script>'
+);
 
 fs.writeFileSync(indexPath, indexHtml);
 

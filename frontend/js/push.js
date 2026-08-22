@@ -33,6 +33,12 @@ export function tryTossNotify() {
   return window.__pitchProTossNotify();
 }
 
+// 경기 화면 🔔 벨 전용 - 즐겨찾기 팀과 무관하게 이 경기 하나만 알림 대상으로 켜거나 끈다.
+export function tryTossWatchMatch(matchId, watch) {
+  if (typeof window.__pitchProTossWatchMatch !== "function") return Promise.resolve(false);
+  return window.__pitchProTossWatchMatch(matchId, watch);
+}
+
 async function getRegistration() {
   if (!isPushSupported()) return null;
   if (!swRegistration) swRegistration = await navigator.serviceWorker.register("/sw.js");
