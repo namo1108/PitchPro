@@ -39,6 +39,20 @@ export function tryTossWatchMatch(matchId, watch) {
   return window.__pitchProTossWatchMatch(matchId, watch);
 }
 
+// 알림 권한이 한 번 "차단"되면 브라우저가 다시는 자동으로 안 물어봐서(코드로 되돌릴 방법이 없음 -
+// 브라우저 보안 정책), "권한이 필요합니다"라고만 하면 사용자가 어디서 풀어야 할지 못 찾아 헤맨다
+// (2026-08-22 사용자 피드백) - denied일 때만 브라우저/OS별로 실제로 풀 수 있는 경로를 짚어준다.
+export function notificationBlockedMessage() {
+  if (typeof Notification === "undefined" || Notification.permission !== "denied") {
+    return "알림을 받으려면 브라우저 알림 권한이 필요합니다.";
+  }
+  const ua = navigator.userAgent || "";
+  if (/SamsungBrowser/i.test(ua)) {
+    return "이 브라우저에서 알림이 차단돼 있어요.\n삼성인터넷 메뉴(≡) > 설정 > 사이트 권한 > 알림에서 이 사이트를 찾아 허용으로 바꿔주세요.";
+  }
+  return "이 브라우저에서 알림이 차단돼 있어요.\n주소창의 사이트 이름(또는 자물쇠/ⓘ 아이콘)을 눌러 '권한' > '알림'을 허용으로 바꾼 뒤 새로고침해주세요.";
+}
+
 async function getRegistration() {
   if (!isPushSupported()) return null;
   if (!swRegistration) swRegistration = await navigator.serviceWorker.register("/sw.js");
@@ -151,6 +165,7 @@ export function initPushButton() {
 
     const subscription = await ensureSubscribed();
     syncNotifyButton(!!subscription);
+    if (!subscription) alert(notificationBlockedMessage());
   });
 }
 

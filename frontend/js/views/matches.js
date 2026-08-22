@@ -18,7 +18,7 @@ import {
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
 import { isWatched, toggleWatch } from "../watchlist.js";
-import { setMatchWatch, isPushSupported, isTossApp, tryTossWatchMatch } from "../push.js";
+import { setMatchWatch, isPushSupported, isTossApp, tryTossWatchMatch, notificationBlockedMessage } from "../push.js";
 import { isFavorite } from "../favorites.js";
 import { saveViewState } from "../viewState.js";
 import { getTheme } from "../theme.js";
@@ -641,7 +641,7 @@ function attachWatchBells(root) {
         const reverted = toggleWatch(matchId);
         bellEl.classList.toggle("active", reverted);
         bellEl.textContent = reverted ? "🔔" : "🔕";
-        alert("알림을 받으려면 브라우저 알림 권한이 필요합니다.");
+        alert(notificationBlockedMessage());
       }
     });
   });
