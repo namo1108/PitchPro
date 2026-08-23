@@ -160,6 +160,9 @@ export const KV_KEYS = {
   // K3/K4는 KFA 공식 사이트가 경기 종료 후에만 상세를 열어줘서(라이브 중엔 항상 빔) AiScore로
   // 라이브 통계를 보강한다. 우리 내부 경기 id -> AiScore match_id 매핑.
   aiscoreGameRefs: "aiscore:gamerefs:v1",
+  // scoreman123.com은 AiScore보다 라벨이 확실한 통계를 준다(2026-08-23) - 팀 매핑이 확인된 경기부터
+  // 우선 이걸로 채운다. 우리 내부 경기 id -> scoreman123 매치ID 매핑.
+  scoremanGameRefs: "scoreman:gamerefs:v1",
   // 경기당 이미 알림 보낸 퇴장(선수+시각)을 기록해두는 중복방지용 저장소. 하루 지나면 만료시켜 정리한다.
   notifiedCards: "cards:notified:v1",
   // 리그 검색에서 국가대표팀도 찾을 수 있도록 캐시해두는 국가대표팀 목록(성인 남자만).

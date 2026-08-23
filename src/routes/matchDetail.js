@@ -36,6 +36,7 @@ import {
   normalizeMlsStatistics,
 } from "../lib/mlsMatchCenter.js";
 import { findAiscoreMatchId, fetchAiscoreStatistics } from "../lib/aiscoreMatchCenter.js";
+import { findScoremanMatchId, fetchScoremanStatistics } from "../lib/scoremanMatchCenter.js";
 
 const LIVE_STATUSES = new Set(["IN_PLAY", "PAUSED"]);
 const SQUAD_PHOTO_CACHE_TTL_SECONDS = 6 * 60 * 60; // 스쿼드 사진은 자주 안 바뀌어 넉넉히 캐싱
@@ -191,6 +192,22 @@ async function fillFromMls(env, match, isLive, isFinished) {
 // 중엔 항상 비어있었다(2026-08-23 확인 - KFA 사이트 구조의 한계, 우리 스크래퍼 버그 아님). AiScore로
 // 라이브 통계 중 확실히 검증된 항목(점유율)만 보강한다 - 나머지 카테고리는 아직 확신이 없어 비워둔다
 // (aiscoreMatchCenter.js 주석 참고).
+// scoreman123.com은 AiScore보다 라벨이 확실한 통계를 준다(scoremanMatchCenter.js 주석 참고) - 팀
+// 매핑이 확인된 경기부터 먼저 이걸로 채우고, 못 찾으면(아직 매핑 안 된 팀 등) AiScore로 넘어간다.
+const SCOREMAN_CODES = new Set(["K3", "K4"]);
+async function fillFromScoreman(env, match, isLive, isFinished) {
+  if (!SCOREMAN_CODES.has(match.competition.code) || match.statistics.length || !(isLive || isFinished)) return;
+
+  try {
+    const scoremanId = await findScoremanMatchId(env, match);
+    if (!scoremanId) return;
+    const statistics = await fetchScoremanStatistics(scoremanId, match);
+    if (statistics.length) match.statistics = statistics;
+  } catch (err) {
+    console.error("scoreman123 match detail fetch failed:", err);
+  }
+}
+
 const AISCORE_CODES = new Set(["K3", "K4"]);
 async function fillFromAiscore(env, match, isLive, isFinished) {
   if (!AISCORE_CODES.has(match.competition.code) || match.statistics.length || !(isLive || isFinished)) return;
@@ -321,7 +338,9 @@ export async function handleMatchDetail(request, env, id) {
   await fillFromKLeague(env, match);
   // K3/K4는 API-Football이 애초에 득점자/라인업을 안 주므로 KFA 공식 사이트로 채운다.
   await fillFromKfa(env, match);
-  // KFA는 경기 종료 후에만 상세를 열어줘서 라이브 중 통계는 AiScore로 보강한다.
+  // KFA는 경기 종료 후에만 상세를 열어줘서 라이브 중 통계는 scoreman123/AiScore로 보강한다
+  // (scoreman123 쪽 팀 매핑이 확인된 경기만 우선 채워지고, 나머지는 AiScore가 이어받는다).
+  await fillFromScoreman(env, match, isLive, isFinished);
   await fillFromAiscore(env, match, isLive, isFinished);
   // MLS도 API-Football이 라인업을 안 주므로 mlssoccer.com 자체 매치센터로 채운다.
   await fillFromMls(env, match, isLive, isFinished);
