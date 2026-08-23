@@ -27,7 +27,14 @@ import {
   normalizeKLeagueStatistics,
 } from "../lib/kleagueMatchCenter.js";
 import { findKfaGameRef, fetchKfaMatchDetail, parseKfaMatchDetail } from "../lib/kfaMatchCenter.js";
-import { findMlsSportecId, fetchMlsMatchDetail, normalizeMlsLineups } from "../lib/mlsMatchCenter.js";
+import {
+  findMlsSportecId,
+  fetchMlsMatchDetail,
+  normalizeMlsLineups,
+  fetchMlsKeyEvents,
+  fetchMlsPossession,
+  normalizeMlsStatistics,
+} from "../lib/mlsMatchCenter.js";
 
 const LIVE_STATUSES = new Set(["IN_PLAY", "PAUSED"]);
 const SQUAD_PHOTO_CACHE_TTL_SECONDS = 6 * 60 * 60; // 스쿼드 사진은 자주 안 바뀌어 넉넉히 캐싱
@@ -139,22 +146,40 @@ async function fillFromKfa(env, match) {
 }
 
 // MLS 폴백 - API-Football이 MLS 라인업/통계를 아예 안 준다(2026-08-23 확인, 종료된 경기도 항상
-// 빈 배열). mlssoccer.com 자체 매치센터(mlsMatchCenter.js)에서 라인업만 채운다 - 팀 약어 매핑이
-// 아직 다 검증된 게 아니라(K3/K4 KFA 매핑 초기와 동일한 상황) 못 찾으면 조용히 건너뛴다.
+// 빈 배열). mlssoccer.com 자체 매치센터(mlsMatchCenter.js)에서 라인업/통계를 채운다 - 팀 약어
+// 매핑이 아직 다 검증된 게 아니라(K3/K4 KFA 매핑 초기와 동일한 상황) 못 찾으면 조용히 건너뛴다.
 const MLS_CODES = new Set(["MLS"]);
-async function fillFromMls(env, match) {
-  if (!MLS_CODES.has(match.competition.code) || match.lineups.length) return;
+async function fillFromMls(env, match, isLive, isFinished) {
+  if (!MLS_CODES.has(match.competition.code)) return;
 
   try {
     const sportecId = await findMlsSportecId(env, match);
     if (!sportecId) return;
-    const data = await fetchMlsMatchDetail(sportecId);
-    const lineups = normalizeMlsLineups(data, match);
-    if (lineups.length) {
-      match.lineups = lineups;
-      if (!match.tacticalNote) {
-        match.tacticalNote = buildTacticalNote(match.lineups, match.homeTeam.id, match.homeTeam.name, match.awayTeam.name);
+
+    if (!match.lineups.length) {
+      const data = await fetchMlsMatchDetail(sportecId);
+      const lineups = normalizeMlsLineups(data, match);
+      if (lineups.length) {
+        match.lineups = lineups;
+        if (!match.tacticalNote) {
+          match.tacticalNote = buildTacticalNote(match.lineups, match.homeTeam.id, match.homeTeam.name, match.awayTeam.name);
+        }
       }
+    }
+
+    // 통계(슈팅/코너/파울/점유율)는 킥오프 전엔 의미가 없어 라이브·종료 경기에서만 조회한다.
+    if (!match.statistics.length && (isLive || isFinished)) {
+      const [events, possession] = await Promise.all([
+        fetchMlsKeyEvents(sportecId).catch((err) => {
+          console.error("mls key_events fetch failed:", err);
+          return [];
+        }),
+        fetchMlsPossession(sportecId).catch((err) => {
+          console.error("mls possession fetch failed:", err);
+          return [];
+        }),
+      ]);
+      if (events.length) match.statistics = normalizeMlsStatistics(events, possession, match);
     }
   } catch (err) {
     console.error("mls match detail fetch failed:", err);
@@ -278,7 +303,7 @@ export async function handleMatchDetail(request, env, id) {
   // K3/K4는 API-Football이 애초에 득점자/라인업을 안 주므로 KFA 공식 사이트로 채운다.
   await fillFromKfa(env, match);
   // MLS도 API-Football이 라인업을 안 주므로 mlssoccer.com 자체 매치센터로 채운다.
-  await fillFromMls(env, match);
+  await fillFromMls(env, match, isLive, isFinished);
 
   // 목록(routes/matches.js)에서만 붙이고 여기선 빠뜨려서, 목록에서 받은 캐시로 먼저 그린 상세 화면엔
   // 중계/티켓 버튼이 보였다가 이 상세 응답으로 다시 그려지는 순간 사라지는 버그가 있었다 - 목록과

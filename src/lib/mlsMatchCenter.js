@@ -125,3 +125,97 @@ export function normalizeMlsLineups(data, match) {
   const away = normalizeMlsSide(data.away, match.awayTeam.id);
   return [home, away].filter(Boolean);
 }
+
+// key_events는 페이지당 20개씩 잘려 나온다(next_page_token으로 이어붙여야 함, 2026-08-23 확인 -
+// 37분 진행된 경기에서 이미 1페이지를 넘김). 한 경기가 이 페이지 수를 넘길 일은 거의 없지만
+// (연장전 포함해도), 혹시 응답이 이상해서 토큰이 끝없이 나오는 경우를 대비해 상한을 둔다.
+const MAX_KEY_EVENTS_PAGES = 10;
+
+export async function fetchMlsKeyEvents(sportecId) {
+  const events = [];
+  let pageToken;
+  for (let page = 0; page < MAX_KEY_EVENTS_PAGES; page++) {
+    const url = new URL(`https://stats-api.mlssoccer.com/matches/${sportecId}/key_events`);
+    if (pageToken) url.searchParams.set("page_token", pageToken);
+    const res = await fetch(url, { headers: { "user-agent": UA, accept: "application/json" } });
+    if (!res.ok) throw new Error(`mls key_events ${res.status}`);
+    const data = await res.json();
+    events.push(...(data.events || []));
+    if (!data.next_page_token) break;
+    pageToken = data.next_page_token;
+  }
+  return events;
+}
+
+export async function fetchMlsPossession(sportecId) {
+  const res = await fetch(`https://stats-api.mlssoccer.com/statistics/clubs/matches/${sportecId}/possession?scope=all`, {
+    headers: { "user-agent": UA, accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`mls possession ${res.status}`);
+  const data = await res.json();
+  // scope: "match"인 항목이 경기 전체 누적 점유율 - 나머지는 5분 구간별 세부 값이라 필요 없다.
+  const matchEntry = (data.match_statistics_list || []).find((e) => e.match_statistics.scope === "match");
+  return matchEntry?.match_statistics.team_statistics || [];
+}
+
+// 온타깃(유효슈팅) 판정: SavedShot(막힘)/SuccessfulShot(득점)은 골키퍼가 막았거나 들어갔다는 뜻이라
+// "온타깃"으로 치고, ShotWide(빗나감)/BlockedShot(수비에 막힘)/OtherShot(불명확)은 제외한다 -
+// API-Football의 shotsOnGoal 정의(유효슈팅 = 막히지 않고 골대 안으로 갔던 슈팅)와 맞춘 근사치다.
+const ON_TARGET_SHOT_RESULTS = new Set(["SavedShot", "SuccessfulShot"]);
+
+function roleToTeamId(role, match) {
+  return role === "home" ? String(match.homeTeam.id) : String(match.awayTeam.id);
+}
+
+export function normalizeMlsStatistics(events, possession, match) {
+  const homeId = String(match.homeTeam.id);
+  const awayId = String(match.awayTeam.id);
+  const acc = {
+    [homeId]: { shotsOnGoal: 0, shotsTotal: 0, corners: 0, fouls: 0, yellowCards: 0, redCards: 0, saves: 0, xg: 0 },
+    [awayId]: { shotsOnGoal: 0, shotsTotal: 0, corners: 0, fouls: 0, yellowCards: 0, redCards: 0, saves: 0, xg: 0 },
+  };
+
+  for (const { type, event: e } of events) {
+    if (type === "shot_at_goals") {
+      const teamId = roleToTeamId(e.team_role, match);
+      const oppId = teamId === homeId ? awayId : homeId;
+      acc[teamId].shotsTotal += 1;
+      acc[teamId].xg += Number(e.xG) || 0;
+      if (ON_TARGET_SHOT_RESULTS.has(e.shot_result)) acc[teamId].shotsOnGoal += 1;
+      if (e.shot_result === "SavedShot") acc[oppId].saves += 1;
+    } else if (type === "corner_kicks") {
+      acc[roleToTeamId(e.team_role, match)].corners += 1;
+    } else if (type === "fouls") {
+      acc[roleToTeamId(e.team_fouler_role, match)].fouls += 1;
+    } else if (type === "cards") {
+      const teamId = roleToTeamId(e.team_role, match);
+      if (e.card_color === "red") acc[teamId].redCards += 1;
+      else acc[teamId].yellowCards += 1;
+    }
+  }
+
+  const possessionByTeam = {};
+  for (const p of possession || []) {
+    const teamId = roleToTeamId(p.team_role, match);
+    possessionByTeam[teamId] = Math.round(p.possession_ratio);
+  }
+
+  return [homeId, awayId].map((teamId) => {
+    const s = acc[teamId];
+    return {
+      teamId,
+      stats: {
+        shotsOnGoal: s.shotsTotal ? s.shotsOnGoal : null,
+        shotsTotal: s.shotsTotal || null,
+        possession: possessionByTeam[teamId] != null ? `${possessionByTeam[teamId]}%` : null,
+        corners: s.corners,
+        fouls: s.fouls,
+        yellowCards: s.yellowCards,
+        redCards: s.redCards,
+        saves: s.saves,
+        passAccuracy: null,
+        xg: s.shotsTotal ? Number(s.xg.toFixed(2)) : null,
+      },
+    };
+  });
+}
