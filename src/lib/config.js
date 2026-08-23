@@ -154,6 +154,9 @@ export const KV_KEYS = {
   // K3/K4는 kleague.com이 아닌 KFA(대한축구협회) 공식 사이트가 매치센터 폴백 소스라 별도 키로 관리한다.
   // 우리 내부 경기 id -> KFA layer_popup 상세 조회 식별자(idx/sIdx/div) 매핑.
   kfaGameRefs: "kfa:gamerefs:v1",
+  // MLS도 API-Football이 라인업/통계를 안 줘서(2026-08-23 확인) mlssoccer.com 자체 매치센터로
+  // 폴백한다. 우리 내부 경기 id -> mlssoccer.com sportecId(예: "MLS-MAT-0009JJ") 매핑.
+  mlsGameRefs: "mls:gamerefs:v1",
   // 경기당 이미 알림 보낸 퇴장(선수+시각)을 기록해두는 중복방지용 저장소. 하루 지나면 만료시켜 정리한다.
   notifiedCards: "cards:notified:v1",
   // 리그 검색에서 국가대표팀도 찾을 수 있도록 캐시해두는 국가대표팀 목록(성인 남자만).
