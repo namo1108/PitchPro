@@ -26,6 +26,8 @@ const SCOREMAN_LEAGUE_IDS = { K4: SCOREMAN_LEAGUE_ID_K4 }; // K3는 아직 확�
 const SCOREMAN_TEAM_ID_BY_APIFOOTBALL_ID = {
   27865: "78139", // 서산에프씨
   27858: "78137", // 금산인삼FC
+  27860: "78140", // 제천시민축구단
+  25720: "73609", // 세종SA축구단
 };
 
 // JSON이 아니라 작은따옴표를 쓰는 JS 배열 리터럴로 와서, eval 없이 정규식으로 필요한 필드만 뽑는다
