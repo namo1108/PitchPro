@@ -17,15 +17,32 @@ const utf8Decoder = new TextDecoder("utf-8", { fatal: false });
 //   응답 안에 "전북 현대 모터스 II"와 "Seosan Pioneer FC"가 공존) 이름 매칭은 신뢰할 수 없다 -
 //   대신 대회ID(K3/K4 각각 고정)와 킥오프 유닉스타임(우리 utcDate와 초 단위까지 정확히 일치)으로
 //   매칭한다.
-// - /v1/m/api/match/team_stats?match_id=... : 통계도 라벨이 없고, "3자리 카테고리번호 + 홈값 +
-//   원정값"을 그냥 이어붙인 십진수 하나로 옴(예: 1253169 = 카테고리125 + 홈31 + 원정69 = 점유율
-//   31%-69%). 실제 화면(m.aiscore.com 라인업/통계 탭) 스크린샷과 대조해서 지금까지 확인된 카테고리:
-//   123=공격, 124=위험공격, 125=점유율. 나머지(슈팅/코너/카드 등으로 추정되는 값들)는 이 매치 하나의
-//   스냅샷만으로는 확실히 구분이 안 돼(여러 후보가 같은 값으로 겹침) 더 확인 전까진 안 쓴다 -
-//   확인되는 대로 STAT_CATEGORY_MAP에 추가하면 된다.
+// - /v1/m/api/match/team_stats?match_id=... : "카테고리번호" 문자열 -> "홈값" 문자열 -> "원정값"
+//   문자열이 연속 3개 필드로 오는 반복 구조다(라벨 없음, 세 자리 카테고리 21개가 한 묶음). 처음엔
+//   raw 바이트를 latin1로 대충 훑어보고 "1253169 = 125+31+69"처럼 세 값이 이어붙은 숫자 하나로
+//   착각했는데(2026-08-23), 그건 protobuf 태그 바이트(필드1 반복 문자열의 태그가 마침 0x0A=개행문자라
+//   raw 덤프에 우연히 줄바꿈처럼 보였을 뿐) 착시였다 - 실제로 이 파일과 같은 walkProtoLite 파서를
+//   team_stats에도 그대로 돌려보고서야 "카테고리/홈/원정"이 애초에 별개 필드였다는 걸 확인했다.
+//   같은 21개 카테고리 묶음이 응답 안에 3번 반복되는데(전체 누적 / 전반 / 후반 - 전반+후반 합이
+//   전체와 정확히 일치하는 걸로 확인), 우리는 항상 첫 번째 묶음(전체 누적)만 쓴다.
+//   실제 화면(m.aiscore.com 통계 탭) 스크린샷과 대조해서 지금까지 확인된 카테고리: 123=공격,
+//   124=위험공격, 125=점유율. 슈팅/코너/카드로 추정되는 값들(101,102,109,113,121,128,183 등)은
+//   한 경기 스냅샷만으론 후보가 여럿 겹쳐서(예: 세 카테고리가 동시에 1-2로 같은 값) 확실히 구분이
+//   안 돼 더 확인 전까진 안 쓴다 - 확인되는 대로 STAT_CATEGORY_MAP에 추가하면 된다.
 const K3_COMPETITION_ID = "r8lk2dig0ni0736";
 const K4_COMPETITION_ID = "0ndkz6ix1gtgq3z";
 const COMPETITION_IDS = { K3: K3_COMPETITION_ID, K4: K4_COMPETITION_ID };
+
+// K3/K4는 매 라운드 여러 경기가 정각(예: 08:00 UTC)에 동시 킥오프하는 경우가 흔해서(2026-08-23
+// 확인 - 서산FC:금산인삼FC와 거제시티즌:Haman FC가 같은 대회에서 초 단위까지 똑같은 킥오프), 대회ID
+// +킥오프시각만으로는 유일하게 못 정한다. 이름은 응답 안에서도 한글/영문이 섞여 못 믿으니, 이미
+// 확인된 경기에 한해 우리 API-Football 팀ID -> AiScore 팀ID를 여기 적어두고, 동시킥오프 후보가
+// 여럿이면 이 표로 실제 우리 경기 팀과 일치하는 후보만 채택한다(모르는 팀이면 안전하게 건너뜀 -
+// KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID와 같은 방식으로, 겹치는 경기가 제보될 때마다 추가한다).
+const AISCORE_TEAM_ID_BY_APIFOOTBALL_ID = {
+  27865: "ndkz6irv4zceq3z", // 서산에프씨
+  9569: "edq09i9ez6s4qxg", // 금산인삼FC
+};
 
 function readVarint(buf, pos) {
   let result = 0n;
@@ -123,6 +140,8 @@ async function findAllTodayMatches(code, isoDate) {
       cur = { matchId: r.str };
     } else if (cur) {
       if (r.path === "15.2.4.1") cur.compId = r.str;
+      else if (r.path === "15.2.6.1") cur.homeId = r.str;
+      else if (r.path === "15.2.7.1") cur.awayId = r.str;
       else if (r.path === "15.2.15") cur.kickoff = Number(r.val);
     }
   }
@@ -143,8 +162,18 @@ export async function findAiscoreMatchId(env, match) {
     );
     const targetKickoff = Math.round(new Date(match.utcDate).getTime() / 1000);
     const todays = await findAllTodayMatches(match.competition.code, kstDate);
-    const found = todays.find((m) => m.kickoff === targetKickoff);
-    if (!found) return null;
+    const candidates = todays.filter((m) => m.kickoff === targetKickoff);
+    if (!candidates.length) return null;
+
+    let found = candidates[0];
+    if (candidates.length > 1) {
+      // 동시 킥오프 경기가 여럿이면 팀ID 매핑으로 확인된 후보만 채택 - 모르면 안전하게 포기한다
+      // (틀린 경기에 통계를 붙이는 것보다 아예 안 붙는 게 낫다).
+      const homeAiscoreId = AISCORE_TEAM_ID_BY_APIFOOTBALL_ID[match.homeTeam.id];
+      const awayAiscoreId = AISCORE_TEAM_ID_BY_APIFOOTBALL_ID[match.awayTeam.id];
+      found = candidates.find((m) => (homeAiscoreId && m.homeId === homeAiscoreId) || (awayAiscoreId && m.awayId === awayAiscoreId));
+      if (!found) return null;
+    }
 
     refs[match.id] = found.matchId;
     await putJSON(env, KV_KEYS.aiscoreGameRefs, refs);
@@ -155,42 +184,38 @@ export async function findAiscoreMatchId(env, match) {
   }
 }
 
-// 카테고리번호 -> {stats 필드, 자릿수 폭}. possession만 우리 통계 화면의 기존 항목과 바로 연결된다
-// (123 공격/124 위험공격은 우리 UI에 대응하는 항목이 없어 일단 보류 - 화면에 새 줄을 추가하면 그때
-// 같이 켠다).
+// 카테고리번호(문자열) -> {stats 필드, 값 변환}. possession만 우리 통계 화면의 기존 항목과 바로
+// 연결된다(123 공격/124 위험공격은 우리 UI에 대응하는 항목이 없어 일단 보류 - 화면에 새 줄을
+// 추가하면 그때 같이 켠다).
 const STAT_CATEGORY_MAP = {
-  125: { key: "possession", digits: 2, format: (v) => `${v}%` },
+  125: { key: "possession", format: (v) => `${Number(v)}%` },
 };
-
-function decodeStatValue(raw) {
-  const s = String(raw);
-  for (const digits of [2, 1]) {
-    const catLen = s.length - digits * 2;
-    if (catLen < 1) continue;
-    const cat = Number(s.slice(0, catLen));
-    const mapping = STAT_CATEGORY_MAP[cat];
-    if (mapping && mapping.digits === digits) {
-      const home = Number(s.slice(catLen, catLen + digits));
-      const away = Number(s.slice(catLen + digits));
-      return { key: mapping.key, home: mapping.format ? mapping.format(home) : home, away: mapping.format ? mapping.format(away) : away };
-    }
-  }
-  return null;
-}
 
 export async function fetchAiscoreStatistics(matchId, match) {
   const buf = await fetchAiscoreBinary(`https://api.aiscore.com/v1/m/api/match/team_stats?match_id=${matchId}`);
   const records = [];
   walkProtoLite(buf, 0, buf.length, 0, [], records);
+  const strs = records.filter((r) => r.type === "str").map((r) => r.str);
 
+  // [카테고리, 홈값, 원정값]이 21개 카테고리 묶음으로 3번(전체/전반/후반) 반복된다 - 카테고리가
+  // 처음 나온 순간(=첫 번째 묶음=전체 누적)의 값만 쓰고, 같은 카테고리가 또 나오면(전반/후반 묶음)
+  // 무시한다. 정확한 카테고리 개수에 의존하지 않아 응답 구조가 살짝 바뀌어도 안전하다.
+  // 이 응답에 우리가 아는 카테고리 묶음 말고 다른 문자열 필드가 섞여 있을 가능성에 대비해,
+  // "카테고리로 보이는(100~199, 숫자만) 값"이 나온 위치에서만 3개씩 묶어 읽는다 - 안 맞으면
+  // 한 칸씩만 밀어서 정렬을 다시 맞춰본다(통째로 3칸씩 밀면 한 번 어긋난 뒤로 전부 못 읽는다).
+  const isCategoryLike = (s) => /^1\d{2}$/.test(s);
+  const isValueLike = (s) => /^\d{1,3}$/.test(s);
+  const seen = new Set();
   const homeStats = {};
   const awayStats = {};
-  for (const r of records) {
-    if (r.type !== "str") continue;
-    const decoded = decodeStatValue(r.str);
-    if (!decoded) continue;
-    homeStats[decoded.key] = decoded.home;
-    awayStats[decoded.key] = decoded.away;
+  for (let i = 0; i + 2 < strs.length; i++) {
+    if (!isCategoryLike(strs[i]) || !isValueLike(strs[i + 1]) || !isValueLike(strs[i + 2])) continue;
+    const cat = Number(strs[i]);
+    const mapping = STAT_CATEGORY_MAP[cat];
+    if (!mapping || seen.has(cat)) continue;
+    seen.add(cat);
+    homeStats[mapping.key] = mapping.format(strs[i + 1]);
+    awayStats[mapping.key] = mapping.format(strs[i + 2]);
   }
 
   if (!Object.keys(homeStats).length) return [];
