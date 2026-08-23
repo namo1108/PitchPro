@@ -126,13 +126,16 @@ export async function fetchAndStoreMatches(env, existing) {
   // 진행 중이던 경기의 스코어가 순간적으로 "줄어든 것처럼" 캐시에 덮어써진다 - 골 감지 크론은 이걸
   // "진짜로 두 틱 연속 관찰된 새 값"으로 오인해 골 취소 알림을 보내고, 곧이어 빠른 폴링이 다시 원래
   // 값으로 되돌리면 그것도 두 틱 연속으로 관찰돼 골 알림을 또 보낸다 - 이 반복이 사용자에게 "골/골
-  // 취소가 계속 반복해서 온다"로 보였다(2026-08-22, K4 기장군민 vs 진주시민, 레이트리밋으로 두 조회
-  // 경로가 동시에 불안정했던 구간에서 확인). 그래서 스윕이 어떤 경기를 여전히 IN_PLAY/PAUSED로
-  // 보고하면(즉 종료 등 실제 상태 전이가 아니면) 스코어만큼은 더 실시간인 빠른 폴링 쪽 값을 그대로
-  // 유지한다 - 상태 전이(FINISHED 등)는 이 스윕이 유일한 감지 경로라 그대로 반영되게 둔다.
+  // 취소가 계속 반복해서 온다"로 보였다(2026-08-22, K4 기장군민 vs 진주시민).
+  // 처음엔 "스윕이 지금도 IN_PLAY/PAUSED라고 볼 때만" 보호했는데, K3/K4처럼 API-Football 상태 판정
+  // 자체가 불안정한(가끔 SCHEDULED로 되돌아가는) 대회에서는 그 재확인 조건 때문에 보호가 풀려서
+  // 같은 사고가 또 났다(2026-08-23, K4 서산에프씨 vs 금산인삼FC) - 스윕이 "종료류"로 확정 전이한
+  // 게 아닌 이상(즉 아직 살아있던 경기가 사라지거나 취소/중단된 게 아닌 이상) 무조건 빠른 폴링 쪽
+  // 스코어를 유지하도록 바꿨다.
+  const TERMINAL_STATUSES = new Set(["FINISHED", "POSTPONED", "CANCELLED", "SUSPENDED"]);
   const merged = allMatches.map((m) => {
     const prevLive = liveById.get(m.id);
-    if (prevLive && (m.status === "IN_PLAY" || m.status === "PAUSED")) {
+    if (prevLive && !TERMINAL_STATUSES.has(m.status)) {
       return { ...m, score: prevLive.score };
     }
     return m;
