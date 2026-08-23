@@ -35,6 +35,7 @@ import {
   fetchMlsPossession,
   normalizeMlsStatistics,
 } from "../lib/mlsMatchCenter.js";
+import { findAiscoreMatchId, fetchAiscoreStatistics } from "../lib/aiscoreMatchCenter.js";
 
 const LIVE_STATUSES = new Set(["IN_PLAY", "PAUSED"]);
 const SQUAD_PHOTO_CACHE_TTL_SECONDS = 6 * 60 * 60; // 스쿼드 사진은 자주 안 바뀌어 넉넉히 캐싱
@@ -186,6 +187,24 @@ async function fillFromMls(env, match, isLive, isFinished) {
   }
 }
 
+// K3/K4는 KFA 공식 사이트가 경기 종료 후에만 상세(라인업/이벤트)를 열어줘서(fillFromKfa 참고) 라이브
+// 중엔 항상 비어있었다(2026-08-23 확인 - KFA 사이트 구조의 한계, 우리 스크래퍼 버그 아님). AiScore로
+// 라이브 통계 중 확실히 검증된 항목(점유율)만 보강한다 - 나머지 카테고리는 아직 확신이 없어 비워둔다
+// (aiscoreMatchCenter.js 주석 참고).
+const AISCORE_CODES = new Set(["K3", "K4"]);
+async function fillFromAiscore(env, match, isLive, isFinished) {
+  if (!AISCORE_CODES.has(match.competition.code) || match.statistics.length || !(isLive || isFinished)) return;
+
+  try {
+    const aiscoreId = await findAiscoreMatchId(env, match);
+    if (!aiscoreId) return;
+    const statistics = await fetchAiscoreStatistics(aiscoreId, match);
+    if (statistics.length) match.statistics = statistics;
+  } catch (err) {
+    console.error("aiscore match detail fetch failed:", err);
+  }
+}
+
 // 목록 크론 캐시에는 venue/득점자/라인업/스탯이 없으므로, 상세 조회는 클릭 시점에
 // 업스트림을 직접 불러 짧은 TTL로 캐싱한다. 라이브·예정 경기는 캐싱하지 않고 매번 새로 불러온다
 // (라인업은 킥오프 1시간 전쯤 API-Football에 올라오므로 그때그때 최신 상태를 봐야 한다).
@@ -302,6 +321,8 @@ export async function handleMatchDetail(request, env, id) {
   await fillFromKLeague(env, match);
   // K3/K4는 API-Football이 애초에 득점자/라인업을 안 주므로 KFA 공식 사이트로 채운다.
   await fillFromKfa(env, match);
+  // KFA는 경기 종료 후에만 상세를 열어줘서 라이브 중 통계는 AiScore로 보강한다.
+  await fillFromAiscore(env, match, isLive, isFinished);
   // MLS도 API-Football이 라인업을 안 주므로 mlssoccer.com 자체 매치센터로 채운다.
   await fillFromMls(env, match, isLive, isFinished);
 
