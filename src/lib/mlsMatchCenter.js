@@ -25,7 +25,7 @@ const MLS_TEAM_SLUGS = {
   1601: "tor", // Toronto FC
   1602: "rbny", // New York Red Bulls (사이트에서 확인됨)
   1603: "van", // Vancouver Whitecaps
-  1605: "lag", // LA Galaxy
+  1605: "la", // LA Galaxy (사이트에서 확인됨, "lag" 아님)
   1606: "rsl", // Real Salt Lake
   1607: "chi", // Chicago Fire (사이트에서 확인됨)
   1610: "col", // Colorado Rapids
