@@ -216,7 +216,10 @@ export const DETAIL_CACHE_TTL_SECONDS = 300;
 // (2026-08-22 제보: 같은 라이브 경기를 7~9초 간격으로 다시 불러도 lineups가 0/2를 오갔음). 완전히
 // 성공한 응답만 아주 짧게 캐싱해서, 다음 요청이 하필 레이트리밋에 걸린 순간이어도 방금 성공한
 // 값을 대신 보여주게 한다(신선도는 이 정도 지연이면 체감상 문제 없음).
-export const LIVE_DETAIL_CACHE_TTL_SECONDS = 15;
+// 원래 15초로 뒀었는데 Cloudflare KV는 expirationTtl 최소값이 60초라 그동안 매번 "KV PUT failed:
+// Invalid expiration_ttl of 15" 에러로 조용히 실패하고 있었다(2026-08-23 확인 - 이 캐시가 사실상
+// 하루 종일 한 번도 안 걸렸다는 뜻). KV가 허용하는 최소값인 60으로 올려서 실제로 저장되게 한다.
+export const LIVE_DETAIL_CACHE_TTL_SECONDS = 60;
 
 export const REFRESH_INTERVALS_MS = {
   news: 20 * 60 * 1000,

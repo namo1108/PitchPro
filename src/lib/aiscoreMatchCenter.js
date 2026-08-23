@@ -2,6 +2,10 @@ import { getJSON, putJSON } from "./kv.js";
 import { KV_KEYS } from "./config.js";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+// Cloudflare Workers엔 Node의 Buffer가 없어서(nodejs_compat 없이는) Uint8Array + TextDecoder로만
+// 다룬다 - 로컬 Node에서 테스트할 땐 Buffer가 있어서 문제가 안 보이다가 배포 후에야
+// "Buffer is not defined"로 터졌다(2026-08-23).
+const utf8Decoder = new TextDecoder("utf-8", { fatal: false });
 
 // KFA 공식 사이트는 경기가 완전히 끝나야만 상세(라인업/이벤트)를 열어줘서 라이브 중엔 K3/K4가 계속
 // 비어 보였다(2026-08-23 확인 - kfaMatchCenter.js 자체는 정상, KFA 사이트 구조의 한계). AiScore
@@ -77,7 +81,7 @@ function walkProtoLite(buf, start, end, depth, path, out) {
       const l = Number(len);
       if (l < 0 || pos + l > end) return;
       const slice = buf.slice(pos, pos + l);
-      const asStr = slice.toString("utf8");
+      const asStr = utf8Decoder.decode(slice);
       const printableRatio = l ? [...asStr].filter((c) => c.codePointAt(0) >= 32 || c === "\n").length / asStr.length : 1;
       const looksLikeString = l >= 2 && l <= 80 && printableRatio > 0.98 && !asStr.includes("�");
       if (looksLikeString) {
@@ -99,7 +103,7 @@ function walkProtoLite(buf, start, end, depth, path, out) {
 async function fetchAiscoreBinary(url) {
   const res = await fetch(url, { headers: { "user-agent": UA, accept: "application/octet-stream" } });
   if (!res.ok) throw new Error(`aiscore ${res.status}`);
-  return Buffer.from(await res.arrayBuffer());
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 // KST 자정 기준으로 하루치 전세계 경기 목록을 받아 K3/K4 경기만 골라, 대회ID+킥오프 초 단위 일치로
