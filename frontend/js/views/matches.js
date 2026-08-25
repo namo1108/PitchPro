@@ -79,11 +79,17 @@ function saveExtraLeagueCodes() {
 // null이면 "아직 못 받음 또는 실패" -> 필터링 없이 예전처럼 전부 보여준다(fail-open).
 let curatedCodes = null;
 let curatedCodesPromise = null;
+// 여기서 await하지 않고 백그라운드로만 쏜다 - 이 요청이 (reject가 아니라) 응답 자체를 못 받고
+// 멈추는 상황이면, loadMatches에서 Promise.all로 묶어 기다릴 경우 경기 목록 자체가 영원히
+// "불러오는 중"에서 멈춰버린다(토스 앱 내 webview에서 실제로 발생, 2026-08-25). curatedCodes가
+// 늦게 채워져도 필터링이 fail-open(null이면 전부 표시)이라 문제없고, 다 받아온 뒤엔 이미 그려둔
+// 목록을 한 번 더 다시 그려서 필터를 뒤늦게라도 적용한다.
 function ensureCuratedCodes() {
   if (!curatedCodesPromise) {
     curatedCodesPromise = fetchJSON("/competitions")
       .then((data) => {
         curatedCodes = new Set((data.competitions || []).map((c) => c.code));
+        if (state.lastMatches) renderMatches(state.lastMatches);
       })
       .catch(() => {}); // 실패하면 curatedCodes는 null로 남아 필터링을 건너뛴다.
   }
@@ -103,9 +109,10 @@ export async function loadMatches(opts = {}) {
   const alreadyLoaded = state.loadedOffsets.has(state.dayOffset);
   if (!opts.silent && !alreadyLoaded) el.matchesList.innerHTML = skeletonList(5);
   ensureKLeagueRankMap(); // 백그라운드로 미리 채워둠(주요경기 우선순위 계산용) - 못 채워도 기존 정렬로 조용히 대체됨
+  ensureCuratedCodes(); // 백그라운드 - 아래 fetch를 기다리게 하지 않는다(이유는 함수 선언부 주석 참고)
   try {
     const iso = toISODate(dateWithOffset(state.dayOffset));
-    const [data] = await Promise.all([fetchJSON(`/matches?date=${iso}`), ensureCuratedCodes()]);
+    const data = await fetchJSON(`/matches?date=${iso}`);
     const matches = data.matches || [];
     state.lastMatches = matches;
     renderMatches(matches);
