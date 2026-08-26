@@ -782,12 +782,8 @@ function renderHeroCard(m) {
     </div>
   `;
 
-  card.querySelectorAll("[data-team-id]").forEach((teamEl) => {
-    teamEl.addEventListener("click", (e) => {
-      e.stopPropagation();
-      goToTeam(teamEl.dataset.teamId);
-    });
-  });
+  // 팀 엠블럼/이름을 눌러도 팀 정보가 아니라 이 경기 상세로 가야 한다(2026-08-25 피드백 - 카드
+  // 아무 데나 눌러도 경기 정보가 나와야 하는데, 엠블럼만 따로 팀 페이지로 새는 게 헷갈림).
   attachWatchBells(card);
 
   card.addEventListener("click", () => loadMatchDetail(m.id, m));
@@ -840,12 +836,6 @@ function renderMatchRow(m) {
     </div>
   `;
 
-  row.querySelectorAll("[data-team-id]").forEach((teamEl) => {
-    teamEl.addEventListener("click", (e) => {
-      e.stopPropagation();
-      goToTeam(teamEl.dataset.teamId);
-    });
-  });
   attachWatchBells(row);
 
   row.addEventListener("click", () => loadMatchDetail(m.id, m));
