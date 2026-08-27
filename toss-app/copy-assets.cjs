@@ -27,11 +27,11 @@ esbuild.buildSync({
   outfile: path.join(DEST, "js", "toss-ads.js"),
 });
 
-// toss-notifications.js(Notification/User)는 세 번(2026-08-22, 2026-08-25 x2) 로드할 때마다 미니앱
-// 전체를 먹통으로 만들었다 - <script async>도 안 통했다. 그런데 그 세 번은 전부 다른 코드(광고 코드나
-// 즐겨찾기 연동 등)와 한 파일에 섞여 있었다 - toss-ads.js가 단독으로는 문제없다고 확인된 지금, 이번엔
-// Notification/User만 깨끗하게 단독으로 로드해서 정말 이 둘 자체가 원인인지 최종 확인한다
-// (2026-08-27, 사용자 요청). 또 먹통이면 이제 "Notification/User가 범인"이라고 확정할 수 있다.
+// toss-notifications.js(Notification/User)는 이제 확정됐다(2026-08-27) - toss-ads.js와 나란히
+// async로 단독 로드해봤더니 광고는 뜨는데 경기 목록(app.js)은 여전히 안 뜬다는 걸 사용자가 재현
+// 확인해줬다(총 4번째 재현). 다른 코드와 안 섞여도 이 둘만으로 앱이 멈춘다 - 이제 "Notification/User
+// API 자체"가 원인이라고 확정. 번들은 계속 만들어두되(다음에 참고용) 로드는 안 한다 - 원격 디버깅
+// (chrome://inspect)으로 이 SDK 내부의 정확한 정지 지점을 보기 전까지는 다시 시도하지 않는다.
 esbuild.buildSync({
   entryPoints: [path.join(__dirname, "src", "toss-notifications.js")],
   bundle: true,
@@ -41,7 +41,7 @@ esbuild.buildSync({
 });
 indexHtml = indexHtml.replace(
   '<script type="module" src="/js/app.js"></script>',
-  '<script type="module" async src="/js/toss-ads.js"></script>\n  <script type="module" async src="/js/toss-notifications.js"></script>\n  <script type="module" src="/js/app.js"></script>'
+  '<script type="module" async src="/js/toss-ads.js"></script>\n  <script type="module" src="/js/app.js"></script>'
 );
 
 fs.writeFileSync(indexPath, indexHtml);
