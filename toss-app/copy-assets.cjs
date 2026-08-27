@@ -18,24 +18,7 @@ const indexPath = path.join(DEST, "index.html");
 let indexHtml = fs.readFileSync(indexPath, "utf8");
 indexHtml = indexHtml.replace("<html lang=\"ko\">", '<html lang="ko" data-toss-app="1">');
 
-// 세 번째로 확인한 문제(2026-08-22, 2026-08-25 x2): toss-notifications.js(Notification/User,
-// @apps-in-toss/web-framework)를 로드하면 앱인토스 미니앱 전체가 먹통이 된다. <script async>로도
-// 못 피했다(2026-08-26) - 원인은 스크립트 "실행 순서"가 아니라 이 SDK 코드가 실행되는 순간 JS
-// 스레드 자체가 멈추는 것으로 보인다(예: 네이티브 브릿지 동기 호출이 응답을 못 받고 계속 대기).
-// 번들 자체(esbuild)는 계속 만들어두되(다음에 참고용) 로드는 안 한다 - 원격 디버깅(chrome://inspect)
-// 으로 실제 정지 지점을 확인하기 전까지는 다시 시도하지 않는다.
-esbuild.buildSync({
-  entryPoints: [path.join(__dirname, "src", "toss-notifications.js")],
-  bundle: true,
-  format: "esm",
-  target: "es2020",
-  outfile: path.join(DEST, "js", "toss-notifications.js"),
-});
-
-// toss-ads.js는 같은 SDK 패키지지만 TossAds만 import한다(Notification/User는 전혀 안 씀) - 알림
-// 쪽 코드가 먹통의 원인이었는지, 광고 쪽(TossAds)도 똑같이 문제인지 구분해보기 위해 이것만 먼저
-// 로드해본다(2026-08-27, 사용자 요청). 여기서도 같은 증상이 재현되면 SDK 패키지 자체(초기화 시점에
-// 뭔가를 하는 공용 진입점)가 원인이라는 뜻이 된다.
+// toss-ads.js(TossAds만 import)는 2026-08-27에 단독 테스트에서 먹통 없이 정상 확인됐다 - 계속 로드.
 esbuild.buildSync({
   entryPoints: [path.join(__dirname, "src", "toss-ads.js")],
   bundle: true,
@@ -43,9 +26,22 @@ esbuild.buildSync({
   target: "es2020",
   outfile: path.join(DEST, "js", "toss-ads.js"),
 });
+
+// toss-notifications.js(Notification/User)는 세 번(2026-08-22, 2026-08-25 x2) 로드할 때마다 미니앱
+// 전체를 먹통으로 만들었다 - <script async>도 안 통했다. 그런데 그 세 번은 전부 다른 코드(광고 코드나
+// 즐겨찾기 연동 등)와 한 파일에 섞여 있었다 - toss-ads.js가 단독으로는 문제없다고 확인된 지금, 이번엔
+// Notification/User만 깨끗하게 단독으로 로드해서 정말 이 둘 자체가 원인인지 최종 확인한다
+// (2026-08-27, 사용자 요청). 또 먹통이면 이제 "Notification/User가 범인"이라고 확정할 수 있다.
+esbuild.buildSync({
+  entryPoints: [path.join(__dirname, "src", "toss-notifications.js")],
+  bundle: true,
+  format: "esm",
+  target: "es2020",
+  outfile: path.join(DEST, "js", "toss-notifications.js"),
+});
 indexHtml = indexHtml.replace(
   '<script type="module" src="/js/app.js"></script>',
-  '<script type="module" async src="/js/toss-ads.js"></script>\n  <script type="module" src="/js/app.js"></script>'
+  '<script type="module" async src="/js/toss-ads.js"></script>\n  <script type="module" async src="/js/toss-notifications.js"></script>\n  <script type="module" src="/js/app.js"></script>'
 );
 
 fs.writeFileSync(indexPath, indexHtml);
