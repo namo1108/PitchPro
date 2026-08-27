@@ -576,13 +576,34 @@ html[data-toss-app] .more-toggle-btn {
   border-radius: 999px;
 }
 
-html[data-toss-app] .content {
-  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
-}
-
 html[data-toss-app] .more-menu {
   bottom: calc(22px + env(safe-area-inset-bottom, 0px));
   padding-bottom: 78px;
+}
+
+/* 토스 배너 광고 - 일반 웹/PWA/안드로이드는 아예 안 보이고(빈 컨테이너), 앱인토스 빌드에서만
+   플로팅 탭바 바로 위에 떠 있게 한다. 96px는 토스 가이드가 지정한 고정 배너 높이 - 실제로 광고가
+   안 붙으면(TossAds.attachBanner 실패/미지원) 빈 공간만 차지하니, 그 경우엔 컨테이너를 JS에서
+   숨기는 게 낫다(toss-notifications.js가 처리). 정확한 여백은 실기기 확인 후 미세조정이 필요할 수 있다. */
+.toss-ad-banner {
+  display: none;
+}
+
+html[data-toss-app] .toss-ad-banner {
+  display: block;
+  position: fixed;
+  left: 28px;
+  right: 28px;
+  bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  max-width: calc(900px - 56px);
+  margin: 0 auto;
+  width: calc(100% - 56px);
+  height: 96px;
+  z-index: 18;
+}
+
+html[data-toss-app] .content {
+  padding-bottom: calc(212px + env(safe-area-inset-bottom, 0px));
 }
 
 .section-title {

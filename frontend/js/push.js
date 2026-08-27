@@ -11,8 +11,50 @@ function urlBase64ToUint8Array(base64String) {
 
 let swRegistration = null;
 
+// 앱인토스(토스 미니앱) WebView처럼 서비스워커/푸시 자체를 지원하지 않는 환경이 있다 - 이 경우
+// "권한이 없어서" 실패하는 게 아니라 애초에 기능 자체가 없는 거라, 호출부가 다른 안내 문구를
+// 보여줄 수 있게 구분해서 노출한다.
+export function isPushSupported() {
+  return "serviceWorker" in navigator && "PushManager" in window;
+}
+
+// 앱인토스 빌드에서만 <html data-toss-app="1">이 심어진다(toss-app/copy-assets.cjs 참고).
+export function isTossApp() {
+  return document.documentElement.hasAttribute("data-toss-app");
+}
+
+// 토스 SDK(@apps-in-toss/web-framework)는 valibot 등을 bare import하는 ESM이라 번들러 없는 우리
+// 정적 프론트에서 그냥 import할 수 없다 - 그래서 toss-app/copy-assets.cjs가 esbuild로 별도
+// 번들링해서 앱인토스 빌드에만 끼워 넣고(toss-notifications.js), window에 함수 하나만 노출해둔다.
+// 일반 웹/PWA/안드로이드 빌드에는 이 스크립트 자체가 없어 함수도 없으므로 항상 안전하게 호출 전
+// 존재 여부를 확인한다.
+export function tryTossNotify() {
+  if (typeof window.__pitchProTossNotify !== "function") return false;
+  return window.__pitchProTossNotify();
+}
+
+// 경기 화면 🔔 벨 전용 - 즐겨찾기 팀과 무관하게 이 경기 하나만 알림 대상으로 켜거나 끈다.
+export function tryTossWatchMatch(matchId, watch) {
+  if (typeof window.__pitchProTossWatchMatch !== "function") return Promise.resolve(false);
+  return window.__pitchProTossWatchMatch(matchId, watch);
+}
+
+// 알림 권한이 한 번 "차단"되면 브라우저가 다시는 자동으로 안 물어봐서(코드로 되돌릴 방법이 없음 -
+// 브라우저 보안 정책), "권한이 필요합니다"라고만 하면 사용자가 어디서 풀어야 할지 못 찾아 헤맨다
+// (2026-08-22 사용자 피드백) - denied일 때만 브라우저/OS별로 실제로 풀 수 있는 경로를 짚어준다.
+export function notificationBlockedMessage() {
+  if (typeof Notification === "undefined" || Notification.permission !== "denied") {
+    return "알림을 받으려면 브라우저 알림 권한이 필요합니다.";
+  }
+  const ua = navigator.userAgent || "";
+  if (/SamsungBrowser/i.test(ua)) {
+    return "이 브라우저에서 알림이 차단돼 있어요.\n삼성인터넷 메뉴(≡) > 설정 > 사이트 권한 > 알림에서 이 사이트를 찾아 허용으로 바꿔주세요.";
+  }
+  return "이 브라우저에서 알림이 차단돼 있어요.\n주소창의 사이트 이름(또는 자물쇠/ⓘ 아이콘)을 눌러 '권한' > '알림'을 허용으로 바꾼 뒤 새로고침해주세요.";
+}
+
 async function getRegistration() {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
+  if (!isPushSupported()) return null;
   if (!swRegistration) swRegistration = await navigator.serviceWorker.register("/sw.js");
   return swRegistration;
 }
@@ -85,7 +127,14 @@ function syncNotifyButton(subscribed) {
 
 export function initPushButton() {
   const btn = document.getElementById("notify-btn");
-  if (!btn || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+  if (!btn) return;
+
+  // 2026-08-22 - 이 버튼에 토스 알림 동의 요청을 연결했더니(favorites-changed/matches.js의
+  // isTossApp 분기와 동시에 존재할 때만) 토스 미니앱 전체가 먹통이 되는 재현되는 사고가 있었다
+  // (여러 번 비교 테스트로 확인, 정확한 원인은 못 찾음 - 세 지점을 각각 넣었을 땐 멀쩡한데 셋을
+  // 합치면 깨짐). 즐겨찾기 시 자동으로 뜨는 동의 화면(favorites-changed 참고)으로도 같은 목적을
+  // 달성하니, 이 버튼은 안전하게 그냥 꺼둔다.
+  if (!isPushSupported()) {
     if (btn) btn.disabled = true;
     return;
   }
@@ -116,24 +165,34 @@ export function initPushButton() {
 
     const subscription = await ensureSubscribed();
     syncNotifyButton(!!subscription);
+    if (!subscription) alert(notificationBlockedMessage());
   });
 }
 
 // 이미 구독 중인 상태에서 즐겨찾기 팀이 바뀌면(구독 시점 이후 추가/삭제), 서버의 teamIds도 다시 맞춘다.
 // 안 그러면 구독할 때 즐겨찾기가 비어 있던 경우 팀 골 알림이 영영 안 온다.
 //
-// 아직 구독 중이 아니면(=첫 즐겨찾기 팀 추가), 여기서 바로 알림 권한을 요청한다 - "즐겨찾기 팀
-// 등록"이라는 사용자의 진짜 클릭에서 곧바로 이어지는 동기 호출이라 브라우저의 user-activation이
-// 살아있어 권한 팝업이 자연스럽게 뜬다("🔔 골 알림 받기" 버튼을 따로 눌러야 하는 불편을 없앤다).
+// 아직 구독 중이 아니면(=첫 즐겨찾기 팀 추가, 또는 이미 권한은 있는데 구독 자체가 어떤 이유로든
+// 사라진 경우) 여기서 바로 재구독을 시도한다 - "즐겨찾기 팀 등록"이라는 사용자의 진짜 클릭에서
+// 곧바로 이어지는 동기 호출이라 브라우저의 user-activation이 살아있어 권한 팝업이 필요하면 자연
+// 스럽게 뜬다("🔔 골 알림 받기" 버튼을 따로 눌러야 하는 불편을 없앤다).
+// 2026-08-20 수정 - 처음엔 permission이 "default"(한 번도 안 물어봄)일 때만 시도했는데, 이미
+// "granted" 상태인데 구독 객체만 사라진 경우(구독 만료, 저장공간 초기화 등)를 놓쳐서 즐겨찾기를
+// 다시 추가해도 재구독이 전혀 안 되는 사고가 있었다 - "denied"(명시적으로 거부)만 제외한다.
 // 단, 브라우저는 권한을 코드로 "자동 허용"시키는 건 절대 허용하지 않는다 - 사용자가 그 네이티브
 // 팝업에서 직접 허용/거부를 선택해야 하며, 우리가 할 수 있는 건 그 팝업이 뜨는 타이밍뿐이다.
 window.addEventListener("favorites-changed", async () => {
   const reg = await getRegistration();
-  if (!reg) return;
+  if (!reg) {
+    // 앱인토스(토스 미니앱)는 서비스워커/푸시 자체가 없어 위 getRegistration이 항상 null인데,
+    // 대신 토스 자체 알림 동의 화면(Notification.requestAgreement)으로 같은 역할을 한다.
+    if (isTossApp()) tryTossNotify();
+    return;
+  }
   const existing = await reg.pushManager.getSubscription();
 
   if (!existing) {
-    if (Notification.permission === "default") await ensureSubscribed();
+    if (Notification.permission !== "denied") await ensureSubscribed();
     return;
   }
 

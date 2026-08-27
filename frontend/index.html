@@ -378,6 +378,13 @@
           <div id="admin-reports-body" class="admin-reports-body">불러오는 중...</div>
         </div>
 
+        <!-- 크론 실패/이상감지 로그 - 예전엔 발생할 때마다 푸시로 왔는데 너무 잦아서 여기 모아본다. -->
+        <div class="settings-group">
+          <div class="settings-group-title">⚠️ 크론 실패 / 이상감지 로그</div>
+          <div id="admin-alerts-body" class="admin-reports-body">불러오는 중...</div>
+          <button id="admin-alerts-clear-btn" class="auth-submit-btn" style="display: none; margin-top: 8px;">확인 완료 (목록 비우기)</button>
+        </div>
+
         <!-- 계정/커뮤니티 데이터를 JSON 파일로 내려받는 수동 백업. -->
         <div class="settings-group">
           <div class="settings-group-title">💾 데이터 백업</div>
@@ -453,6 +460,11 @@
         <span>설정</span>
       </button>
     </div>
+
+    <!-- 앱인토스(토스 미니앱) 전용 배너 광고 컨테이너 - toss-app/src/toss-notifications.js가 여기에
+         TossAds 배너를 붙인다. 일반 웹/PWA/안드로이드 빌드는 style.css에서 기본 display:none이라
+         빈 공간을 차지하지 않는다. -->
+    <div id="toss-ad-banner" class="toss-ad-banner"></div>
 
     <nav class="bottom-nav">
       <button class="nav-btn active" data-view="matches">

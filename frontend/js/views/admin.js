@@ -250,6 +250,51 @@ async function loadAdminReports() {
   }
 }
 
+// 크론 실패/이상감지(레이트리밋 등) 로그 - 예전엔 발생할 때마다 관리자 계정으로 푸시 알림이 왔는데
+// 너무 잦다는 피드백(2026-08-26)으로 조용히 여기에 쌓이도록 바꿨다. "확인 완료"를 누르면 지금까지
+// 쌓인 걸 비우고, 그 이후에 새로 실패한 것만 다시 쌓인다.
+async function loadAdminAlerts() {
+  const body = document.getElementById("admin-alerts-body");
+  const clearBtn = document.getElementById("admin-alerts-clear-btn");
+  if (!body) return;
+  body.textContent = "불러오는 중...";
+  try {
+    const data = await authFetch("/admin/alerts");
+    if (!data.entries?.length) {
+      body.textContent = "쌓인 로그가 없습니다.";
+      if (clearBtn) clearBtn.style.display = "none";
+      return;
+    }
+    if (clearBtn) clearBtn.style.display = "";
+    body.innerHTML = data.entries
+      .map((e) => {
+        const time = new Date(e.createdAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+        return `
+          <div class="admin-report-row">
+            <div class="admin-report-target">${escapeHtml(e.taskName)}</div>
+            <div class="admin-report-body">${escapeHtml(e.message)}</div>
+            <div class="admin-report-meta">${time}</div>
+          </div>
+        `;
+      })
+      .join("");
+  } catch (err) {
+    body.textContent = `불러오기 실패: ${err.message}`;
+  }
+}
+
+document.getElementById("admin-alerts-clear-btn")?.addEventListener("click", async (e) => {
+  e.target.disabled = true;
+  try {
+    await authFetch("/admin/alerts/clear", { method: "POST" });
+    await loadAdminAlerts();
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    e.target.disabled = false;
+  }
+});
+
 // GA 등 외부 분석 도구 없이 서버(src/routes/track.js)가 KV에 날짜별로 더해둔 익명 집계를 보여준다.
 // 개인 식별 없이 "탭 조회수/가입/로그인/집관인증" 횟수만 있는 요약이라 큰 대시보드가 아니라
 // 간단한 표로 끝낸다.
@@ -313,6 +358,7 @@ export function openAdminPage() {
   pushDetail("admin");
   loadAdminAnalytics();
   loadAdminReports();
+  loadAdminAlerts();
 }
 
 document.getElementById("admin-page-open-btn")?.addEventListener("click", openAdminPage);

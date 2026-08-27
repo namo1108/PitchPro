@@ -365,6 +365,14 @@ export async function routeApiRequest(request, env, ctx) {
   if (segments[1] === "admin" && segments[2] === "reports" && segments[4] === "resolve" && segments.length === 5 && request.method === "POST") {
     return handleResolveReport(request, env, segments[3]);
   }
+  if (segments[1] === "admin" && segments[2] === "alerts" && segments.length === 3 && request.method === "GET") {
+    const { handleListAdminAlerts } = await import("./lib/adminAlert.js");
+    return handleListAdminAlerts(request, env);
+  }
+  if (segments[1] === "admin" && segments[2] === "alerts" && segments[3] === "clear" && segments.length === 4 && request.method === "POST") {
+    const { handleClearAdminAlerts } = await import("./lib/adminAlert.js");
+    return handleClearAdminAlerts(request, env);
+  }
   if (segments[1] === "admin" && segments[2] === "test-cron-alert" && request.method === "POST") {
     const { alertAdminOfFailure } = await import("./lib/adminAlert.js");
     await alertAdminOfFailure(env, `테스트-${Date.now()}`, new Error("관리자 알림 테스트입니다."));

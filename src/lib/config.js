@@ -25,6 +25,7 @@ export const COMPETITIONS = [
   { code: "DED", name: "Eredivisie", emblem: "https://media.api-sports.io/football/leagues/88.png", apiFootballLeagueId: 88, apiFootballSeason: 2026, transferWindows: EU_WINDOWS },
   { code: "PPL", name: "Primeira Liga", emblem: "https://media.api-sports.io/football/leagues/94.png", apiFootballLeagueId: 94, apiFootballSeason: 2026, transferWindows: EU_WINDOWS },
   { code: "ELC", name: "Championship", emblem: "https://media.api-sports.io/football/leagues/40.png", apiFootballLeagueId: 40, apiFootballSeason: 2026, transferWindows: EU_WINDOWS },
+  { code: "EFL", name: "EFL컵(카라바오컵)", emblem: "https://media.api-sports.io/football/leagues/48.png", apiFootballLeagueId: 48, apiFootballSeason: 2026, hasBracket: true, featured: true },
   { code: "BSA", name: "Brasileirão", emblem: "https://media.api-sports.io/football/leagues/71.png", apiFootballLeagueId: 71, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-03" }, { start: "07-15", end: "09-18" }] },
   { code: "CL", name: "Champions League", emblem: "https://media.api-sports.io/football/leagues/2.png", apiFootballLeagueId: 2, apiFootballSeason: 2026, hasBracket: true, featured: true },
   { code: "EL", name: "Europa League", emblem: "https://media.api-sports.io/football/leagues/3.png", apiFootballLeagueId: 3, apiFootballSeason: 2026, hasBracket: true, featured: true },
@@ -173,6 +174,9 @@ export const KV_KEYS = {
   communityPostPrefix: "community:post:",
   // 신고 목록 - 게시글/댓글 공용으로 한 인덱스에 쌓는다(양이 많지 않을 거라 굳이 분리할 필요 없음).
   communityReportIndex: "community:reports:index",
+  // 크론 실패/이상감지 로그 - 예전엔 발생할 때마다 관리자에게 푸시 알림을 보냈는데, 너무 잦아서
+  // (2026-08-26 피드백) 조용히 여기에 쌓아두고 관리자 페이지에서 몰아서 확인하는 방식으로 바꿨다.
+  adminAlertLog: "admin:alertlog:v1",
   // 포인트가 오르내릴 때마다(집관인증 참여/승리/패배 정산 등) 한 줄씩 남기는 개인별 내역 - 유저당
   // 최근 POINTS_LOG_MAX_ENTRIES개만 유지한다(무한정 쌓아두지 않음).
   pointsLogPrefix: "pointslog:",

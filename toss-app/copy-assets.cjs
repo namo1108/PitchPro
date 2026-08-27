@@ -18,15 +18,17 @@ const indexPath = path.join(DEST, "index.html");
 let indexHtml = fs.readFileSync(indexPath, "utf8");
 indexHtml = indexHtml.replace("<html lang=\"ko\">", '<html lang="ko" data-toss-app="1">');
 
-// 2026-08-22 07:32(7b0d29b)에 이미 한 번 확인한 문제다: toss-notifications.js를 로드하면 앱인토스
-// 미니앱 전체가 먹통이 된다(경기/뉴스 등 전부, 알림만이 아니라). 그때 스크립트 태그 주입을 뺐었는데,
-// 6분 뒤(5515914 -> 96baf1e, "경기별 알림 워치" 기능) 다시 들어가면서 버그가 재발했다(2026-08-25
-// 재확인 - 8/20 이전 빌드만 정상 작동, 이후 빌드는 전부 로딩 중 멈춤). "테스트 채널이 불안정해서"라는
-// 그 사이의 결론은, 이 되돌림 전/후 빌드가 섞여서 테스트되며 생긴 착시였다. 원인(SDK 초기화 코드가
-// 페이지 전체를 깨뜨리는 이유) 자체는 아직 못 찾았으니, 번들은 만들어두되(esbuild는 유지, 나중에
-// 다시 붙일 때 참고용) 로드는 하지 않는다 - 토스 자체 알림/워치 기능이 빠지는 게, 앱 전체가 먹통인
-// 것보다 훨씬 낫다. push.js의 tryTossNotify/tryTossWatchMatch는 window.__pitchProToss* 함수가
-// 없으면 안전하게 false를 돌려주도록 이미 만들어져 있어 이 스크립트 없이도 나머지는 정상 동작한다.
+// 2026-08-22(7b0d29b)/2026-08-25 두 번이나 겪은 문제: toss-notifications.js(@apps-in-toss/web-framework
+// 번들)를 로드하면 앱인토스 미니앱 전체가 먹통이 된다(경기/뉴스 등 전부, 알림만이 아니라) - 8/20
+// 이전 빌드(이 태그가 없던 시점)만 정상 작동했고, 이후 빌드는 전부 로딩 중 멈췄다. 코드를 다시 보니
+// window.__pitchProToss* 함수 정의 말고는 이 스크립트 자체는 즉시 실행되는 코드가 없다 - 그런데도
+// 멈춘다는 건, import한 SDK 내부 어딘가(네이티브 브릿지 초기화 등)가 응답을 못 받고 계속 기다리는
+// 상태에 빠진다는 뜻으로 보인다. 문제는 <script type="module">이 async 없이는 문서 순서대로
+// 실행되도록 스펙에 정해져 있어서, 이 스크립트가 안 끝나면 뒤에 오는 app.js조차 실행을 못 하고
+// 기다리게 된다 - 그래서 매번 "경기 화면도 안 뜬다"처럼 앱 전체가 죽는 것처럼 보였던 것.
+// async를 붙이면 이 스크립트는 독립적으로 로드/실행되고, app.js는 기다리지 않고 바로 실행된다 -
+// SDK가 여전히 멈추더라도 토스 알림 기능만 조용히 안 되고 나머지 앱은 정상 동작해야 한다(2026-08-26
+// 재도입, "나의 팀" 자동 알림 + 광고 SDK가 같은 패키지를 필요로 해서 다시 붙임).
 esbuild.buildSync({
   entryPoints: [path.join(__dirname, "src", "toss-notifications.js")],
   bundle: true,
@@ -34,6 +36,10 @@ esbuild.buildSync({
   target: "es2020",
   outfile: path.join(DEST, "js", "toss-notifications.js"),
 });
+indexHtml = indexHtml.replace(
+  '<script type="module" src="/js/app.js"></script>',
+  '<script type="module" async src="/js/toss-notifications.js"></script>\n  <script type="module" src="/js/app.js"></script>'
+);
 
 fs.writeFileSync(indexPath, indexHtml);
 
