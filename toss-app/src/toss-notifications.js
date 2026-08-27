@@ -1,47 +1,4 @@
-import { Notification, User, TossAds } from "@apps-in-toss/web-framework";
-
-// 2026-08-26 - 콘솔에서 발급받은 배너 광고 그룹 ID(사용자 제공).
-const AD_GROUP_ID = "ait.v2.live.082ac21e3f3d4e7b";
-
-// 플로팅 탭바 바로 위에 고정 배치된 컨테이너(index.html #toss-ad-banner, 일반 웹/PWA/안드로이드
-// 빌드에는 style.css에서 항상 display:none) - SDK 초기화가 실패하거나(구버전 토스 앱 등) 광고가
-// 안 채워지면(onNoFill) 빈 배너가 자리만 차지하니 그 경우 컨테이너 자체를 숨긴다.
-function initBannerAd() {
-  const container = document.getElementById("toss-ad-banner");
-  if (!container) return;
-  if (!TossAds?.initialize?.isSupported?.()) {
-    container.style.display = "none";
-    return;
-  }
-
-  TossAds.initialize({
-    callbacks: {
-      onInitialized: () => {
-        const result = TossAds.attachBanner(AD_GROUP_ID, container, {
-          theme: "auto",
-          tone: "blackAndWhite",
-          variant: "expanded",
-          callbacks: {
-            onNoFill: () => {
-              container.style.display = "none";
-            },
-            onAdFailedToRender: (payload) => {
-              console.error("토스 배너 광고 렌더링 실패:", payload?.error?.message);
-              container.style.display = "none";
-            },
-          },
-        });
-        if (!result) container.style.display = "none";
-      },
-      onInitializationFailed: (error) => {
-        console.error("토스 광고 SDK 초기화 실패:", error?.message);
-        container.style.display = "none";
-      },
-    },
-  });
-}
-
-initBannerAd();
+import { Notification, User } from "@apps-in-toss/web-framework";
 
 // 콘솔 스마트 발송(기능성 캠페인)에 등록해둔 발송 코드 - src/lib/tossPush.js의 TOSS_TEMPLATE_CODE와 반드시 같아야 한다.
 const TEMPLATE_CODE = "pitchpro-notify";

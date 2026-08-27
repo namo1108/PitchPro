@@ -581,15 +581,29 @@ html[data-toss-app] .more-menu {
   padding-bottom: 78px;
 }
 
-/* 토스 배너 광고 컨테이너(#toss-ad-banner, index.html) - toss-notifications.js를 다시 로드할 수
-   있게 되기 전까지는(2026-08-26 재확인 - async를 붙여도 SDK가 여전히 앱 전체를 멈춤) 이 스크립트
-   자체를 안 불러오므로, 광고를 채우거나 실패 시 숨겨줄 코드가 없다 - 기본값을 항상 숨김으로 둔다. */
+/* 토스 배너 광고 - 일반 웹/PWA/안드로이드는 아예 안 보이고(빈 컨테이너), 앱인토스 빌드에서만
+   플로팅 탭바 바로 위에 떠 있게 한다. 96px는 토스 가이드가 지정한 고정 배너 높이 - 광고가 안
+   붙으면(TossAds.attachBanner 실패/미지원) toss-ads.js가 컨테이너를 숨긴다.
+   가이드 필수 조건(2026-08-27, developers-apps-in-toss.toss.im/documentation/common/monetization/
+   iaa/web-banner): 컨테이너 width는 항상 화면 너비와 동일(100%)해야 한다 - 탭바처럼 좌우 여백을
+   주면 안 된다(처음에 28px씩 inset을 줬다가 이 문서 보고 수정, 정책 위반이었음). */
 .toss-ad-banner {
   display: none;
 }
 
+html[data-toss-app] .toss-ad-banner {
+  display: block;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+  height: 96px;
+  z-index: 18;
+}
+
 html[data-toss-app] .content {
-  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(212px + env(safe-area-inset-bottom, 0px));
 }
 
 .section-title {
