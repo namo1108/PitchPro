@@ -460,6 +460,10 @@ function showFinishedToast(m) {
   });
 }
 
+// leagues.js의 LEAGUE_GROUPS "국내(K리그)" 코드 집합과 반드시 같아야 한다 - 리그 탭에서 테마가
+// 켜지는 대회면 경기 상세에서도 같은 테마가 켜져야 하니(2026-08-28), 코드 목록을 그대로 맞춘다.
+const KLEAGUE_THEME_CODES = new Set(["KL1", "KL2", "KFA", "K3", "K4"]);
+
 // 화면 상단에 크게 보여줄 "주요 경기" 하나를 고른다: 라이브 경기가 있으면 그중 우선순위가 높은 대회,
 // 없으면 오늘 경기 중 우선순위가 높은 대회의 가장 이른 경기.
 // 우선순위: (0) 나의 팀(즐겨찾기) 경기는 isFollowedMatch로 이미 별도 필터링되어 항상 최우선이고,
@@ -1542,6 +1546,12 @@ function renderMatchDetail(m) {
   const isSameMatch = state.detailMatchId === m.id;
   const previousActiveTab = isSameMatch ? el.detailContent.querySelector(".team-tab-btn.active")?.dataset.detailTab : null;
   state.detailMatchId = m.id;
+
+  // 리그 탭(leagues.js의 LEAGUE_GROUPS.theme)과 같은 코드 집합 - 경기 상세도 그 리그 경기면 같은
+  // 테마 배경이 자동으로 켜진다(2026-08-28 사용자 요청, 버튼 없이 "보고 있는 리그" 기준 자동 적용).
+  const theme = KLEAGUE_THEME_CODES.has(m.competition.code) ? "kleague" : null;
+  if (theme) el.detailContent.dataset.theme = theme;
+  else delete el.detailContent.dataset.theme;
 
   const isLive = LIVE_STATUSES.has(m.status) && !m.dataStale;
   const isFinished = m.status === "FINISHED";

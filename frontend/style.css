@@ -2052,6 +2052,56 @@ table.standings-table {
   color: var(--gold);
 }
 
+/* 경기 상세도 리그 탭(#view-leagues[data-theme])과 같은 원리 - K리그 경기면 matches.js의
+   renderMatchDetail이 #match-detail-content에 data-theme="kleague"를 얹고, 여기서 화면 전체에
+   대각선 레드 스트라이프+스타버스트 배경을 입힌다. 버튼 없이 "지금 보는 경기가 어느 리그인지"만으로
+   자동 전환되고, 다른 경기로 넘어가면 자동으로 꺼진다(2026-08-28). */
+.match-detail-content {
+  position: relative;
+  isolation: isolate;
+}
+.match-detail-content::before,
+.match-detail-content::after {
+  content: "";
+  position: absolute;
+  inset: -24px -16px;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.5s var(--ease);
+  pointer-events: none;
+}
+.match-detail-content[data-theme="kleague"]::before {
+  opacity: 1;
+  background:
+    linear-gradient(200deg, #10193a 0%, #060a1c 55%, #050814 100%),
+    linear-gradient(118deg, transparent 0%, transparent 38%, rgba(226, 39, 63, 0.55) 43%, rgba(226, 39, 63, 0.32) 49%, transparent 55%, transparent 100%),
+    linear-gradient(118deg, transparent 0%, transparent 56%, rgba(255, 207, 77, 0.28) 60%, transparent 64%, transparent 100%);
+}
+.match-detail-content[data-theme="kleague"]::after {
+  opacity: 1;
+  background:
+    radial-gradient(180px 180px at 78% 22%, rgba(255, 90, 90, 0.85), rgba(226, 39, 63, 0.25) 45%, transparent 72%),
+    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 3px, transparent 3.5px) 85% 48% / 100% 100% no-repeat,
+    radial-gradient(circle, rgba(255, 255, 255, 0.7) 0 2px, transparent 2.4px) 10% 65% / 100% 100% no-repeat,
+    radial-gradient(circle, rgba(255, 207, 77, 0.8) 0 1.6px, transparent 2px) 92% 70% / 100% 100% no-repeat;
+}
+
+.match-detail-content[data-theme="kleague"] .scoreboard-card {
+  background: linear-gradient(165deg, rgba(16, 25, 58, 0.88), rgba(6, 10, 28, 0.94));
+  border-color: rgba(226, 39, 63, 0.5);
+}
+.match-detail-content[data-theme="kleague"] .scoreboard-competition,
+.match-detail-content[data-theme="kleague"] .scoreboard-status:not(.live):not(.finished) {
+  color: var(--gold);
+}
+.match-detail-content[data-theme="kleague"] .team-tab-btn.active {
+  color: #ff6b7a;
+  border-bottom-color: #ff6b7a;
+}
+.match-detail-content[data-theme="kleague"] .detail-action-btn {
+  border-color: rgba(226, 39, 63, 0.4);
+}
+
 .detail-info-grid {
   margin-top: 20px;
   display: grid;
