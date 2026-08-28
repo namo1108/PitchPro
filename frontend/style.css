@@ -1444,6 +1444,52 @@ html[data-toss-app] .content {
   font-size: 16px;
 }
 
+/* 리그별 테마 배경 - 지금은 국내(K리그) 그룹을 펼치면 화면 전체에 대각선 레드 스트라이프+스타버스트를
+   입힌다(2026-08-28 사용자 요청, K리그 공식 대진표 그래픽 참고). leagues.js의 syncViewTheme()이
+   #view-leagues에 data-theme="kleague"를 얹고 떼는 걸로 켜고 끈다 - 그룹을 접으면 원래 배경으로
+   자연스럽게 돌아온다. ::before(줄무늬 두 겹)/::after(스타버스트+스파클)를 뷰 뒤에 고정해서 카드들이
+   그 위에 얹힌 것처럼 보이게 한다. */
+#view-leagues {
+  position: relative;
+  isolation: isolate;
+}
+#view-leagues::before,
+#view-leagues::after {
+  content: "";
+  position: absolute;
+  inset: -24px -16px;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.5s var(--ease);
+  pointer-events: none;
+}
+#view-leagues[data-theme="kleague"]::before {
+  opacity: 1;
+  background:
+    linear-gradient(200deg, #10193a 0%, #060a1c 55%, #050814 100%),
+    linear-gradient(118deg, transparent 0%, transparent 38%, rgba(226, 39, 63, 0.55) 43%, rgba(226, 39, 63, 0.32) 49%, transparent 55%, transparent 100%),
+    linear-gradient(118deg, transparent 0%, transparent 56%, rgba(255, 207, 77, 0.28) 60%, transparent 64%, transparent 100%);
+}
+#view-leagues[data-theme="kleague"]::after {
+  opacity: 1;
+  background:
+    radial-gradient(180px 180px at 78% 32%, rgba(255, 90, 90, 0.85), rgba(226, 39, 63, 0.25) 45%, transparent 72%),
+    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 3px, transparent 3.5px) 82% 62% / 100% 100% no-repeat,
+    radial-gradient(circle, rgba(255, 255, 255, 0.7) 0 2px, transparent 2.4px) 12% 78% / 100% 100% no-repeat,
+    radial-gradient(circle, rgba(255, 207, 77, 0.8) 0 1.6px, transparent 2px) 90% 85% / 100% 100% no-repeat;
+}
+
+/* 이 화면의 리그 그룹/행 카드는 원래 불투명 배경이라 뒤의 테마 그래픽이 안 비친다 - 테마가 켜져
+   있을 땐 반투명하게 낮춰서 카드 아래로 스트라이프가 은은하게 비치게 한다. */
+#view-leagues[data-theme] .league-group {
+  background: rgba(14, 26, 21, 0.72);
+  backdrop-filter: blur(1px);
+  transition: background 0.4s var(--ease);
+}
+#view-leagues[data-theme] .league-group-body .league-row {
+  background: rgba(14, 26, 21, 0.6);
+}
+
 .league-back-btn {
   display: block;
   background: none;

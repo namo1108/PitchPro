@@ -10,17 +10,22 @@ import { isFavorite } from "../favorites.js";
 // 트리(아코디언)로 접었다 펼치게 한다. 코드에 없는 대회는 자동으로 "기타"에 담긴다.
 const LEAGUE_GROUPS = [
   { title: "국제대회", codes: ["WC", "EC", "CL", "ACL", "ACL2", "ACUP"] },
-  { title: "국내(K리그)", codes: ["KL1", "KL2", "KFA", "K3", "K4"] },
+  // theme: 이 그룹을 펼치면 리그 탭 화면 전체에 그 리그 톤의 배경 연출을 입힌다(2026-08-28 사용자
+  // 요청, K리그 공식 대진표 그래픽 참고 - 대각선 레드 스트라이프+스타버스트). 카드 하나가 아니라
+  // 화면 전체 배경이라 style.css의 #view-leagues[data-theme] 규칙으로 처리한다(syncViewTheme 참고).
+  { title: "국내(K리그)", codes: ["KL1", "KL2", "KFA", "K3", "K4"], theme: "kleague" },
   { title: "유럽 5대리그", codes: ["PL", "PD", "BL1", "SA", "FL1"] },
   { title: "유럽 기타", codes: ["DED", "PPL", "ELC", "NOR", "DEN", "SCO"] },
   { title: "아시아", codes: ["J1", "J2", "J3"] },
   { title: "아메리카·기타", codes: ["BSA", "MLS", "AUS", "KSA", "CHN"] },
 ];
+const THEME_BY_TITLE = new Map(LEAGUE_GROUPS.filter((g) => g.theme).map((g) => [g.title, g.theme]));
 
 // 첫 방문엔 국내(K리그) 그룹만 펼쳐두고 나머지는 접어서 시작한다.
 const state = { competitions: [], openCode: null, pollTimer: null, query: "", openGroups: new Set(["국내(K리그)"]), loaded: false };
 
 const el = {
+  view: document.getElementById("view-leagues"),
   list: document.getElementById("league-list"),
   searchInput: document.getElementById("league-search-input"),
   teamResults: document.getElementById("league-team-results"),
@@ -73,9 +78,11 @@ function renderList(animate = true) {
   }
 
   const byCode = new Map(state.competitions.map((c) => [c.code, c]));
-  const grouped = LEAGUE_GROUPS.map((g) => ({ title: g.title, items: g.codes.map((code) => byCode.get(code)).filter(Boolean) })).filter(
-    (g) => g.items.length
-  );
+  const grouped = LEAGUE_GROUPS.map((g) => ({
+    title: g.title,
+    theme: g.theme,
+    items: g.codes.map((code) => byCode.get(code)).filter(Boolean),
+  })).filter((g) => g.items.length);
   const groupedCodes = new Set(LEAGUE_GROUPS.flatMap((g) => g.codes));
   const others = state.competitions.filter((c) => !groupedCodes.has(c.code));
   if (others.length) grouped.push({ title: "기타", items: others });
@@ -108,6 +115,16 @@ function renderList(animate = true) {
   el.list.querySelectorAll("[data-group]").forEach((btn) => {
     btn.addEventListener("click", () => toggleGroup(btn.dataset.group, btn));
   });
+  syncViewTheme();
+}
+
+// 테마가 있는 그룹(지금은 국내(K리그))이 펼쳐져 있는 동안만 리그 탭 화면 전체에 그 테마 배경을
+// 입힌다 - 카드 하나가 아니라 화면 전체 연출이라 뷰 루트(#view-leagues)에 data-theme를 얹는다.
+function syncViewTheme() {
+  if (!el.view) return;
+  const activeTheme = [...state.openGroups].map((title) => THEME_BY_TITLE.get(title)).find(Boolean);
+  if (activeTheme) el.view.dataset.theme = activeTheme;
+  else delete el.view.dataset.theme;
 }
 
 function toggleGroup(title, btn) {
@@ -122,6 +139,7 @@ function toggleGroup(title, btn) {
     body.style.display = "flex";
     btn.classList.add("open");
   }
+  syncViewTheme();
 }
 
 function bindLeagueRows(container) {
