@@ -1482,10 +1482,11 @@ html[data-toss-app] .content {
 .theme-emblem-watermark {
   position: absolute;
   z-index: -1;
-  right: -6%;
-  top: 4%;
-  width: 230px;
-  height: 230px;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  width: 280px;
+  height: 280px;
   object-fit: contain;
   opacity: 0;
   transition: opacity 0.5s var(--ease);
@@ -1494,7 +1495,7 @@ html[data-toss-app] .content {
 }
 #view-leagues[data-theme] .theme-emblem-watermark,
 #view-detail[data-theme] .theme-emblem-watermark {
-  opacity: 0.2;
+  opacity: 0.1;
 }
 
 /* 리그당 토큰 3종(--t-bg 바탕 그라디언트, --t-motif 브랜드 텍스처, --t-glow 워터마크/카드 글로우) -
