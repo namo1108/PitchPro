@@ -30,6 +30,10 @@ const LEAGUE_GROUPS = [
   { title: "아메리카·기타", codes: ["BSA", "AUS", "KSA", "CHN"] },
 ];
 const THEME_BY_TITLE = new Map(LEAGUE_GROUPS.filter((g) => g.theme).map((g) => [g.title, g.theme]));
+// 리그 상세/순위 화면(openLeague)은 그룹이 아니라 대회 코드 하나를 딱 짚어서 열리니, 코드로 바로
+// 테마를 찾을 수 있게 별도 매핑을 둔다(그룹 여러 개가 동시에 펼쳐져 있는 아코디언 상태와 무관하게
+// 항상 "지금 보고 있는 그 리그"의 테마가 정확히 켜져야 한다, 2026-08-29 버그 수정).
+const THEME_BY_CODE = new Map(LEAGUE_GROUPS.filter((g) => g.theme).flatMap((g) => g.codes.map((code) => [code, g.theme])));
 
 // 첫 방문엔 국내(K리그) 그룹만 펼쳐두고 나머지는 접어서 시작한다.
 // themeEmblems: 테마별 워터마크에 쓸 실제 API-Football 엠블럼 URL - competitions를 받아오면
@@ -133,19 +137,27 @@ function renderList(animate = true) {
   syncViewTheme();
 }
 
-// 테마가 있는 그룹(지금은 국내(K리그))이 펼쳐져 있는 동안만 리그 탭 화면 전체에 그 테마 배경을
-// 입힌다 - 카드 하나가 아니라 화면 전체 연출이라 뷰 루트(#view-leagues)에 data-theme를 얹는다.
-function syncViewTheme() {
+// 뷰 루트(#view-leagues)에 data-theme를 얹고 떼는 공용 함수 - 아코디언 목록 화면(syncViewTheme)과
+// 리그 상세/순위 화면(openLeague) 둘 다 결국 여기로 모인다.
+function applyViewTheme(themeKey, emblemUrl) {
   if (!el.view) return;
-  const activeTheme = [...state.openGroups].map((title) => THEME_BY_TITLE.get(title)).find(Boolean);
-  if (activeTheme) {
-    el.view.dataset.theme = activeTheme;
-    const emblem = state.themeEmblems.get(activeTheme);
-    if (el.themeEmblem) el.themeEmblem.src = emblem || "";
+  if (themeKey) {
+    el.view.dataset.theme = themeKey;
+    if (el.themeEmblem) el.themeEmblem.src = emblemUrl || "";
   } else {
     delete el.view.dataset.theme;
     if (el.themeEmblem) el.themeEmblem.removeAttribute("src");
   }
+}
+
+// 테마가 있는 그룹(K리그/프리미어리그/...)이 펼쳐져 있는 동안 리그 탭 화면 전체에 그 테마 배경을
+// 입힌다 - 여러 그룹을 동시에 펼쳐둘 수 있어서(아코디언이 하나만 열리게 강제하지 않음), 그중 가장
+// 최근에 연 테마 그룹을 우선한다(2026-08-29 수정 - 예전엔 Set 순회 순서상 항상 "처음 연" 그룹이
+// 이겨서, 다른 리그를 열어도 계속 첫 번째 색으로 고정되는 버그가 있었다).
+function syncViewTheme() {
+  const activeTitle = [...state.openGroups].reverse().find((title) => THEME_BY_TITLE.has(title));
+  const themeKey = activeTitle ? THEME_BY_TITLE.get(activeTitle) : null;
+  applyViewTheme(themeKey, themeKey ? state.themeEmblems.get(themeKey) : null);
 }
 
 function toggleGroup(title, btn) {
@@ -235,6 +247,7 @@ function showLeagueList() {
   el.searchInput.style.display = "block";
   state.openCode = null;
   stopStandingsPoll();
+  syncViewTheme(); // 상세 화면에서 켜졌던 코드 기준 테마를 목록 화면 기준(펼쳐진 그룹)으로 되돌린다.
 }
 
 // 경기 탭의 대회 헤더를 눌러 리그 순위로 바로 넘어오는 진입점 - 리그 탭을 안 거쳐도(첫 방문이라
@@ -257,6 +270,10 @@ function openLeague(code) {
   el.detailWrap.style.display = "block";
   state.openCode = code;
   pushSubView(showLeagueList);
+  // 아코디언 상태(state.openGroups)와 무관하게, 지금 실제로 보고 있는 대회 코드 기준으로 테마를
+  // 정확히 맞춘다(2026-08-29 - 예전엔 이 화면에서 테마가 아예 갱신되지 않아서, 아무 리그 순위를
+  // 봐도 예전에 마지막으로 아코디언에서 열어봤던 색이 그대로 남아있는 버그가 있었다).
+  applyViewTheme(THEME_BY_CODE.get(code) || null, comp.emblem);
 
   if (comp.hasBracket) {
     el.bracketWrap.style.display = "block";
