@@ -1444,17 +1444,22 @@ html[data-toss-app] .content {
   font-size: 16px;
 }
 
-/* 리그별 테마 배경 - 지금은 국내(K리그) 그룹을 펼치면 화면 전체에 대각선 레드 스트라이프+스타버스트를
-   입힌다(2026-08-28 사용자 요청, K리그 공식 대진표 그래픽 참고). leagues.js의 syncViewTheme()이
-   #view-leagues에 data-theme="kleague"를 얹고 떼는 걸로 켜고 끈다 - 그룹을 접으면 원래 배경으로
-   자연스럽게 돌아온다. ::before(줄무늬 두 겹)/::after(스타버스트+스파클)를 뷰 뒤에 고정해서 카드들이
-   그 위에 얹힌 것처럼 보이게 한다. */
-#view-leagues {
+/* 리그별 테마 배경 - 리그 탭에서 테마 있는 그룹을 펼치거나(leagues.js) 그 리그 경기 상세로 들어가면
+   (matches.js) 화면 전체에 그 리그 톤 배경 + 실제 API-Football 엠블럼 워터마크가 자동으로 켜진다
+   (2026-08-28/29 사용자 요청, 각 리그 공식 그래픽 참고). 두 화면(#view-leagues, #view-detail)이
+   완전히 같은 메커니즘을 쓰므로 규칙을 합쳐서 하나로 관리한다 - 리그가 늘어나도 테마 토큰 블록만
+   추가하면 된다. ::before(배경 그라디언트)/::after(브랜드 텍스처)를 뷰 뒤에 고정해서 카드들이 그
+   위에 얹힌 것처럼 보이게 하고, .theme-emblem-watermark(<img>, index.html)가 그 리그의 실제 엠블럼을
+   크게 반투명으로 띄운다. */
+#view-leagues,
+#view-detail {
   position: relative;
   isolation: isolate;
 }
 #view-leagues::before,
-#view-leagues::after {
+#view-leagues::after,
+#view-detail::before,
+#view-detail::after {
   content: "";
   position: absolute;
   inset: -24px -16px;
@@ -1463,24 +1468,103 @@ html[data-toss-app] .content {
   transition: opacity 0.5s var(--ease);
   pointer-events: none;
 }
-#view-leagues[data-theme="kleague"]::before {
+#view-leagues[data-theme]::before,
+#view-detail[data-theme]::before {
   opacity: 1;
-  background:
-    linear-gradient(200deg, #10193a 0%, #060a1c 55%, #050814 100%),
+  background: var(--t-bg);
+}
+#view-leagues[data-theme]::after,
+#view-detail[data-theme]::after {
+  opacity: 1;
+  background: var(--t-motif);
+}
+
+.theme-emblem-watermark {
+  position: absolute;
+  z-index: -1;
+  right: -6%;
+  top: 4%;
+  width: 230px;
+  height: 230px;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.5s var(--ease);
+  pointer-events: none;
+  filter: drop-shadow(0 0 40px var(--t-glow, transparent));
+}
+#view-leagues[data-theme] .theme-emblem-watermark,
+#view-detail[data-theme] .theme-emblem-watermark {
+  opacity: 0.2;
+}
+
+/* 리그당 토큰 3종(--t-bg 바탕 그라디언트, --t-motif 브랜드 텍스처, --t-glow 워터마크/카드 글로우) -
+   두 화면 다 같은 값을 쓰므로 id를 묶어서 한 번만 정의한다. */
+#view-leagues[data-theme="kleague"],
+#view-detail[data-theme="kleague"] {
+  --t-accent: #e2273f;
+  --t-glow: rgba(226, 39, 63, 0.5);
+  --t-bg: linear-gradient(200deg, #10193a 0%, #060a1c 55%, #050814 100%),
     linear-gradient(118deg, transparent 0%, transparent 38%, rgba(226, 39, 63, 0.55) 43%, rgba(226, 39, 63, 0.32) 49%, transparent 55%, transparent 100%),
     linear-gradient(118deg, transparent 0%, transparent 56%, rgba(255, 207, 77, 0.28) 60%, transparent 64%, transparent 100%);
+  --t-motif: radial-gradient(180px 180px at 78% 28%, rgba(255, 90, 90, 0.7), rgba(226, 39, 63, 0.2) 45%, transparent 72%),
+    radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 3px, transparent 3.5px) 82% 60% / 100% 100% no-repeat,
+    radial-gradient(circle, rgba(255, 207, 77, 0.8) 0 1.6px, transparent 2px) 90% 82% / 100% 100% no-repeat;
 }
-#view-leagues[data-theme="kleague"]::after {
-  opacity: 1;
-  background:
-    radial-gradient(180px 180px at 78% 32%, rgba(255, 90, 90, 0.85), rgba(226, 39, 63, 0.25) 45%, transparent 72%),
-    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 3px, transparent 3.5px) 82% 62% / 100% 100% no-repeat,
-    radial-gradient(circle, rgba(255, 255, 255, 0.7) 0 2px, transparent 2.4px) 12% 78% / 100% 100% no-repeat,
-    radial-gradient(circle, rgba(255, 207, 77, 0.8) 0 1.6px, transparent 2px) 90% 85% / 100% 100% no-repeat;
+#view-leagues[data-theme="pl"],
+#view-detail[data-theme="pl"] {
+  --t-accent: #a855f7;
+  --t-glow: rgba(168, 85, 247, 0.55);
+  --t-bg: linear-gradient(165deg, #2c0c48 0%, #150629 62%, #070312 100%);
+  --t-motif: radial-gradient(240px 240px at 84% 26%, rgba(181, 101, 240, 0.35), transparent 70%),
+    radial-gradient(200px 200px at 6% 80%, rgba(124, 31, 160, 0.25), transparent 70%);
+}
+#view-leagues[data-theme="pd"],
+#view-detail[data-theme="pd"] {
+  --t-accent: #d81f2e;
+  --t-glow: rgba(216, 31, 46, 0.5);
+  --t-bg: linear-gradient(160deg, #240406 0%, #0d0202 65%, #050101 100%);
+  --t-motif: radial-gradient(300px 200px at 90% 10%, rgba(255, 90, 99, 0.25), transparent 70%),
+    linear-gradient(118deg, transparent 0%, transparent 42%, rgba(216, 31, 46, 0.5) 46%, rgba(216, 31, 46, 0.26) 51%, transparent 56%, transparent 100%);
+}
+#view-leagues[data-theme="bl1"],
+#view-detail[data-theme="bl1"] {
+  --t-accent: #b8172f;
+  --t-glow: rgba(184, 23, 47, 0.5);
+  --t-bg: linear-gradient(160deg, #260306 0%, #0d0202 65%, #050101 100%);
+  --t-motif: radial-gradient(280px 280px at 88% 20%, rgba(255, 107, 82, 0.3), transparent 68%);
+}
+#view-leagues[data-theme="sa"],
+#view-detail[data-theme="sa"] {
+  --t-accent: #1560d8;
+  --t-glow: rgba(21, 96, 216, 0.5);
+  --t-bg: linear-gradient(160deg, #041025 0%, #020814 65%, #010409 100%);
+  --t-motif: radial-gradient(260px 260px at 82% 24%, rgba(79, 178, 255, 0.32), transparent 68%);
+}
+#view-leagues[data-theme="fl1"],
+#view-detail[data-theme="fl1"] {
+  --t-accent: #4a5ce0;
+  --t-glow: rgba(74, 92, 224, 0.45);
+  --t-bg: linear-gradient(160deg, #070b2c 0%, #030512 65%, #01020a 100%);
+  --t-motif: linear-gradient(120deg, transparent 0%, transparent 42%, rgba(74, 92, 224, 0.38) 47%, transparent 55%, transparent 100%);
+}
+#view-leagues[data-theme="mls"],
+#view-detail[data-theme="mls"] {
+  --t-accent: #d4af6a;
+  --t-glow: rgba(240, 210, 122, 0.55);
+  --t-bg: linear-gradient(160deg, #0b0f26 0%, #05070f 65%, #030408 100%);
+  --t-motif: radial-gradient(280px 280px at 80% 22%, rgba(240, 210, 122, 0.26), transparent 68%);
+}
+#view-leagues[data-theme="cl"],
+#view-detail[data-theme="cl"] {
+  --t-accent: #4fd8ff;
+  --t-glow: rgba(0, 229, 255, 0.6);
+  --t-bg: linear-gradient(160deg, #0d1660 0%, #230a5e 55%, #06071e 100%);
+  --t-motif: radial-gradient(300px 300px at 80% 16%, rgba(0, 229, 255, 0.3), transparent 70%),
+    radial-gradient(260px 260px at 10% 74%, rgba(122, 63, 245, 0.35), transparent 70%);
 }
 
 /* 이 화면의 리그 그룹/행 카드는 원래 불투명 배경이라 뒤의 테마 그래픽이 안 비친다 - 테마가 켜져
-   있을 땐 반투명하게 낮춰서 카드 아래로 스트라이프가 은은하게 비치게 한다. */
+   있을 땐 반투명하게 낮춰서 카드 아래로 배경이 은은하게 비치게 한다. */
 #view-leagues[data-theme] .league-group {
   background: rgba(14, 26, 21, 0.72);
   backdrop-filter: blur(1px);
@@ -2052,54 +2136,22 @@ table.standings-table {
   color: var(--gold);
 }
 
-/* 경기 상세도 리그 탭(#view-leagues[data-theme])과 같은 원리 - K리그 경기면 matches.js의
-   renderMatchDetail이 #match-detail-content에 data-theme="kleague"를 얹고, 여기서 화면 전체에
-   대각선 레드 스트라이프+스타버스트 배경을 입힌다. 버튼 없이 "지금 보는 경기가 어느 리그인지"만으로
-   자동 전환되고, 다른 경기로 넘어가면 자동으로 꺼진다(2026-08-28). */
-.match-detail-content {
-  position: relative;
-  isolation: isolate;
+/* 경기 상세 카드도 리그 탭과 같은 --t-* 토큰을 그대로 쓴다(위 #view-leagues/#view-detail 공용 블록
+   참고) - 리그가 늘어나도 여기는 하나도 안 건드려도 된다. */
+#view-detail[data-theme] .scoreboard-card {
+  background: linear-gradient(165deg, rgba(10, 14, 26, 0.88), rgba(4, 6, 14, 0.94));
+  border-color: color-mix(in srgb, var(--t-accent) 55%, transparent);
 }
-.match-detail-content::before,
-.match-detail-content::after {
-  content: "";
-  position: absolute;
-  inset: -24px -16px;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.5s var(--ease);
-  pointer-events: none;
-}
-.match-detail-content[data-theme="kleague"]::before {
-  opacity: 1;
-  background:
-    linear-gradient(200deg, #10193a 0%, #060a1c 55%, #050814 100%),
-    linear-gradient(118deg, transparent 0%, transparent 38%, rgba(226, 39, 63, 0.55) 43%, rgba(226, 39, 63, 0.32) 49%, transparent 55%, transparent 100%),
-    linear-gradient(118deg, transparent 0%, transparent 56%, rgba(255, 207, 77, 0.28) 60%, transparent 64%, transparent 100%);
-}
-.match-detail-content[data-theme="kleague"]::after {
-  opacity: 1;
-  background:
-    radial-gradient(180px 180px at 78% 22%, rgba(255, 90, 90, 0.85), rgba(226, 39, 63, 0.25) 45%, transparent 72%),
-    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0 3px, transparent 3.5px) 85% 48% / 100% 100% no-repeat,
-    radial-gradient(circle, rgba(255, 255, 255, 0.7) 0 2px, transparent 2.4px) 10% 65% / 100% 100% no-repeat,
-    radial-gradient(circle, rgba(255, 207, 77, 0.8) 0 1.6px, transparent 2px) 92% 70% / 100% 100% no-repeat;
-}
-
-.match-detail-content[data-theme="kleague"] .scoreboard-card {
-  background: linear-gradient(165deg, rgba(16, 25, 58, 0.88), rgba(6, 10, 28, 0.94));
-  border-color: rgba(226, 39, 63, 0.5);
-}
-.match-detail-content[data-theme="kleague"] .scoreboard-competition,
-.match-detail-content[data-theme="kleague"] .scoreboard-status:not(.live):not(.finished) {
+#view-detail[data-theme] .scoreboard-competition,
+#view-detail[data-theme] .scoreboard-status:not(.live):not(.finished) {
   color: var(--gold);
 }
-.match-detail-content[data-theme="kleague"] .team-tab-btn.active {
-  color: #ff6b7a;
-  border-bottom-color: #ff6b7a;
+#view-detail[data-theme] .team-tab-btn.active {
+  color: var(--t-accent);
+  border-bottom-color: var(--t-accent);
 }
-.match-detail-content[data-theme="kleague"] .detail-action-btn {
-  border-color: rgba(226, 39, 63, 0.4);
+#view-detail[data-theme] .detail-action-btn {
+  border-color: color-mix(in srgb, var(--t-accent) 45%, transparent);
 }
 
 .detail-info-grid {

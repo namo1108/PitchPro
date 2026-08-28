@@ -8,24 +8,37 @@ import { isFavorite } from "../favorites.js";
 
 // 대회 27개를 한 줄짜리 긴 리스트로 두면 원하는 리그를 찾기 힘들어서, 지역/성격별로 묶어
 // 트리(아코디언)로 접었다 펼치게 한다. 코드에 없는 대회는 자동으로 "기타"에 담긴다.
+//
+// theme: 이 그룹을 펼치면 리그 탭 화면 전체에 그 리그 톤의 배경 연출을 입힌다(2026-08-28/29 사용자
+// 요청, 각 리그 공식 그래픽 참고 - 브랜드 컬러 + 그 그룹의 대표 대회 엠블럼을 화면 뒤에 크게 반투명
+// 워터마크로 깐다). 카드 하나가 아니라 화면 전체 배경이라 style.css의 #view-leagues[data-theme]
+// 규칙으로 처리한다(syncViewTheme 참고). 테마를 넣으려고 "유럽 5대리그"(예전엔 5개 리그를 한 그룹에
+// 묶어뒀음)를 리그별로 쪼갰다 - 그래야 그룹 하나 = 리그 하나 = 테마 하나가 맞아떨어진다. 같은 이유로
+// UEFA 챔피언스리그(원래 "국제대회"에 있었음)와 MLS(원래 "아메리카·기타"에 있었음)도 따로 뺐다.
 const LEAGUE_GROUPS = [
-  { title: "국제대회", codes: ["WC", "EC", "CL", "ACL", "ACL2", "ACUP"] },
-  // theme: 이 그룹을 펼치면 리그 탭 화면 전체에 그 리그 톤의 배경 연출을 입힌다(2026-08-28 사용자
-  // 요청, K리그 공식 대진표 그래픽 참고 - 대각선 레드 스트라이프+스타버스트). 카드 하나가 아니라
-  // 화면 전체 배경이라 style.css의 #view-leagues[data-theme] 규칙으로 처리한다(syncViewTheme 참고).
+  { title: "국제대회", codes: ["WC", "EC", "ACL", "ACL2", "ACUP"] },
+  { title: "UEFA 챔피언스리그", codes: ["CL"], theme: "cl" },
   { title: "국내(K리그)", codes: ["KL1", "KL2", "KFA", "K3", "K4"], theme: "kleague" },
-  { title: "유럽 5대리그", codes: ["PL", "PD", "BL1", "SA", "FL1"] },
+  { title: "프리미어리그", codes: ["PL"], theme: "pl" },
+  { title: "라리가", codes: ["PD"], theme: "pd" },
+  { title: "분데스리가", codes: ["BL1"], theme: "bl1" },
+  { title: "세리에 A", codes: ["SA"], theme: "sa" },
+  { title: "리그앙", codes: ["FL1"], theme: "fl1" },
+  { title: "MLS", codes: ["MLS"], theme: "mls" },
   { title: "유럽 기타", codes: ["DED", "PPL", "ELC", "NOR", "DEN", "SCO"] },
   { title: "아시아", codes: ["J1", "J2", "J3"] },
-  { title: "아메리카·기타", codes: ["BSA", "MLS", "AUS", "KSA", "CHN"] },
+  { title: "아메리카·기타", codes: ["BSA", "AUS", "KSA", "CHN"] },
 ];
 const THEME_BY_TITLE = new Map(LEAGUE_GROUPS.filter((g) => g.theme).map((g) => [g.title, g.theme]));
 
 // 첫 방문엔 국내(K리그) 그룹만 펼쳐두고 나머지는 접어서 시작한다.
-const state = { competitions: [], openCode: null, pollTimer: null, query: "", openGroups: new Set(["국내(K리그)"]), loaded: false };
+// themeEmblems: 테마별 워터마크에 쓸 실제 API-Football 엠블럼 URL - competitions를 받아오면
+// renderList에서 채운다(그 전엔 비어있어 워터마크 없이 색/텍스처만 켜진다).
+const state = { competitions: [], openCode: null, pollTimer: null, query: "", openGroups: new Set(["국내(K리그)"]), loaded: false, themeEmblems: new Map() };
 
 const el = {
   view: document.getElementById("view-leagues"),
+  themeEmblem: document.getElementById("league-theme-emblem"),
   list: document.getElementById("league-list"),
   searchInput: document.getElementById("league-search-input"),
   teamResults: document.getElementById("league-team-results"),
@@ -87,6 +100,8 @@ function renderList(animate = true) {
   const others = state.competitions.filter((c) => !groupedCodes.has(c.code));
   if (others.length) grouped.push({ title: "기타", items: others });
 
+  state.themeEmblems = new Map(grouped.filter((g) => g.theme && g.items[0]?.emblem).map((g) => [g.theme, g.items[0].emblem]));
+
   if (!grouped.length) {
     el.list.innerHTML = '<div class="empty-state">리그 목록을 불러오지 못했습니다.</div>';
     return;
@@ -123,8 +138,14 @@ function renderList(animate = true) {
 function syncViewTheme() {
   if (!el.view) return;
   const activeTheme = [...state.openGroups].map((title) => THEME_BY_TITLE.get(title)).find(Boolean);
-  if (activeTheme) el.view.dataset.theme = activeTheme;
-  else delete el.view.dataset.theme;
+  if (activeTheme) {
+    el.view.dataset.theme = activeTheme;
+    const emblem = state.themeEmblems.get(activeTheme);
+    if (el.themeEmblem) el.themeEmblem.src = emblem || "";
+  } else {
+    delete el.view.dataset.theme;
+    if (el.themeEmblem) el.themeEmblem.removeAttribute("src");
+  }
 }
 
 function toggleGroup(title, btn) {

@@ -92,6 +92,9 @@
 
       <!-- 리그(순위) -->
       <section id="view-leagues" class="view">
+        <!-- 리그별 테마(leagues.js의 syncViewTheme)가 켜지면 그 리그의 실제 API-Football 엠블럼을
+             화면 뒤에 크게 반투명으로 깔아준다 - style.css의 #view-leagues[data-theme] 규칙 참고. -->
+        <img id="league-theme-emblem" class="theme-emblem-watermark" alt="" />
         <div class="team-search-wrap">
           <input type="text" id="league-search-input" class="league-search-input" placeholder="🔍 리그/팀 검색 (예: 프리미어, 토트넘, 대한민국)" autocomplete="off" />
           <div id="league-team-results" class="team-search-results"></div>
@@ -396,6 +399,10 @@
 
       <!-- 경기 상세 -->
       <section id="view-detail" class="view">
+        <!-- 리그 탭과 같은 원리 - renderMatchDetail이 #view-detail에 data-theme를 얹으면 그 리그의
+             실제 엠블럼이 화면 뒤에 반투명으로 깔린다. match-detail-content는 매 렌더마다 innerHTML이
+             통째로 갈리므로, 이 <img>는 그 밖(뷰 루트)에 둬야 렌더될 때마다 사라지지 않는다. -->
+        <img id="match-theme-emblem" class="theme-emblem-watermark" alt="" />
         <button class="back-btn" data-back-to="matches">← 목록으로</button>
         <div id="match-detail-content" class="match-detail-content">
           <div class="loading">불러오는 중...</div>
