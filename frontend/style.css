@@ -1479,11 +1479,14 @@ html[data-toss-app] .content {
   background: var(--t-motif);
 }
 
+/* position:absolute였을 때는 #view-leagues/#view-detail의 "전체 콘텐츠 높이"(순위표가 길면 그만큼
+   커짐) 기준으로 가운데 정렬돼서, 실제로는 화면 아래쪽 스크롤해야 보이는 위치에 있었다(사용자 제보,
+   2026-08-29) - fixed로 바꿔서 스크롤과 무관하게 항상 "지금 보이는 화면"의 정중앙에 고정한다. */
 .theme-emblem-watermark {
-  position: absolute;
+  position: fixed;
   z-index: -1;
   left: 50%;
-  top: 46%;
+  top: 50%;
   transform: translate(-50%, -50%);
   width: 280px;
   height: 280px;
