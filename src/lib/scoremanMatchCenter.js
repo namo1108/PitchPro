@@ -19,15 +19,30 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 //   형태(JS 배열 리터럴). 통계타입 0=슈팅, 1=유효슈팅, 6=공격, 7=위협공격, 11=점유율(현재),
 //   12=점유율(전반전) - 전후반 분리값과 대조해서 확인함. 2(코너킥 추정)는 아직 스크린샷 대조가
 //   부족해 보류.
-const SCOREMAN_LEAGUE_ID_K4 = "108";
-const SCOREMAN_LEAGUE_IDS = { K4: SCOREMAN_LEAGUE_ID_K4 }; // K3는 아직 확인된 경기가 없어 비워둠(2026-08-23)
-
-// K3/K4는 팀이 많아 한 번에 다 못 채운다 - AiScore 매핑 때처럼 확인되는 경기부터 하나씩 늘린다.
+// 2026-08-23엔 K4 리그ID를 "108"로 확인해 하드코딩했었는데, 2026-08-29에 같은 서산에프씨(팀ID
+// 78139, 변함없음)로 재확인해보니 리그ID가 "121"로 바뀌어 있었다(K3로 추정되는 조합은 "120") -
+// 일주일도 안 돼 바뀐 걸 보면 이 사이트의 "리그ID"는 시즌 고정값이 아니라 라운드/조 편성 등에 따라
+// 바뀔 수 있는 값으로 보인다. 그래서 리그ID로 필터링하는 걸 아예 그만두고, 팀ID(변함없이 안정적으로
+// 확인됨)+킥오프 초 단위 일치만으로 매칭한다 - 두 조건이 동시에 맞아떨어지는 다른 경기가 우연히
+// 존재할 가능성은 사실상 없다.
+// K3/K4는 팀이 많아 한 번에 다 못 채운다 - 확인되는 경기부터 하나씩 늘린다. 2026-08-29에 그날 진행된
+// K3/K4 6경기를 전부 이 방식으로 대조해 한 번에 확인했다(기존 4개 + 아래 8개 추가).
 const SCOREMAN_TEAM_ID_BY_APIFOOTBALL_ID = {
   27865: "78139", // 서산에프씨
   27858: "78137", // 금산인삼FC
   27860: "78140", // 제천시민축구단
   25720: "73609", // 세종SA축구단
+  23089: "7797", // 남양주시민축구단
+  18653: "52847", // 당진시민축구단
+  7064: "13528", // 춘천시민축구단
+  7068: "5585", // 대전코레일FC
+  7111: "26483", // 양평FC
+  7075: "5633", // FC강릉
+  25717: "60898", // 전북현대모터스(II)
+  27859: "78138", // 함안군민축구단
+  18656: "7794", // 평창유나이티드축구클럽
+  7101: "32253", // 평택시티즌FC
+  25719: "73611", // 기장군민축구단
 };
 
 // JSON이 아니라 작은따옴표를 쓰는 JS 배열 리터럴로 와서, eval 없이 정규식으로 필요한 필드만 뽑는다
@@ -46,17 +61,18 @@ function parseMatchList(text) {
   let m;
   MATCH_ROW_RE.lastIndex = 0;
   while ((m = MATCH_ROW_RE.exec(text))) {
-    const [, matchId, leagueId, homeId, awayId, , , y, mo, d, h, mi, s] = m;
+    const [, matchId, , homeId, awayId, , , y, mo, d, h, mi, s] = m;
     // 이 사이트 날짜 문자열은 월이 0부터 시작하는 JS Date 표기이고 시각은 UTC 그대로다.
     const kickoff = Date.UTC(Number(y), Number(mo), Number(d), Number(h), Number(mi), Number(s)) / 1000;
-    rows.push({ matchId, leagueId, homeId, awayId, kickoff });
+    rows.push({ matchId, homeId, awayId, kickoff });
   }
   return rows;
 }
 
+const SCOREMAN_CODES = new Set(["K3", "K4"]);
+
 export async function findScoremanMatchId(env, match) {
-  const leagueId = SCOREMAN_LEAGUE_IDS[match.competition.code];
-  if (!leagueId) return null;
+  if (!SCOREMAN_CODES.has(match.competition.code)) return null;
 
   const refs = (await getJSON(env, KV_KEYS.scoremanGameRefs)) || {};
   if (refs[match.id]) return refs[match.id];
@@ -72,7 +88,6 @@ export async function findScoremanMatchId(env, match) {
 
     const found = rows.find(
       (r) =>
-        r.leagueId === leagueId &&
         r.kickoff === targetKickoff &&
         ((homeScoremanId && r.homeId === homeScoremanId) || (awayScoremanId && r.awayId === awayScoremanId))
     );
