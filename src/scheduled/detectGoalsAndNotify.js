@@ -46,6 +46,11 @@ export async function detectGoalsAndNotify(env) {
   // "같은 새 값을 두 틱 연속으로 봤을 때"만 확정해서 알린다 - 한 틱짜리 흔들림은 다음 틱에 원래
   // 값으로 돌아오면서 자동으로 버려진다.
   const prevPending = prev?.pending || {};
+  // K3/K4는 API-Football 자체의 라이브 상태/스코어 판정이 불안정해서(가끔 몇 틱씩 잘못된 스코어를
+  // 들고 왔다가 되돌아옴 - 2026-08-22 기장군민 vs 진주시민, 2026-08-23 서산에프씨 vs 금산인삼FC,
+  // 2026-08-29 서산에프씨 재발) 일반 대회용 "2틱 연속" 확정만으로는 부족해서 매번 뚫렸다. K3/K4만
+  // 3틱 연속(대기 2번)을 요구해서 흔들림이 더 오래 버텨도 걸러지게 한다 - 다른 대회는 지금처럼 2틱.
+  const STRICT_CONFIRM_CODES = new Set(["K3", "K4"]);
   // 승부차기 스코어(score.penalty)는 fullTime과 별개 필드라 따로 이전 값을 기억해야 한다 - 연장까지
   // 마친 뒤 무승부라 승부차기에 들어간 경기만 이 값이 채워진다(리그 경기 등은 항상 null).
   const prevPenalty = prev?.penalty || {};
@@ -94,15 +99,24 @@ export async function detectGoalsAndNotify(env) {
 
     const candidate = prevPending[m.id];
     const sameAsCandidate = candidate && candidate.home === observed.home && candidate.away === observed.away;
+    const requiredSightings = STRICT_CONFIRM_CODES.has(m.competition.code) ? 3 : 2;
 
     if (!sameAsCandidate) {
       // 값이 바뀐 걸 처음 본 틱 - 아직 확정하지 않고 다음 틱에 같은 값인지 지켜본다.
       nextScores[m.id] = confirmed;
-      nextPending[m.id] = observed;
+      nextPending[m.id] = { ...observed, seen: 1 };
       continue;
     }
 
-    // 두 틱 연속 같은 새 값 -> 확정하고 알림 대상에 올린다.
+    const seen = (candidate.seen || 1) + 1;
+    if (seen < requiredSightings) {
+      // 같은 값이 또 나왔지만 K3/K4 기준(3틱)엔 아직 못 미침 - 한 번 더 지켜본다.
+      nextScores[m.id] = confirmed;
+      nextPending[m.id] = { ...observed, seen };
+      continue;
+    }
+
+    // 요구 틱 수만큼 연속 같은 새 값 -> 확정하고 알림 대상에 올린다.
     // 크론 간격 사이 같은 팀이 2골 이상 넣으면 점수 차이(count)가 1보다 커진다 -> 그만큼 알림도 여러 건
     // 보내야 하는데, 예전엔 "골이 들어갔다" 여부만 봐서 한 틱에 여러 골이 몰리면 뒤 골 알림만 가고
     // 앞 골 알림은 통째로 누락됐었다.

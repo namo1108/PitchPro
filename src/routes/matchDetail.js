@@ -242,8 +242,18 @@ export async function handleMatchDetail(request, env, id) {
     if (!match) return json({ detail: "경기를 찾을 수 없습니다." }, 404);
   }
 
-  const isLive = LIVE_STATUSES.has(match.status);
+  let isLive = LIVE_STATUSES.has(match.status);
   const isFinished = match.status === "FINISHED";
+
+  // K3/K4는 API-Football 자체의 상태 판정이 가끔 흔들려서(라이브 중에도 순간 SCHEDULED로 되돌아감 -
+  // refreshApiFootballMatches.js 주석 참고) 이 상세 조회(getFixture 단건)도 같은 흔들림을 그대로
+  // 받으면 isLive가 잘못 false가 되어 scoreman123/AiScore 라이브 통계 보강까지 통째로 스킵됐다
+  // (2026-08-29 제보: "경기 도중에 스탯/라인업이 안 불러와져"). 목록 크론이 이미 라이브로 캐싱해둔
+  // KV_KEYS.matches(스코어 보호 로직이 적용돼 더 안정적)와 다르면 캐시 쪽을 믿는다.
+  if (KFA_CODES.has(match.competition.code) && !isLive && !isFinished) {
+    const cachedMatch = await findFallbackMatch(env, id);
+    if (cachedMatch && LIVE_STATUSES.has(cachedMatch.status)) isLive = true;
+  }
 
   match.goalEvents = [];
   match.substitutions = [];
