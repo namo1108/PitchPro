@@ -18,7 +18,7 @@ import {
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
 import { isWatched, toggleWatch } from "../watchlist.js";
-import { setMatchWatch } from "../push.js";
+import { setMatchWatch, isTossApp } from "../push.js";
 import { isFavorite } from "../favorites.js";
 import { saveViewState } from "../viewState.js";
 import { getTheme } from "../theme.js";
@@ -40,6 +40,9 @@ const state = {
   lastMatches: null,
   extraLeagueCodes: loadExtraLeagueCodes(),
   pickerOpen: false,
+  // "league"(기본, 대회별로 묶어서) 또는 "time"(리그 구분 없이 시간순 - 2026-08-29 사용자 요청,
+  // "지금 무슨 경기들이 있나" 한눈에 보고 싶을 때용). 새로고침하면 기본값으로 돌아간다(세션 한정).
+  sortMode: "league",
 };
 
 const el = {
@@ -50,6 +53,7 @@ const el = {
   refreshBtn: document.getElementById("refresh-btn"),
   datePickerBtn: document.getElementById("date-picker-btn"),
   dateInput: document.getElementById("date-picker-input"),
+  timeSortBtn: document.getElementById("time-sort-btn"),
   detailContent: document.getElementById("match-detail-content"),
   detailView: document.getElementById("view-detail"),
   themeEmblem: document.getElementById("match-theme-emblem"),
@@ -478,7 +482,7 @@ const COMPETITION_TIERS = [
   ["WC"], // 월드컵
   ["CL", "EC", "ACL"], // 대륙간컵대회
   ["PL", "PD", "BL1", "SA", "FL1", "DED", "PPL", "ELC", "BSA", "KL1", "KL2"], // 세계 상위 리그
-  ["KFA", "EFL"], // 컵대회
+  ["KFA", "EFL", "FA"], // 컵대회
 ];
 
 function competitionRank(code) {
@@ -527,7 +531,7 @@ const MATCH_LIST_TIERS = [
   ["KL1", "KL2", "K3", "K4"],
   ["CL", "ACL"],
   ["PL", "PD", "BL1", "SA", "FL1"],
-  ["WC", "EC", "KFA", "EFL"],
+  ["WC", "EC", "KFA", "EFL", "FA"],
 ];
 
 function matchListRank(code) {
@@ -569,6 +573,11 @@ function renderMatches(matches) {
   if (!matches.length) {
     el.matchesList.innerHTML = '<div class="empty-state">해당 날짜에 예정된 경기가 없습니다.</div>';
     fadeIn(el.matchesList);
+    return;
+  }
+
+  if (state.sortMode === "time") {
+    renderMatchesByTime(matches);
     return;
   }
 
@@ -672,6 +681,17 @@ function renderMatches(matches) {
   if (pickerCandidates.length) el.matchesList.appendChild(renderLeaguePicker(pickerCandidates));
 }
 
+// "시간순" 모드(2026-08-29 사용자 요청) - 대회로 묶지 않고, 오늘 경기 전부를 킥오프 시각 하나로만
+// 정렬해서 쭉 보여준다. 대회 그룹이 없어지니 각 행에 어느 대회 경기인지 작게 태그를 붙인다(안 그러면
+// 어느 리그 경기인지 알 방법이 없어짐) - renderMatchRow에 옵션으로 얹는다.
+function renderMatchesByTime(matches) {
+  el.matchesList.innerHTML = "";
+  matches
+    .slice()
+    .sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate))
+    .forEach((m) => el.matchesList.appendChild(renderMatchRow(m, { showCompetition: true })));
+}
+
 // 코드에 없는(변방) 리그 중 오늘 실제로 경기가 있는 것만 후보로 모아 "다른 리그 보기"에 체크박스로
 // 보여준다 - 이미 선택해서 목록에 보이는 리그도 여기 그대로 남겨둬서 체크를 풀어 다시 숨길 수 있다.
 function renderLeaguePicker(pickerCandidates) {
@@ -718,6 +738,9 @@ function renderLeaguePicker(pickerCandidates) {
 
 // 경기별 알림 벨(★즐겨찾기와 무관하게 이 경기 하나만 골 알림)의 공용 마크업.
 function watchBellHtml(matchId) {
+  // 토스 미니앱은 알림 자체를 지원 안 하니(Notification/User SDK가 앱을 먹통으로 만들어서 아예 뺐음,
+  // 2026-08-27/29) 흐리게 표시하고 눌러도 안내만 뜨는 대신, 아예 렌더링을 하지 않는다.
+  if (isTossApp()) return "";
   const watched = isWatched(matchId);
   return `<button class="watch-bell ${watched ? "active" : ""}" data-watch-id="${matchId}" aria-label="경기 알림 설정" title="경기 알림 설정">${watched ? "🔔" : "🔕"}</button>`;
 }
@@ -800,9 +823,10 @@ function renderHeroCard(m) {
   return card;
 }
 
-function renderMatchRow(m) {
+function renderMatchRow(m, opts = {}) {
   const row = document.createElement("div");
   row.className = "match-row";
+  if (opts.showCompetition) row.classList.add("with-comp-tag");
 
   const isLive = LIVE_STATUSES.has(m.status) && !m.dataStale;
   const isFinished = m.status === "FINISHED";
@@ -830,7 +854,14 @@ function renderMatchRow(m) {
     ? `<div class="score-box ${isLive ? "live-score" : ""}">${home}<span class="score-dash">:</span>${away}</div>`
     : `<div class="score-box">vs</div>`;
 
+  // 시간순 모드는 대회 그룹 헤더가 없어서, 행 하나하나에 이 경기가 어느 대회인지 작게 태그를
+  // 붙여줘야 한다(안 그러면 팀 이름만 보고 어떤 대회 경기인지 알 방법이 없다).
+  const compTagHtml = opts.showCompetition
+    ? `<div class="match-row-comp-tag">${emblemImg(m.competition, "match-row-comp-emblem")}<span>${m.competition.name}</span></div>`
+    : "";
+
   row.innerHTML = `
+    ${compTagHtml}
     ${statusHtml}
     <div class="team home" data-team-id="${m.homeTeam.id}">
       ${crestImg(m.homeTeam, "team-crest")}
@@ -1777,6 +1808,12 @@ el.refreshBtn.addEventListener("click", () => {
   loadMatches().finally(() => {
     setTimeout(() => el.refreshBtn.classList.remove("spinning"), 600);
   });
+});
+
+el.timeSortBtn?.addEventListener("click", () => {
+  state.sortMode = state.sortMode === "time" ? "league" : "time";
+  el.timeSortBtn.classList.toggle("active", state.sortMode === "time");
+  if (state.lastMatches) renderMatches(state.lastMatches);
 });
 
 el.datePickerBtn.addEventListener("click", () => {

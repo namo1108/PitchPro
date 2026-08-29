@@ -659,6 +659,13 @@ html[data-toss-app] .content {
   box-shadow: 0 0 16px rgba(36, 229, 131, 0.25);
 }
 
+/* 시간순 보기 버튼이 켜져 있는 동안(#time-sort-btn.active) 눌러야 할 상태임을 색으로 표시한다. */
+#time-sort-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .refresh-btn {
   margin-left: 8px;
   font-size: 16px;
@@ -1113,6 +1120,32 @@ html[data-toss-app] .content {
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.2s var(--ease), transform 0.2s var(--ease);
+}
+
+/* 시간순 모드(renderMatchesByTime) 전용 - 대회 그룹 헤더가 없어서 행 위에 작은 대회 태그를 한 줄
+   더 얹는다. 기존 5열 그리드는 그대로 두고, 태그만 전체 폭으로 첫 행에 배치한다. */
+.match-row.with-comp-tag {
+  grid-template-rows: auto auto;
+  padding-top: 8px;
+}
+.match-row-comp-tag {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed var(--border);
+}
+.match-row-comp-emblem {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  border-radius: 3px;
 }
 
 .match-row::before {

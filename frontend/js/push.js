@@ -11,6 +11,13 @@ function urlBase64ToUint8Array(base64String) {
 
 let swRegistration = null;
 
+// 앱인토스 빌드에서만 <html data-toss-app="1">이 심어진다(toss-app/copy-assets.cjs 참고). 이 체크
+// 자체는 DOM 속성만 보는 거라 @apps-in-toss/web-framework(먹통 문제의 원인)와 전혀 무관하게 안전하다 -
+// 알림은 아예 지원 안 하니(2026-08-29), 알림벨을 흐리게 보여주지 말고 처음부터 렌더링 자체를 뺀다.
+export function isTossApp() {
+  return document.documentElement.hasAttribute("data-toss-app");
+}
+
 async function getRegistration() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
   if (!swRegistration) swRegistration = await navigator.serviceWorker.register("/sw.js");
@@ -85,8 +92,10 @@ function syncNotifyButton(subscribed) {
 
 export function initPushButton() {
   const btn = document.getElementById("notify-btn");
+  // 흐리게 비활성화만 해두면 "왜 안 되지" 하고 눌러보게 되니(2026-08-29), 애초에 알림 자체를 지원
+  // 안 하는 환경(토스 미니앱 등)에서는 버튼을 아예 숨긴다.
   if (!btn || !("serviceWorker" in navigator) || !("PushManager" in window)) {
-    if (btn) btn.disabled = true;
+    if (btn) btn.style.display = "none";
     return;
   }
 
