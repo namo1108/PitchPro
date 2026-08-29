@@ -581,6 +581,15 @@ html[data-toss-app] .more-menu {
   padding-bottom: 78px;
 }
 
+/* 토스 미니앱은 표준 웹 푸시(알림)를 지원 안 한다 - 경기 목록의 알림벨(watch-bell)과 설정 탭의
+   "골 알림 받기" 버튼을 숨긴다. push.js에서 isTossApp을 import해서 JS로 조건부 렌더링했더니
+   원인 불명으로 미니앱 전체가 먹통이 되는 게 재현돼서(2026-08-29, 아주 긴 이등분 탐색 끝에 확인 -
+   push.js를 절대 건드리지 않는 게 안전하다고 결론남), 대신 순수 CSS로 숨긴다. */
+html[data-toss-app] .watch-bell,
+html[data-toss-app] #notify-btn {
+  display: none;
+}
+
 /* 토스 배너 광고 - 일반 웹/PWA/안드로이드는 아예 안 보이고(빈 컨테이너), 앱인토스 빌드에서만
    플로팅 탭바 바로 위에 떠 있게 한다. 96px는 토스 가이드가 지정한 고정 배너 높이 - 광고가 안
    붙으면(TossAds.attachBanner 실패/미지원) toss-ads.js가 컨테이너를 숨긴다.

@@ -18,7 +18,7 @@ import {
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
 import { isWatched, toggleWatch } from "../watchlist.js";
-import { setMatchWatch, isTossApp } from "../push.js";
+import { setMatchWatch } from "../push.js";
 import { isFavorite } from "../favorites.js";
 import { saveViewState } from "../viewState.js";
 import { getTheme } from "../theme.js";
@@ -738,9 +738,10 @@ function renderLeaguePicker(pickerCandidates) {
 
 // 경기별 알림 벨(★즐겨찾기와 무관하게 이 경기 하나만 골 알림)의 공용 마크업.
 function watchBellHtml(matchId) {
-  // 토스 미니앱은 알림 자체를 지원 안 하니(Notification/User SDK가 앱을 먹통으로 만들어서 아예 뺐음,
-  // 2026-08-27/29) 흐리게 표시하고 눌러도 안내만 뜨는 대신, 아예 렌더링을 하지 않는다.
-  if (isTossApp()) return "";
+  // 토스 미니앱에서는 style.css의 html[data-toss-app] .watch-bell { display: none }로 숨긴다 -
+  // push.js에서 isTossApp을 import하면 원인 불명의 이유로 토스 미니앱 전체가 먹통이 되는 게
+  // 재현돼서(2026-08-29, 아주 긴 이등분 탐색으로 확인 - Notification/User SDK 때와는 별개 문제),
+  // JS 조건부 렌더링 대신 순수 CSS로 처리한다. push.js는 절대 건드리지 않는다.
   const watched = isWatched(matchId);
   return `<button class="watch-bell ${watched ? "active" : ""}" data-watch-id="${matchId}" aria-label="경기 알림 설정" title="경기 알림 설정">${watched ? "🔔" : "🔕"}</button>`;
 }
