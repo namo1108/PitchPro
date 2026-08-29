@@ -7,7 +7,9 @@ import { buildMatchAnalysis } from "../lib/analysis.js";
 import { getAdidasPointsByCode, findTeamAdidasPoint } from "../lib/kleagueAdidasPoints.js";
 import { fetchTeamRank, KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID } from "../scheduled/refreshKLeagueResults.js";
 
-const ANALYSIS_CACHE_KEY = "analysis:v11";
+// v12: featured 대회 목록이 바뀌면(2026-08-29, K3/K4 제외 + 5대리그/FA컵 등 추가) 예전 필터로
+// 만들어둔 캐시가 TTL(3시간) 동안 그대로 남아있으니, 버전을 올려서 즉시 새로 만들어지게 한다.
+const ANALYSIS_CACHE_KEY = "analysis:v12";
 // 사전 갱신 크론 주기(scheduled/index.js)의 2배로 넉넉하게 잡아서, 쿼터가 빡빡해 사전 갱신 틱이
 // 한 번 건너뛰어져도(isQuotaTight) 다음 틱 전에 캐시가 만료되지 않게 한다(사용자 제보: "AI 분석
 // 열 때 딜레이가 있다" - 콜드캐시로 직접 계산을 떠맡는 순간이 그 지연이다).
@@ -25,17 +27,16 @@ const CONCURRENCY = 6;
 // AI 분석은 주요 대회(config.js의 featured: true)만 만든다 - 팀당 조회 비용이 커서 전체 대회를
 // 다 계산할 수 없다. 그 외 리그/컵대회/친선경기는 문구를 억지로 만들지 않고 경기 목록에만 링크로
 // 노출한다(handleAnalysis 하단 참고).
-// 2026-08-11 사용자 요청으로 범용 커버리지(유럽 5대리그 등) 대신 K리그 전 부(1~4) + 아시아/한국
-// 대회 + 유럽 대항전 + 월드컵/유로만 남겨서 그 안에서 더 깊게 분석하는 쪽으로 범위를 좁혔다.
+// 2026-08-29 사용자 요청 - 스포츠토토가 실제로 다루는 대회 위주로 좁혔다(5대리그/챔스/유로파/
+// 컨퍼런스/AFC챔스1·2/코리아컵/FA컵/카라바오컵 + K리그1·2). K3/K4/J리그/월드컵/유로/아시안컵은
+// featured에서 뺐다(config.js 참고) - 몇 년에 한 번뿐인 국가대표 대회거나 토토 대상이 아님.
 // 노출 슬롯이 몇 개뿐이라, 시간순으로만 뽑으면 그날 하필 빨리 킥오프하는 대회가 슬롯을 차지하고
 // 정작 K리그가 밀려날 수 있어 "중요도 티어" 순으로 먼저 정렬한 뒤 같은 티어 안에서만 시간순으로 줄을 세운다.
-// 0티어: K리그 전 부는 사용자 요청상 항상 최우선. 1티어: 월드컵/유로/챔피언스리그/ACL 엘리트.
-// 2티어: 유로파(컨퍼런스)리그/아시안컵/코리아컵. 3티어: J리그.
+// 0티어: K리그. 1티어: 챔피언스리그/AFC챔스 엘리트/5대리그. 2티어: 유로파(컨퍼런스)리그/코리아컵/FA컵/카라바오컵.
 const AI_ANALYSIS_TIERS = [
-  ["KL1", "KL2", "K3", "K4"],
-  ["WC", "EC", "CL", "ACL"],
-  ["EL", "ECL", "ACUP", "KFA"],
-  ["J1"],
+  ["KL1", "KL2"],
+  ["CL", "ACL", "PL", "PD", "BL1", "SA", "FL1"],
+  ["EL", "ECL", "KFA", "FA", "EFL"],
 ];
 const FEATURED_CODES = new Set(COMPETITIONS.filter((c) => c.featured).map((c) => c.code));
 
