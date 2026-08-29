@@ -139,11 +139,18 @@ function renderList(animate = true) {
 
 // 뷰 루트(#view-leagues)에 data-theme를 얹고 떼는 공용 함수 - 아코디언 목록 화면(syncViewTheme)과
 // 리그 상세/순위 화면(openLeague) 둘 다 결국 여기로 모인다.
+// img.src에 빈 문자열을 넣으면 "이미지 없음"이 아니라 현재 문서 자체를 이미지로 다시 요청하는
+// 유명한 브라우저 버그가 있다 - 첫 방문이라 state.themeEmblems가 아직 안 채워졌을 때(예: 지난 세션
+// 마지막 화면이 리그 탭이었어서 앱 시작과 동시에 이 탭으로 복원되는 경우) emblemUrl이 비어서
+// 이 경로를 타면 그대로 재현된다(토스 미니앱 "먹통" 원인으로 추정, 2026-08-29). 항상 removeAttribute로만 비운다.
 function applyViewTheme(themeKey, emblemUrl) {
   if (!el.view) return;
   if (themeKey) {
     el.view.dataset.theme = themeKey;
-    if (el.themeEmblem) el.themeEmblem.src = emblemUrl || "";
+    if (el.themeEmblem) {
+      if (emblemUrl) el.themeEmblem.src = emblemUrl;
+      else el.themeEmblem.removeAttribute("src");
+    }
   } else {
     delete el.view.dataset.theme;
     if (el.themeEmblem) el.themeEmblem.removeAttribute("src");
