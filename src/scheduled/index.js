@@ -14,6 +14,7 @@ import { refreshBrackets } from "./refreshBrackets.js";
 import { enrichTransferFees } from "./enrichTransferFees.js";
 import { pollLiveMatches } from "./pollLiveMatches.js";
 import { scrapeK3K4TopScorers } from "./scrapeK3K4TopScorers.js";
+import { captureK3K4Stats } from "./captureK3K4Stats.js";
 import { scrapeKLeagueTopPlayers } from "./scrapeKLeagueTopPlayers.js";
 import { scrapeKLeaguePlayerPhotos } from "./scrapeKLeaguePlayerPhotos.js";
 import { scrapeKLeagueCoachPhotos } from "./scrapeKLeagueCoachPhotos.js";
@@ -57,6 +58,13 @@ export async function runScheduledTasks(env) {
   // 자주 돌려도 부담이 적다.
   if (await shouldRun(env, `${KV_KEYS.lastRunPrefix}kfacupresults`, 5 * 60 * 1000)) {
     tasks.push(["kfa 코리아컵 결과 보정", () => refreshKfaCupResults(env)]);
+  }
+
+  // K3/K4 라이브 스탯(라이브스코어/scoreman123/AiScore)은 그 경기가 라이브인 동안만 잠깐 데이터를
+  // 들고 있다가 시간 지나면 지워버려서, 아무도 라이브 중에 안 열어본 경기는 스탯을 영영 놓친다
+  // (2026-08-30 제보) - 라이브 중인 K3/K4 경기는 아무도 안 보고 있어도 주기적으로 미리 캐싱해둔다.
+  if (await shouldRun(env, `${KV_KEYS.lastRunPrefix}k3k4statscapture`, 5 * 60 * 1000)) {
+    tasks.push(["k3/k4 라이브 스탯 사전 캐싱", () => captureK3K4Stats(env)]);
   }
 
   // 이적시장 탭 데이터: 리그별 팀을 몇 개씩 순환 조회하는 무거운 작업이라 5분마다 다 돌리지 않는다.

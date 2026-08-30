@@ -195,7 +195,7 @@ async function fillFromMls(env, match, isLive, isFinished) {
 // 스코어가 항목도 제일 많고(슈팅/유효슈팅/코너킥/반칙/점유율) 라벨도 한글 그대로라 가장 먼저 시도하고,
 // 대회 일정 피드를 아직 등록 못 한 대회(K4 등)나 실패 시에만 그 아래로 넘어간다.
 const FLASHSCORE_CODES = new Set(["K3", "K4"]);
-async function fillFromFlashscore(env, match, isLive, isFinished) {
+export async function fillFromFlashscore(env, match, isLive, isFinished) {
   if (!FLASHSCORE_CODES.has(match.competition.code) || match.statistics.length || !(isLive || isFinished)) return;
 
   try {
@@ -211,7 +211,7 @@ async function fillFromFlashscore(env, match, isLive, isFinished) {
 // scoreman123.com은 AiScore보다 라벨이 확실한 통계를 준다(scoremanMatchCenter.js 주석 참고) - 팀
 // 매핑이 확인된 경기부터 먼저 이걸로 채우고, 못 찾으면(아직 매핑 안 된 팀 등) AiScore로 넘어간다.
 const SCOREMAN_CODES = new Set(["K3", "K4"]);
-async function fillFromScoreman(env, match, isLive, isFinished) {
+export async function fillFromScoreman(env, match, isLive, isFinished) {
   if (!SCOREMAN_CODES.has(match.competition.code) || match.statistics.length || !(isLive || isFinished)) return;
 
   try {
@@ -225,7 +225,7 @@ async function fillFromScoreman(env, match, isLive, isFinished) {
 }
 
 const AISCORE_CODES = new Set(["K3", "K4"]);
-async function fillFromAiscore(env, match, isLive, isFinished) {
+export async function fillFromAiscore(env, match, isLive, isFinished) {
   if (!AISCORE_CODES.has(match.competition.code) || match.statistics.length || !(isLive || isFinished)) return;
 
   try {
@@ -238,24 +238,19 @@ async function fillFromAiscore(env, match, isLive, isFinished) {
   }
 }
 
-// 목록 크론 캐시에는 venue/득점자/라인업/스탯이 없으므로, 상세 조회는 클릭 시점에
-// 업스트림을 직접 불러 짧은 TTL로 캐싱한다. 라이브·예정 경기는 캐싱하지 않고 매번 새로 불러온다
-// (라인업은 킥오프 1시간 전쯤 API-Football에 올라오므로 그때그때 최신 상태를 봐야 한다).
-export async function handleMatchDetail(request, env, id) {
-  const cacheKey = `${KV_KEYS.detailPrefix}${id}`;
-  const cached = await getJSON(env, cacheKey);
-  if (cached) return json(cached);
-
+// handleMatchDetail(사용자 클릭 시점)과 captureK3K4Stats.js(라이브 중 사전 캐싱 크론) 둘 다 쓰는
+// 핵심 조회 로직 - API-Football 원본 + 각종 폴백 소스를 다 채우고 캐시에 저장까지 한다. 못 찾으면 null.
+export async function buildMatchDetail(env, id) {
   let match;
   try {
     const raw = await apiFootball.getFixture(env, id);
     const fixture = raw.response?.[0];
-    if (!fixture) return json({ detail: "경기를 찾을 수 없습니다." }, 404);
+    if (!fixture) return null;
     match = normalizeFixture(fixture);
   } catch (err) {
     console.error("fixture fetch failed, K리그 캐시 폴백으로 시도:", err);
     match = await findFallbackMatch(env, id);
-    if (!match) return json({ detail: "경기를 찾을 수 없습니다." }, 404);
+    if (!match) return null;
   }
 
   let isLive = LIVE_STATUSES.has(match.status);
@@ -384,10 +379,24 @@ export async function handleMatchDetail(request, env, id) {
     match.broadcastProvider = broadcast.provider;
   }
 
+  const cacheKey = `${KV_KEYS.detailPrefix}${id}`;
   if (isFinished) {
     await putJSON(env, cacheKey, match, { expirationTtl: DETAIL_CACHE_TTL_SECONDS });
   } else if (isLive && !hadFetchError) {
     await putJSON(env, cacheKey, match, { expirationTtl: LIVE_DETAIL_CACHE_TTL_SECONDS });
   }
+  return match;
+}
+
+// 목록 크론 캐시에는 venue/득점자/라인업/스탯이 없으므로, 상세 조회는 클릭 시점에
+// 업스트림을 직접 불러 짧은 TTL로 캐싱한다. 라이브·예정 경기는 캐싱하지 않고 매번 새로 불러온다
+// (라인업은 킥오프 1시간 전쯤 API-Football에 올라오므로 그때그때 최신 상태를 봐야 한다).
+export async function handleMatchDetail(request, env, id) {
+  const cacheKey = `${KV_KEYS.detailPrefix}${id}`;
+  const cached = await getJSON(env, cacheKey);
+  if (cached) return json(cached);
+
+  const match = await buildMatchDetail(env, id);
+  if (!match) return json({ detail: "경기를 찾을 수 없습니다." }, 404);
   return json(match);
 }
