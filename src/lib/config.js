@@ -171,6 +171,11 @@ export const KV_KEYS = {
   // scoreman123.com은 AiScore보다 라벨이 확실한 통계를 준다(2026-08-23) - 팀 매핑이 확인된 경기부터
   // 우선 이걸로 채운다. 우리 내부 경기 id -> scoreman123 매치ID 매핑.
   scoremanGameRefs: "scoreman:gamerefs:v1",
+  // 라이브스코어(livescore.in, 플래시스코어 계열)는 scoreman123/AiScore보다 항목이 많고(슈팅/유효슈팅/
+  // 코너킥/반칙/점유율) 라벨도 한글 그대로 와서 가장 우선 시도하는 소스다(2026-08-30) - 팀ID 하드코딩
+  // 없이 매 시즌 대회 일정 피드에서 킥오프시각+팀명으로 직접 찾는다. 우리 내부 경기 id -> 라이브스코어
+  // 이벤트ID(예: "lMaiEwi5") 매핑.
+  flashscoreGameRefs: "flashscore:gamerefs:v1",
   // 경기당 이미 알림 보낸 퇴장(선수+시각)을 기록해두는 중복방지용 저장소. 하루 지나면 만료시켜 정리한다.
   notifiedCards: "cards:notified:v1",
   // 리그 검색에서 국가대표팀도 찾을 수 있도록 캐시해두는 국가대표팀 목록(성인 남자만).

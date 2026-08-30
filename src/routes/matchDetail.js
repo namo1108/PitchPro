@@ -37,6 +37,7 @@ import {
 } from "../lib/mlsMatchCenter.js";
 import { findAiscoreMatchId, fetchAiscoreStatistics } from "../lib/aiscoreMatchCenter.js";
 import { findScoremanMatchId, fetchScoremanStatistics } from "../lib/scoremanMatchCenter.js";
+import { findFlashscoreMatchId, fetchFlashscoreStatistics } from "../lib/flashscoreMatchCenter.js";
 
 const LIVE_STATUSES = new Set(["IN_PLAY", "PAUSED"]);
 const SQUAD_PHOTO_CACHE_TTL_SECONDS = 6 * 60 * 60; // 스쿼드 사진은 자주 안 바뀌어 넉넉히 캐싱
@@ -189,9 +190,24 @@ async function fillFromMls(env, match, isLive, isFinished) {
 }
 
 // K3/K4는 KFA 공식 사이트가 경기 종료 후에만 상세(라인업/이벤트)를 열어줘서(fillFromKfa 참고) 라이브
-// 중엔 항상 비어있었다(2026-08-23 확인 - KFA 사이트 구조의 한계, 우리 스크래퍼 버그 아님). AiScore로
-// 라이브 통계 중 확실히 검증된 항목(점유율)만 보강한다 - 나머지 카테고리는 아직 확신이 없어 비워둔다
-// (aiscoreMatchCenter.js 주석 참고).
+// 중엔 항상 비어있었다(2026-08-23 확인 - KFA 사이트 구조의 한계, 우리 스크래퍼 버그 아님). 라이브
+// 통계는 라이브스코어(flashscoreMatchCenter.js) -> scoreman123 -> AiScore 순으로 시도한다 - 라이브
+// 스코어가 항목도 제일 많고(슈팅/유효슈팅/코너킥/반칙/점유율) 라벨도 한글 그대로라 가장 먼저 시도하고,
+// 대회 일정 피드를 아직 등록 못 한 대회(K4 등)나 실패 시에만 그 아래로 넘어간다.
+const FLASHSCORE_CODES = new Set(["K3", "K4"]);
+async function fillFromFlashscore(env, match, isLive, isFinished) {
+  if (!FLASHSCORE_CODES.has(match.competition.code) || match.statistics.length || !(isLive || isFinished)) return;
+
+  try {
+    const eventId = await findFlashscoreMatchId(env, match);
+    if (!eventId) return;
+    const statistics = await fetchFlashscoreStatistics(eventId, match);
+    if (statistics.length) match.statistics = statistics;
+  } catch (err) {
+    console.error("flashscore match detail fetch failed:", err);
+  }
+}
+
 // scoreman123.com은 AiScore보다 라벨이 확실한 통계를 준다(scoremanMatchCenter.js 주석 참고) - 팀
 // 매핑이 확인된 경기부터 먼저 이걸로 채우고, 못 찾으면(아직 매핑 안 된 팀 등) AiScore로 넘어간다.
 const SCOREMAN_CODES = new Set(["K3", "K4"]);
@@ -348,8 +364,10 @@ export async function handleMatchDetail(request, env, id) {
   await fillFromKLeague(env, match);
   // K3/K4는 API-Football이 애초에 득점자/라인업을 안 주므로 KFA 공식 사이트로 채운다.
   await fillFromKfa(env, match);
-  // KFA는 경기 종료 후에만 상세를 열어줘서 라이브 중 통계는 scoreman123/AiScore로 보강한다
-  // (scoreman123 쪽 팀 매핑이 확인된 경기만 우선 채워지고, 나머지는 AiScore가 이어받는다).
+  // KFA는 경기 종료 후에만 상세를 열어줘서 라이브 중 통계는 라이브스코어/scoreman123/AiScore로
+  // 보강한다(라이브스코어 우선, 대회 일정 피드가 없거나 실패하면 scoreman123로, 그것도 안 되면
+  // AiScore가 이어받는다).
+  await fillFromFlashscore(env, match, isLive, isFinished);
   await fillFromScoreman(env, match, isLive, isFinished);
   await fillFromAiscore(env, match, isLive, isFinished);
   // MLS도 API-Football이 라인업을 안 주므로 mlssoccer.com 자체 매치센터로 채운다.
