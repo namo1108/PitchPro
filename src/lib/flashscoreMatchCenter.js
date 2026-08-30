@@ -26,9 +26,11 @@ const HEADERS = {
   "x-fsign": FSIGN,
 };
 
-// 대회별 일정 피드 이름. K4는 아직 캡처 전이라 비어있음 - 캡처되는 대로 추가.
+// 대회별 일정 피드 이름 - 대회 페이지를 열어 devtools에서 한 번씩 캡처해서 등록한다(경기당 아니라
+// 대회당 한 번, 시즌 내내 고정값으로 보임).
 const FLASHSCORE_SCHEDULE_FEED = {
   K3: "t_1_106_Q19CngBE_9_ko_1",
+  K4: "t_1_106_vyT5uJOH_9_ko_1",
 };
 
 async function fetchFlashscoreFeed(feedName) {
@@ -51,9 +53,13 @@ function parseFeedRecords(text) {
   });
 }
 
+// 라이브스코어 쪽 팀명은 띄어쓰기가 우리 쪽과 다르게 들어올 때가 있다(예: 금산인삼FC를 "금산 인삼"으로
+// 표기, 2026-08-30 확인) - 공백을 없애고 부분 포함으로 비교해서 이런 표기 차이를 흡수한다.
 function namesOverlap(a, b) {
   if (!a || !b) return false;
-  return a.includes(b) || b.includes(a);
+  const na = a.replace(/\s+/g, "");
+  const nb = b.replace(/\s+/g, "");
+  return na.includes(nb) || nb.includes(na);
 }
 
 export async function findFlashscoreMatchId(env, match) {
