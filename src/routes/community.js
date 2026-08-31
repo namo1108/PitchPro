@@ -8,8 +8,9 @@ import {
   COMMUNITY_COMMENT_MAX_LENGTH,
   GOAT_USERNAMES,
 } from "../lib/config.js";
-import { getAuthedUser } from "../lib/auth.js";
+import { getAuthedUser, findUserByNickname } from "../lib/auth.js";
 import { findBlockedWord } from "../lib/contentFilter.js";
+import { sendPushToUsername } from "../lib/push.js";
 
 function postKey(id) {
   return `${KV_KEYS.communityPostPrefix}${id}`;
@@ -83,6 +84,30 @@ export async function handleGetPost(request, env, id) {
   return json({ post });
 }
 
+// 댓글 안에서 "@닉네임"으로 언급된 사용자를 찾는다 - 공백이나 다음 "@" 전까지를 후보로 보고, 끝에
+// 붙었을 법한 문장부호(쉼표/마침표 등)는 떼어낸다. 닉네임에 공백이 있으면 이 방식으론 못 찾지만
+// (트위터/인스타 등 다른 서비스의 @멘션도 같은 제약이 있는 흔한 트레이드오프), 존재하지 않는
+// 닉네임이면 findUserByNickname이 조용히 null을 돌려주므로 잘못 걸려도 에러 없이 그냥 무시된다.
+const MENTION_RE = /@([^\s@]+)/g;
+async function findMentionedUsers(env, text, excludeUsername) {
+  const candidates = new Set();
+  let m;
+  MENTION_RE.lastIndex = 0;
+  while ((m = MENTION_RE.exec(text))) {
+    const candidate = m[1].replace(/[,.!?~)\]}:;，。！？]+$/g, "");
+    if (candidate) candidates.add(candidate);
+  }
+  if (!candidates.size) return [];
+
+  const users = await Promise.all([...candidates].map((nickname) => findUserByNickname(env, nickname)));
+  const seen = new Set();
+  return users.filter((u) => {
+    if (!u || u.username === excludeUsername || seen.has(u.username)) return false;
+    seen.add(u.username);
+    return true;
+  });
+}
+
 export async function handleCreateComment(request, env, id) {
   const user = await getAuthedUser(request, env);
   if (!user) return json({ detail: "로그인이 필요합니다." }, 401);
@@ -106,6 +131,23 @@ export async function handleCreateComment(request, env, id) {
     entry.commentCount = post.comments.length;
     await putJSON(env, KV_KEYS.communityPostIndex, { posts: index });
   }
+
+  // 댓글이 달리면 관리자(GOAT_USERNAMES)에게는 무조건 알림을 보내고, 댓글 안에서 "@닉네임"으로
+  // 태그된 사람에게도 따로 알림을 보낸다. sendPushToUsername은 그 계정이 알림을 구독한 적 없으면
+  // 조용히 아무 일도 안 하므로(반환값 무시), 실패해도 댓글 등록 자체는 이미 끝난 뒤라 안전하다.
+  const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+  await Promise.all(GOAT_USERNAMES.map((admin) => sendPushToUsername(env, admin, { type: "comment", title: "💬 새 댓글", body: `${post.title} · ${user.nickname}: ${preview}` })));
+
+  const mentioned = await findMentionedUsers(env, text, user.username);
+  await Promise.all(
+    mentioned.map((target) =>
+      sendPushToUsername(env, target.username, {
+        type: "comment",
+        title: "💬 댓글에서 언급됐어요",
+        body: `${user.nickname}님이 "${post.title}"에서 회원님을 언급했어요: ${preview}`,
+      })
+    )
+  );
 
   return json({ status: "ok", comment });
 }
