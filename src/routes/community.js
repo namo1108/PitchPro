@@ -75,6 +75,19 @@ export async function handleCreatePost(request, env) {
     await env.CACHE.delete(postKey(dropped.id)).catch(() => {});
   }
 
+  // 댓글과 마찬가지로, 제목/본문에 "@닉네임"으로 태그된 사람에게도 알림을 보낸다.
+  const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+  const mentioned = await findMentionedUsers(env, `${title} ${text}`, user.username);
+  await Promise.all(
+    mentioned.map((target) =>
+      sendPushToUsername(env, target.username, {
+        type: "comment",
+        title: "💬 게시글에서 언급됐어요",
+        body: `${user.nickname}님이 "${title}"에서 회원님을 언급했어요: ${preview}`,
+      })
+    )
+  );
+
   return json({ status: "ok", post: { ...post, comments: [] } });
 }
 
