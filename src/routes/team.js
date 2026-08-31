@@ -40,10 +40,23 @@ async function buildTeam(env, teamId) {
   // teamId 자체가 유효한지 보여주는 teamRaw만 필수로 취급한다 - 나머지(최근/예정 경기, 스쿼드, 감독)는
   // 레이트리밋 등으로 하나만 실패해도 팀 상세 전체가 죽지 않도록 개별로 잡아서 빈 값으로 대체한다
   // (2026-08-08, API-Football 분당 한도에 걸려 팀 상세가 통째로 502 나던 문제 - 사용자 확인).
+  // 일정(recent/upcoming) 조회 실패는 따로 표시해둔다 - "실패해서 빈 배열"과 "진짜로 경기가 없어서
+  // 빈 배열"을 구분 못 하면, 레이트리밋에 걸린 순간의 빈 일정이 그대로 10분 캐시에 굳어버려서 "팀
+  // 누르면 가끔 일정이 안 나온다"는 문제가 생긴다(2026-08-30 제보) - handleTeamDetail에서 이 경우엔
+  // 캐시에 안 남기고 예전 정상 스냅샷(stale)으로 대신 응답한다.
+  let hadFetchError = false;
   const [teamRaw, recentRaw, upcomingRaw, squadRaw, coachRaw] = await Promise.all([
     apiFootball.getTeam(env, teamId),
-    apiFootball.getTeamRecentFixtures(env, teamId, 10).catch(() => ({ response: [] })),
-    apiFootball.getTeamUpcomingFixtures(env, teamId, 20).catch(() => ({ response: [] })),
+    apiFootball.getTeamRecentFixtures(env, teamId, 10).catch((err) => {
+      console.error("team recent fixtures fetch failed:", err);
+      hadFetchError = true;
+      return { response: [] };
+    }),
+    apiFootball.getTeamUpcomingFixtures(env, teamId, 20).catch((err) => {
+      console.error("team upcoming fixtures fetch failed:", err);
+      hadFetchError = true;
+      return { response: [] };
+    }),
     apiFootball.getSquad(env, teamId).catch(() => ({ response: [] })),
     apiFootball.getCoach(env, teamId).catch(() => null),
   ]);
@@ -80,6 +93,7 @@ async function buildTeam(env, teamId) {
     upcomingMatches: (upcomingRaw.response || []).map(normalizeFixture),
     squad,
     coach,
+    hadFetchError,
   };
 }
 
@@ -94,9 +108,16 @@ export async function handleTeamDetail(request, env, id) {
   if (cached) return json({ ...reKoreanize(cached), venue });
 
   try {
-    const result = await buildTeam(env, id);
-    await putJSON(env, cacheKey, result, { expirationTtl: TEAM_CACHE_TTL_SECONDS });
-    await putJSON(env, staleKey, result); // TTL 없이 마지막 성공 응답을 보관 -> 업스트림 장애/레이트리밋 시 대체용
+    const { hadFetchError, ...result } = await buildTeam(env, id);
+    if (!hadFetchError) {
+      await putJSON(env, cacheKey, result, { expirationTtl: TEAM_CACHE_TTL_SECONDS });
+      await putJSON(env, staleKey, result); // TTL 없이 마지막 성공 응답을 보관 -> 업스트림 장애/레이트리밋 시 대체용
+      return json({ ...reKoreanize(result), venue });
+    }
+    // 일정 조회가 이번엔 실패했다 - 방금 받은(일정이 비어있을 수 있는) 결과를 캐시에 남기지 않고,
+    // 예전에 성공했던 스냅샷이 있으면 그걸로 대신 응답한다(없으면 최후 수단으로 방금 받은 걸 그대로 나감).
+    const stale = await getJSON(env, staleKey);
+    if (stale) return json({ ...reKoreanize(stale), venue, stale: true });
     return json({ ...reKoreanize(result), venue });
   } catch (err) {
     const stale = await getJSON(env, staleKey);
