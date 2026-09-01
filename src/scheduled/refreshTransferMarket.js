@@ -100,7 +100,14 @@ function transferPriorityRank(code) {
 // 전부 순회해야 한다 - 첫 번째 그룹만 보면 나머지 그룹 팀들이 통째로 이적시장 대상에서 빠지게 된다.
 // onlyOpenWindow로 "지금 이적 등록 기간인 리그"만 추려서, 창구가 닫힌 리그(대부분의 기간)에 굳이
 // 순환 조회 예산을 낭비하지 않고 실제로 이적이 일어나는 리그에 집중한다.
-function buildTeamRoster(standingsBlob) {
+//
+// 전체 로스터(약 250팀)를 5팀/5분으로 한 바퀴 도는 데 4시간 가까이 걸려서(아래 TEAMS_PER_TICK 주석
+// 참고) 사용자가 실제로 궁금해하는 팀이 순번이 늦으면 몇 시간씩 안 갱신되는 게 "느리다"는 체감의
+// 핵심 원인이었다(2026-08-31 제보). 골 알림 구독(favoriteTeamIds)은 이미 "이 팀에 관심있다"는
+// 신호라 이적시장에도 그대로 재사용할 수 있다 - 별도 API 호출 없이, 순위표 순서 안에서 이 팀들만
+// 로스터 앞쪽으로 당긴다(자바스크립트 sort는 안정 정렬이라 동순위 내에서는 기존 K리그 우선순위 등
+// 순서가 그대로 유지됨).
+function buildTeamRoster(standingsBlob, subscriptions) {
   const roster = [];
   const comps = transferMarketCompetitions({ onlyOpenWindow: true }).sort((a, b) => transferPriorityRank(a.code) - transferPriorityRank(b.code));
   for (const comp of comps) {
@@ -111,6 +118,11 @@ function buildTeamRoster(standingsBlob) {
       }
     }
   }
+
+  const interestedTeamIds = new Set((subscriptions || []).flatMap((s) => (s.teamIds || []).map(String)));
+  if (interestedTeamIds.size) {
+    roster.sort((a, b) => (interestedTeamIds.has(String(a.teamId)) ? 0 : 1) - (interestedTeamIds.has(String(b.teamId)) ? 0 : 1));
+  }
   return roster;
 }
 
@@ -118,13 +130,13 @@ export async function refreshTransferMarket(env) {
   if (await isQuotaTight(env)) return;
 
   const standingsBlob = await getJSON(env, KV_KEYS.standings);
-  const roster = buildTeamRoster(standingsBlob);
+  const subscriptions = await loadSubscriptions(env);
+  const roster = buildTeamRoster(standingsBlob, subscriptions);
   // 순위표가 아직 하나도 안 채워졌거나(초기 구동 직후), 지금 이적 등록 기간인 리그가 하나도 없으면
   // (연중 조용한 시기) 이번 틱은 API 호출 없이 건너뛴다 - 기존에 모아둔 데이터는 그대로 남아있다.
   if (!roster.length) return;
 
   const existing = (await getJSON(env, KV_KEYS.transferMarket)) || { byTeam: {} };
-  const subscriptions = await loadSubscriptions(env);
 
   const cursorRaw = await env.CACHE.get(CURSOR_KEY);
   const cursor = Number(cursorRaw || "0") % roster.length;
