@@ -283,10 +283,15 @@ function parseMonthDay(md) {
 }
 
 // 오늘이 그 리그의 이적 등록 기간(transferWindows) 안에 드는지. 정보가 없는 대회는 안전하게
-// "항상 열림"으로 취급한다(누락돼서 영영 안 긁히는 것보다는 낫다).
-export function isInTransferWindow(comp, now = new Date()) {
+// "항상 열림"으로 취급한다(누락돼서 영영 안 긁히는 것보다는 낫다). graceDays를 주면 "종료일 + 그
+// 며칠"까지도 아직 열린 것으로 본다 - 실제 이적은 등록 마감일 이후에도 며칠씩 지나서야 공식
+// 발표/전산 반영되는 경우가 있어서(2026-09-01 제보 - K리그 여름 창구가 08-25에 닫힌 뒤로
+// refreshTransferMarket.js가 K리그를 로스터에서 아예 빼버려 그 이후 이적이 통째로 안 잡혔음),
+// 마감일 당일부터 바로 조회를 끊어버리면 이런 뒷북 발표를 놓친다.
+export function isInTransferWindow(comp, now = new Date(), graceDays = 0) {
   if (!comp.transferWindows?.length) return true;
-  const today = monthDayNumber(now);
+  const probe = graceDays ? new Date(now.getTime() - graceDays * 24 * 60 * 60 * 1000) : now;
+  const today = monthDayNumber(probe);
   return comp.transferWindows.some(({ start, end }) => {
     const s = parseMonthDay(start);
     const e = parseMonthDay(end);
@@ -319,12 +324,14 @@ const TRANSFER_MARKET_LEAGUE_CODES = ["PL", "PD", "BL1", "SA", "FL1", "KL1", "KL
 // 시즌마다 바뀌고 그 팀들은 이미 자국 리그 쪽에서 커버되므로 제외하고, 친선경기(FRIENDLY)도 제외한다.
 // onlyOpenWindow=true면 지금 이적 등록 기간이 아닌 리그도 걸러낸다 - 어차피 등록 기간이 아니면 새 이적이
 // 안 생기니, 그런 리그까지 매번 순환 조회하는 건 낭비다(크론에서 크롤링 대상을 추릴 때 사용).
+// 마감일 이후에도 뒷북 발표를 잡을 수 있도록 2주 유예를 준다(위 isInTransferWindow 주석 참고).
+const TRANSFER_WINDOW_GRACE_DAYS = 14;
 export function transferMarketCompetitions({ onlyOpenWindow = false } = {}) {
   return COMPETITIONS.filter(
     (c) =>
       !c.hasBracket &&
       c.code !== "FRIENDLY" &&
       TRANSFER_MARKET_LEAGUE_CODES.includes(c.code) &&
-      (!onlyOpenWindow || isInTransferWindow(c))
+      (!onlyOpenWindow || isInTransferWindow(c, new Date(), TRANSFER_WINDOW_GRACE_DAYS))
   );
 }
