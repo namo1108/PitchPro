@@ -241,12 +241,29 @@ export async function fillFromAiscore(env, match, isLive, isFinished) {
 // handleMatchDetail(사용자 클릭 시점)과 captureK3K4Stats.js(라이브 중 사전 캐싱 크론) 둘 다 쓰는
 // 핵심 조회 로직 - API-Football 원본 + 각종 폴백 소스를 다 채우고 캐시에 저장까지 한다. 못 찾으면 null.
 export async function buildMatchDetail(env, id) {
+  // 라인업 조회는 경기 상태와 무관하게 항상 하고, fixture 자체와 결과를 공유하지도 않으니 fixture
+  // 조회를 기다렸다가 "그다음에" 시작할 이유가 없다 - 처음부터 같이 쏴서 왕복 시간을 겹치게 한다
+  // ("팀/경기 정보 불러오는 속도가 느리다" 제보, 2026-09-02).
+  const lineupsPromise = apiFootball.getFixtureLineups(env, id).catch((err) => {
+    console.error("fixture lineups fetch failed:", err);
+    return null;
+  });
+
   let match;
   try {
     const raw = await apiFootball.getFixture(env, id);
     const fixture = raw.response?.[0];
-    if (!fixture) return null;
-    match = normalizeFixture(fixture);
+    // API-Football이 에러 없이 200을 주면서도 response가 빈 배열일 때가 가끔 있다(레이트리밋과 무관한
+    // 자체적인 순간 흔들림으로 보임 - 2026-09-02 제보: "랜덤으로 경기 눌러보면 안 나오는 경우가 있다,
+    // 아침에 스완지 경기가 안 나왔다"). 이건 예외를 던지지 않아서 catch 블록의 캐시 폴백을 못 타고
+    // 곧장 404가 나가고 있었다 - 예외 경로와 똑같이 캐시 폴백을 시도하도록 통일한다.
+    if (!fixture) {
+      console.error(`fixture fetch returned empty response for ${id}, K리그 캐시 폴백으로 시도`);
+      match = await findFallbackMatch(env, id);
+      if (!match) return null;
+    } else {
+      match = normalizeFixture(fixture);
+    }
   } catch (err) {
     console.error("fixture fetch failed, K리그 캐시 폴백으로 시도:", err);
     match = await findFallbackMatch(env, id);
@@ -280,16 +297,14 @@ export async function buildMatchDetail(env, id) {
   let hadFetchError = false;
 
   const fetchTasks = [
-    apiFootball
-      .getFixtureLineups(env, id)
-      .then((lineupsRaw) => {
-        match.lineups = normalizeLineups(lineupsRaw.response);
-        match.tacticalNote = buildTacticalNote(match.lineups, match.homeTeam.id, match.homeTeam.name, match.awayTeam.name);
-      })
-      .catch((err) => {
-        console.error("fixture lineups fetch failed:", err);
+    lineupsPromise.then((lineupsRaw) => {
+      if (!lineupsRaw) {
         hadFetchError = true;
-      }),
+        return;
+      }
+      match.lineups = normalizeLineups(lineupsRaw.response);
+      match.tacticalNote = buildTacticalNote(match.lineups, match.homeTeam.id, match.homeTeam.name, match.awayTeam.name);
+    }),
   ];
 
   if (isLive || isFinished) {

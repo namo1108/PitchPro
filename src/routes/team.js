@@ -45,7 +45,10 @@ async function buildTeam(env, teamId) {
   // 누르면 가끔 일정이 안 나온다"는 문제가 생긴다(2026-08-30 제보) - handleTeamDetail에서 이 경우엔
   // 캐시에 안 남기고 예전 정상 스냅샷(stale)으로 대신 응답한다.
   let hadFetchError = false;
-  const [teamRaw, recentRaw, upcomingRaw, squadRaw, coachRaw] = await Promise.all([
+  // kleague 사진 캐시 두 개는 API-Football 결과와 무관한 독립적인 KV 조회라, 아래 Promise.all과
+  // 같이 시작해서 기다리는 시간을 겹치게 한다(예전엔 API-Football 5개를 다 기다린 "다음에" 순서대로
+  // 조회해서, 그 왕복 시간만큼 응답이 더 늦어졌다 - "팀 정보 불러오는 속도가 느리다" 제보, 2026-09-02).
+  const [teamRaw, recentRaw, upcomingRaw, squadRaw, coachRaw, kleaguePhotos, kleagueCoachPhotos] = await Promise.all([
     apiFootball.getTeam(env, teamId),
     apiFootball.getTeamRecentFixtures(env, teamId, 10).catch((err) => {
       console.error("team recent fixtures fetch failed:", err);
@@ -59,13 +62,14 @@ async function buildTeam(env, teamId) {
     }),
     apiFootball.getSquad(env, teamId).catch(() => ({ response: [] })),
     apiFootball.getCoach(env, teamId).catch(() => null),
+    getKLeaguePlayerPhotoMap(env),
+    getKLeagueCoachPhotoMap(env),
   ]);
 
   const teamInfo = teamRaw.response?.[0];
   if (!teamInfo) throw new Error("팀 정보를 찾을 수 없습니다.");
 
   const rawSquad = applySquadRemovals((squadRaw.response?.[0]?.players || []).map(normalizeSquadPlayer), teamId);
-  const kleaguePhotos = await getKLeaguePlayerPhotoMap(env);
   const apiSquad = rawSquad.map((p) => {
     const kleagueOverride = lookupKLeaguePlayerPhoto(kleaguePhotos, teamId, p.number);
     if (kleagueOverride) return { ...p, photo: kleagueOverride };
@@ -80,7 +84,6 @@ async function buildTeam(env, teamId) {
   // API-Football의 K리그2 감독 사진은 깨진 방패 아이콘인 경우가 많아서(null이 아니라 URL 자체가
   // 플레이스홀더라 "없음" 판정으로는 못 거름), kleague 스크랩 사진을 먼저 깔고 그 위에 수동 보정을 얹는다.
   let baseCoach = normalizeCoach(selectCurrentCoach(coachRaw?.response, teamId));
-  const kleagueCoachPhotos = await getKLeagueCoachPhotoMap(env);
   const coachPhotoOverride = lookupKLeagueCoachPhoto(kleagueCoachPhotos, teamId);
   if (baseCoach && coachPhotoOverride) baseCoach = { ...baseCoach, photo: coachPhotoOverride };
   // K3/K4는 API-Football이 감독 정보 자체가 없는 구단이 많아서, 비어있을 때만 나무위키 기반 이름으로
