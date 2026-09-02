@@ -2,6 +2,7 @@ import { fetchJSON } from "../api.js";
 import { onTabChange, pushSubView } from "../router.js";
 import { fadeIn, skeletonList, escapeHtml, crestImg } from "../format.js";
 import { isLoggedIn, getCurrentUser, authFetch } from "../auth.js";
+import { setupMentionAutocomplete } from "../mentionAutocomplete.js";
 
 const el = {
   listWrap: document.getElementById("community-list-wrap"),
@@ -14,6 +15,7 @@ const el = {
   teamResults: document.getElementById("community-team-results"),
   teamPicked: document.getElementById("community-team-picked"),
   bodyInput: document.getElementById("community-body-input"),
+  bodyMentionResults: document.getElementById("community-body-mention-results"),
   writeError: document.getElementById("community-write-error"),
   submitBtn: document.getElementById("community-submit-btn"),
   detailWrap: document.getElementById("community-detail-wrap"),
@@ -85,6 +87,33 @@ el.categoryTabs.querySelectorAll(".school-tab-btn").forEach((btn) => {
   });
 });
 
+setupMentionAutocomplete(el.bodyInput, el.bodyMentionResults);
+
+// ---------- 닉네임 옆 친구추가 버튼 ----------
+// 로그인 상태 + 내 닉네임이 아닐 때만 보여준다. 이미 친구거나 요청을 이미 보낸 상태는 서버가 그대로
+// 알려주는 에러 메시지를 버튼 라벨로 반영한다(별도로 매번 상태 조회를 안 해도 되게).
+function friendAddButtonHtml(nickname) {
+  const me = getCurrentUser();
+  if (!me || me.nickname === nickname) return "";
+  return `<button type="button" class="community-friend-add-btn" data-friend-nickname="${escapeHtml(nickname)}">+ 친구</button>`;
+}
+
+function wireFriendAddButtons(container) {
+  container.querySelectorAll("[data-friend-nickname]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation(); // 게시글 목록 행 클릭(글 열기)으로 안 번지게
+      btn.disabled = true;
+      try {
+        await authFetch("/friends/request", { method: "POST", body: { nickname: btn.dataset.friendNickname } });
+        btn.textContent = "✓ 요청됨";
+      } catch (err) {
+        btn.textContent = /이미/.test(err.message) ? "✓ 완료" : "실패";
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
 function teamBadgeHtml(team) {
   if (!team) return "";
   return `<span class="community-team-badge">${crestImg(team, "community-team-badge-crest")}${escapeHtml(team.name)}</span>`;
@@ -105,6 +134,7 @@ function renderList(posts, animate) {
       <div class="community-row-meta">
         ${teamBadgeHtml(p.team)}
         <span class="community-row-nickname">${escapeHtml(p.nickname)}</span>
+        ${friendAddButtonHtml(p.nickname)}
         <span class="community-row-dot">·</span>
         <span class="community-row-time">${timeAgo(p.createdAt)}</span>
         ${p.commentCount ? `<span class="community-row-comments">💬 ${p.commentCount}</span>` : ""}
@@ -118,6 +148,7 @@ function renderList(posts, animate) {
   el.list.querySelectorAll("[data-post-id]").forEach((row) => {
     row.addEventListener("click", () => openPost(row.dataset.postId));
   });
+  wireFriendAddButtons(el.list);
 }
 
 // 이미 상세 화면에 들어와 있는 상태에서(댓글 작성/삭제 후) 내용만 다시 그릴 때 쓴다 - openPost와
@@ -161,6 +192,7 @@ function renderPost(post) {
       <div class="community-comment" data-comment-id="${c.id}">
         <div class="community-comment-meta">
           <span class="community-row-nickname">${escapeHtml(c.nickname)}</span>
+          ${friendAddButtonHtml(c.nickname)}
           <span class="community-row-dot">·</span>
           <span class="community-row-time">${timeAgo(c.createdAt)}${c.editedAt ? " (수정됨)" : ""}</span>
           ${isMine ? '<button class="community-delete-btn" data-edit-comment>수정</button>' : ""}
@@ -182,6 +214,7 @@ function renderPost(post) {
     <div class="community-row-meta">
       ${teamBadgeHtml(post.team)}
       <span class="community-row-nickname">${escapeHtml(post.nickname)}</span>
+      ${friendAddButtonHtml(post.nickname)}
       <span class="community-row-dot">·</span>
       <span class="community-row-time">${timeAgo(post.createdAt)}</span>
     </div>
@@ -194,7 +227,10 @@ function renderPost(post) {
         isLoggedIn()
           ? `
         <div class="community-comment-form">
-          <textarea id="community-comment-input" class="community-comment-input" placeholder="댓글을 남겨보세요" maxlength="500" rows="2"></textarea>
+          <div class="team-search-wrap">
+            <textarea id="community-comment-input" class="community-comment-input" placeholder="댓글을 남겨보세요 (@닉네임으로 태그할 수 있어요)" maxlength="500" rows="2"></textarea>
+            <div id="community-comment-mention-results" class="team-search-results"></div>
+          </div>
           <button id="community-comment-submit" class="community-submit-btn">등록</button>
         </div>
       `
@@ -202,6 +238,12 @@ function renderPost(post) {
       }
     </div>
   `;
+
+  wireFriendAddButtons(el.postContent);
+  setupMentionAutocomplete(
+    document.getElementById("community-comment-input"),
+    document.getElementById("community-comment-mention-results")
+  );
 
   if (canDeletePost) {
     el.postContent.querySelector("[data-delete-post]").addEventListener("click", async () => {
