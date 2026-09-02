@@ -12,6 +12,8 @@ import {
   matchResultForTeam,
   resultClass,
   formBadgesHtml,
+  escapeHtml,
+  playerHintFromElement,
 } from "../format.js";
 import { isFavorite, toggleFavorite, MAX_FAVORITES } from "../favorites.js";
 import { goToPlayer } from "./playerDetail.js";
@@ -22,14 +24,27 @@ const el = {
   content: document.getElementById("team-detail-content"),
 };
 
-export function goToTeam(teamId) {
+// hint(클릭한 요소에서 뽑아낸 팀 이름/크레스트, format.js의 teamHintFromElement 참고)가 있으면
+// 화면 전환과 동시에 헤더만 먼저 그려서, 실제 데이터가 오기 전까지 빈 스켈레톤만 보이는 시간을
+// 없앤다("팀 정보 누르면 바로바로 랜딩되면 좋겠다" 제보, 2026-09-02).
+export function goToTeam(teamId, hint) {
   pushDetail("team");
   saveViewState({ view: "team", teamId });
-  loadTeamDetail(teamId);
+  loadTeamDetail(teamId, hint);
 }
 
-async function loadTeamDetail(teamId) {
-  el.content.innerHTML = skeletonList(6);
+function optimisticHeaderHtml(hint) {
+  if (!hint?.name) return "";
+  return `
+    <div class="team-header-card">
+      ${hint.crest ? `<img class="team-header-crest" src="${escapeHtml(hint.crest)}" alt="" />` : ""}
+      <div class="team-header-name">${escapeHtml(hint.name)}</div>
+    </div>
+  `;
+}
+
+async function loadTeamDetail(teamId, hint) {
+  el.content.innerHTML = optimisticHeaderHtml(hint) + skeletonList(6);
   try {
     const data = await fetchJSON(`/teams/${teamId}`);
     renderTeamDetail(teamId, data);
@@ -246,7 +261,7 @@ function renderTeamDetail(teamId, data) {
   });
 
   el.content.querySelectorAll("[data-player-id]").forEach((cardEl) => {
-    cardEl.addEventListener("click", () => goToPlayer(cardEl.dataset.playerId));
+    cardEl.addEventListener("click", () => goToPlayer(cardEl.dataset.playerId, playerHintFromElement(cardEl)));
   });
 
   el.content.querySelectorAll("[data-match-id]").forEach((rowEl) => {

@@ -1,6 +1,6 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange } from "../router.js";
-import { crestImg, formatMatchDateTime, formBadgesHtml } from "../format.js";
+import { crestImg, formatMatchDateTime, formBadgesHtml, teamHintFromElement } from "../format.js";
 import { listFavorites, toggleFavorite } from "../favorites.js";
 import { goToTeam } from "./teamDetail.js";
 import { openSoccerSchool } from "./soccerSchool.js";
@@ -667,7 +667,7 @@ export async function loadMyTeam() {
   el.list.querySelectorAll("[data-team-id]").forEach((elm) => {
     elm.addEventListener("click", (e) => {
       if (e.target.closest("[data-remove]") || e.target.closest(".checkin-slot")) return;
-      goToTeam(elm.dataset.teamId);
+      goToTeam(elm.dataset.teamId, teamHintFromElement(elm));
     });
   });
   el.list.querySelectorAll("[data-remove]").forEach((btn) => {

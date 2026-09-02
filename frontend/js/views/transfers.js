@@ -1,6 +1,6 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange, pushSubView } from "../router.js";
-import { emblemImg, crestImg, transferAvatarImg, fadeIn, skeletonList, KST_TIME_ZONE } from "../format.js";
+import { emblemImg, crestImg, transferAvatarImg, fadeIn, skeletonList, KST_TIME_ZONE, playerHintFromElement } from "../format.js";
 import { goToPlayer } from "./playerDetail.js";
 
 const state = { leagues: [], loaded: false };
@@ -156,7 +156,7 @@ function toggleTeam(teams, idx, btn) {
   body.dataset.rendered = "1";
   body.querySelectorAll("[data-player-id]").forEach((row) => {
     row.style.cursor = "pointer";
-    row.addEventListener("click", () => goToPlayer(row.dataset.playerId));
+    row.addEventListener("click", () => goToPlayer(row.dataset.playerId, playerHintFromElement(row)));
   });
   loadPhotosFor(team.items, body);
 }

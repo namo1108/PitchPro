@@ -1,6 +1,6 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange } from "../router.js";
-import { crestImg, KST_TIME_ZONE, fadeIn, skeletonList } from "../format.js";
+import { crestImg, KST_TIME_ZONE, fadeIn, skeletonList, teamHintFromElement } from "../format.js";
 import { goToTeam } from "./teamDetail.js";
 import { loadMatchDetail } from "./matches.js";
 
@@ -132,7 +132,7 @@ function renderAnalysis(cards, animate) {
 
   if (animate) fadeIn(el.list);
   el.list.querySelectorAll("[data-team-id]").forEach((elm) => {
-    elm.addEventListener("click", () => goToTeam(elm.dataset.teamId));
+    elm.addEventListener("click", () => goToTeam(elm.dataset.teamId, teamHintFromElement(elm)));
   });
   el.list.querySelectorAll(".ai-card-toggle").forEach((btn) => {
     btn.addEventListener("click", () => {

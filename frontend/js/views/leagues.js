@@ -1,6 +1,6 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange, pushSubView, setLeagueStandingsOpener } from "../router.js";
-import { crestImg, emblemImg, playerAvatarImg, fadeIn, skeletonList } from "../format.js";
+import { crestImg, emblemImg, playerAvatarImg, fadeIn, skeletonList, teamHintFromElement, playerHintFromElement } from "../format.js";
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
 import { loadMatchDetail } from "./matches.js";
@@ -237,11 +237,12 @@ function renderTeamResults(teams) {
     .join("");
   el.teamResults.querySelectorAll("[data-team-id]").forEach((row) => {
     row.addEventListener("click", () => {
+      const hint = teamHintFromElement(row);
       el.searchInput.value = "";
       state.query = "";
       el.teamResults.innerHTML = "";
       renderList();
-      goToTeam(row.dataset.teamId);
+      goToTeam(row.dataset.teamId, hint);
     });
   });
 }
@@ -455,7 +456,7 @@ function renderTables(tables, silent, comp) {
 
   if (!silent) fadeIn(el.standingsWrap);
   el.standingsWrap.querySelectorAll("[data-team-id]").forEach((cell) => {
-    cell.addEventListener("click", () => goToTeam(cell.dataset.teamId));
+    cell.addEventListener("click", () => goToTeam(cell.dataset.teamId, teamHintFromElement(cell)));
   });
 }
 
@@ -506,7 +507,7 @@ function renderTopPlayers(data) {
   `;
 
   el.topPlayersWrap.querySelectorAll("[data-player-id]").forEach((row) => {
-    row.addEventListener("click", () => goToPlayer(row.dataset.playerId));
+    row.addEventListener("click", () => goToPlayer(row.dataset.playerId, playerHintFromElement(row)));
   });
 }
 

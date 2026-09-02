@@ -1,20 +1,33 @@
 import { fetchJSON } from "../api.js";
 import { pushDetail } from "../router.js";
-import { playerAvatarImg, fadeIn, skeletonList } from "../format.js";
+import { playerAvatarImg, fadeIn, skeletonList, escapeHtml } from "../format.js";
 import { saveViewState } from "../viewState.js";
 
 const el = {
   content: document.getElementById("player-detail-content"),
 };
 
-export function goToPlayer(playerId) {
+// hint(클릭한 요소에서 뽑아낸 선수 이름/사진, format.js의 playerHintFromElement 참고)가 있으면
+// 실제 데이터가 오기 전까지 빈 스켈레톤만 보이지 않고 헤더를 먼저 그린다(teamDetail.js와 동일한
+// 패턴 - "선수 누르면 바로바로 랜딩되면 좋겠다" 제보, 2026-09-02).
+export function goToPlayer(playerId, hint) {
   pushDetail("player");
   saveViewState({ view: "player", playerId });
-  loadPlayerDetail(playerId);
+  loadPlayerDetail(playerId, hint);
 }
 
-async function loadPlayerDetail(playerId) {
-  el.content.innerHTML = skeletonList(5);
+function optimisticHeaderHtml(hint) {
+  if (!hint?.name) return "";
+  return `
+    <div class="team-header-card player-header-card">
+      ${hint.photo ? `<img class="player-header-photo" src="${escapeHtml(hint.photo)}" alt="" />` : ""}
+      <div class="team-header-name">${escapeHtml(hint.name)}</div>
+    </div>
+  `;
+}
+
+async function loadPlayerDetail(playerId, hint) {
+  el.content.innerHTML = optimisticHeaderHtml(hint) + skeletonList(5);
   try {
     const data = await fetchJSON(`/players/${playerId}`);
     renderPlayerDetail(data);

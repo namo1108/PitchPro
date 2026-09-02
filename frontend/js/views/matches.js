@@ -14,6 +14,8 @@ import {
   fadeIn,
   skeletonList,
   playerAvatarImg,
+  teamHintFromElement,
+  playerHintFromElement,
 } from "../format.js";
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
@@ -1719,11 +1721,11 @@ function renderMatchDetail(m) {
 
   el.detailContent.querySelectorAll("[data-team-id]").forEach((teamEl) => {
     teamEl.style.cursor = "pointer";
-    teamEl.addEventListener("click", () => goToTeam(teamEl.dataset.teamId));
+    teamEl.addEventListener("click", () => goToTeam(teamEl.dataset.teamId, teamHintFromElement(teamEl)));
   });
 
   el.detailContent.querySelectorAll(".pitch-photo-ring[data-player-id], .pitch-bench-player[data-player-id]").forEach((dotEl) => {
-    dotEl.addEventListener("click", () => goToPlayer(dotEl.dataset.playerId));
+    dotEl.addEventListener("click", () => goToPlayer(dotEl.dataset.playerId, playerHintFromElement(dotEl)));
   });
 
   el.detailContent.querySelectorAll("[data-dominance-chart]").forEach((wrap) => wireDominanceChart(wrap));

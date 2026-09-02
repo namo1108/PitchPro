@@ -1,6 +1,6 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange } from "../router.js";
-import { fadeIn, skeletonList } from "../format.js";
+import { fadeIn, skeletonList, escapeHtml } from "../format.js";
 import { authFetch, isLoggedIn, getToken, onAuthChange } from "../auth.js";
 
 const el = { list: document.getElementById("hof-list") };
@@ -24,24 +24,25 @@ async function loadLeaderboard() {
   }
 }
 
-function friendStateBadge(entry) {
-  if (entry.isFriend) return '<span class="hof-friend-badge">친구</span>';
+// 로그인 상태 + 나 자신이 아닐 때만 친구 관련 UI를 보여준다. 이미 친구/요청 보낸 상태는 배지로만
+// 알려주고, 아직 아무 관계도 없으면 "+친구" 버튼을, 상대가 먼저 요청을 보내온 상태면 "요청 수락"
+// 버튼을 커뮤니티 탭과 같은 스타일(community-friend-add-btn)로 보여준다 - 예전엔 행 전체를 눌러야
+// 친구 요청이 가는 방식이라 눈에 잘 안 띄었다("친구버튼 명예의 전당에도 넣어달라" 요청, 2026-09-02).
+function friendActionHtml(entry) {
+  if (!isLoggedIn() || entry.isMe) return "";
+  if (entry.isFriend) return '<span class="hof-friend-badge">✓ 친구</span>';
   if (entry.requestSent) return '<span class="hof-friend-badge pending">요청함</span>';
-  if (entry.requestReceived) return '<span class="hof-friend-badge pending">요청 받음 · 눌러서 수락</span>';
-  return "";
-}
-
-// 로그인 상태에서 나 자신이 아니고 이미 친구도 아닌 닉네임은 눌러서 친구 요청(또는 받은 요청 수락)을 보낼 수 있다.
-function isClickable(entry) {
-  return isLoggedIn() && !entry.isMe && !entry.isFriend;
+  if (entry.requestReceived) {
+    return `<button type="button" class="community-friend-add-btn" data-nickname="${escapeHtml(entry.nickname)}" data-hof-accept>요청 수락</button>`;
+  }
+  return `<button type="button" class="community-friend-add-btn" data-nickname="${escapeHtml(entry.nickname)}">+ 친구</button>`;
 }
 
 function rowHtml(entry) {
-  const clickable = isClickable(entry);
   return `
-    <div class="hof-row ${entry.isMe ? "me" : ""} ${clickable ? "clickable" : ""}" ${clickable ? `data-nickname="${entry.nickname}" data-request-received="${entry.requestReceived}"` : ""}>
+    <div class="hof-row ${entry.isMe ? "me" : ""}">
       <span class="hof-rank">${MEDAL[entry.rank] || entry.rank}</span>
-      <span class="hof-nickname">${entry.nickname}${entry.isMe ? " (나)" : ""}${friendStateBadge(entry)}<span class="hof-title">${entry.title || ""}</span></span>
+      <span class="hof-nickname">${escapeHtml(entry.nickname)}${entry.isMe ? " (나)" : ""}${friendActionHtml(entry)}<span class="hof-title">${escapeHtml(entry.title || "")}</span></span>
       <span class="hof-level">Lv.${entry.level}</span>
       <span class="hof-points">${entry.points.toLocaleString()}P</span>
     </div>
@@ -50,20 +51,20 @@ function rowHtml(entry) {
 
 // GOAT_USERNAMES(운영자 이스터에그)는 순위 경쟁에서 빼고 맨 위에 염소 아이콘과 함께 고정으로 보여준다.
 function goatRowHtml(entry) {
-  const clickable = isClickable(entry);
   return `
-    <div class="hof-row goat ${entry.isMe ? "me" : ""} ${clickable ? "clickable" : ""}" ${clickable ? `data-nickname="${entry.nickname}" data-request-received="${entry.requestReceived}"` : ""}>
+    <div class="hof-row goat ${entry.isMe ? "me" : ""}">
       <span class="hof-rank">🐐</span>
-      <span class="hof-nickname">${entry.nickname}${entry.isMe ? " (나)" : ""}${friendStateBadge(entry)}<span class="hof-title">${entry.title || ""}</span></span>
+      <span class="hof-nickname">${escapeHtml(entry.nickname)}${entry.isMe ? " (나)" : ""}${friendActionHtml(entry)}<span class="hof-title">${escapeHtml(entry.title || "")}</span></span>
       <span class="hof-level">GOAT</span>
       <span class="hof-points">${entry.points.toLocaleString()}P</span>
     </div>
   `;
 }
 
-async function handleRowClick(row) {
-  const nickname = row.dataset.nickname;
-  const isAccept = row.dataset.requestReceived === "true";
+async function handleFriendAction(btn) {
+  const nickname = btn.dataset.nickname;
+  const isAccept = "hofAccept" in btn.dataset;
+  btn.disabled = true;
   try {
     if (isAccept) {
       await authFetch(`/friends/requests/${encodeURIComponent(nickname)}/accept`, { method: "POST", body: {} });
@@ -73,6 +74,7 @@ async function handleRowClick(row) {
     loadLeaderboard();
   } catch (err) {
     alert(err.message);
+    btn.disabled = false;
   }
 }
 
@@ -101,8 +103,8 @@ function renderLeaderboard(entries, goats, me, animate) {
   `;
 
   if (animate) fadeIn(el.list);
-  el.list.querySelectorAll(".hof-row.clickable").forEach((row) => {
-    row.addEventListener("click", () => handleRowClick(row));
+  el.list.querySelectorAll("[data-nickname]").forEach((btn) => {
+    btn.addEventListener("click", () => handleFriendAction(btn));
   });
 }
 

@@ -4201,6 +4201,27 @@ table.standings-table {
   white-space: nowrap;
 }
 
+.hof-friend-badge {
+  align-self: flex-start;
+  flex-shrink: 0;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.hof-friend-badge.pending {
+  color: var(--text-muted);
+  background: transparent;
+  padding: 0;
+}
+
+.hof-nickname .community-friend-add-btn {
+  align-self: flex-start;
+}
+
 .hof-level {
   color: var(--text-muted);
   font-size: 11.5px;

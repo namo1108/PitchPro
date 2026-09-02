@@ -80,6 +80,30 @@ export function emblemImg(competition, size) {
   return `<img class="${size}" src="${escapeHtml(src || FALLBACK_EMBLEM)}" onerror="this.src='${FALLBACK_EMBLEM}'" alt="${escapeHtml(competition?.name || "")}" />`;
 }
 
+// 팀/선수 상세 화면은 이름/스쿼드/일정 등을 서버에서 새로 받아와야 해서, 클릭 즉시 화면이 텅 빈
+// 스켈레톤으로 바뀌었다가 몇백ms 뒤에야 내용이 채워지는 게 "로딩 없이 바로 랜딩되면 좋겠다"는
+// 체감으로 이어졌다(2026-09-02 제보). 클릭한 요소 자체(크레스트 이미지 + 이름) 안에 이미 보여줄
+// 정보가 들어있는 경우가 대부분이라, 그 DOM에서 바로 뽑아서 상세 화면 헤더를 먼저 그려두면(실제
+// 데이터는 그 아래에서 계속 불러옴) 화면 전환 자체는 즉시 일어난 것처럼 느껴진다. 못 찾으면 null을
+// 돌려주고, 호출부는 그냥 기존처럼 스켈레톤을 보여주면 되므로 어디에 붙여도 실패해도 안전하다.
+function nameHintFromElement(elm) {
+  if (!elm) return null;
+  const img = elm.querySelector("img");
+  const nameEl = elm.querySelector('[class*="name"]') || elm.querySelector("span");
+  const name = nameEl?.textContent?.trim();
+  return name ? { name, photoUrl: img?.src || null } : null;
+}
+
+export function teamHintFromElement(elm) {
+  const hint = nameHintFromElement(elm);
+  return hint ? { name: hint.name, crest: hint.photoUrl } : null;
+}
+
+export function playerHintFromElement(elm) {
+  const hint = nameHintFromElement(elm);
+  return hint ? { name: hint.name, photo: hint.photoUrl } : null;
+}
+
 function hashString(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) {
