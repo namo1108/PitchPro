@@ -619,6 +619,16 @@ html[data-toss-app] #auth-form-wrap {
   display: none !important;
 }
 
+/* 앱인토스 심사 반려(2026-09-02, 두 번째 건) - "미니앱 접속 직후 배너시트가 바로 노출돼요. 미니앱
+   진입 시 즉시 배너시트가 나타나지 않도록 수정해 주세요." updateNotes.js가 앱 시작 600ms 뒤 자동으로
+   띄우는 "업데이트 소식" 팝업(#update-notes-modal)을 가리키는 것으로 보인다 - 사용자 행동 없이 뜨는
+   유일한 시트다. JS 타이머 자체는 그대로 두고(건드릴수록 위험한 부류의 코드는 최소로 손댄다는 원칙),
+   그 결과로 뜨는 모달만 토스 빌드에서 강제로 숨긴다 - JS가 매번 inline display를 다시 설정하므로
+   !important 필요. */
+html[data-toss-app] #update-notes-modal {
+  display: none !important;
+}
+
 /* 토스 배너 광고 - 일반 웹/PWA/안드로이드는 아예 안 보이고(빈 컨테이너), 앱인토스 빌드에서만
    플로팅 탭바 바로 위에 떠 있게 한다. 96px는 토스 가이드가 지정한 고정 배너 높이 - 광고가 안
    붙으면(TossAds.attachBanner 실패/미지원) toss-ads.js가 컨테이너를 숨긴다.
