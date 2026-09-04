@@ -399,7 +399,7 @@ function tableRowsHtml(table, comp) {
       return `
         <tr class="${row.live ? "live-row" : ""}">
           <td><div class="pos-cell"><span class="pos-badge ${badgeClass}"></span>${row.position}</div></td>
-          <td><div class="team-cell ${mine ? "mine" : ""}" data-team-id="${row.team.id}">${crestImg(row.team, "team-crest")}<span class="team-name-text">${row.team.shortName || row.team.name}</span>${mine ? '<span class="mine-star" title="나의 팀">★</span>' : ""}${row.live ? `<span class="${dotClass}" title="경기 진행 중(실시간 반영)"></span>` : ""}</div></td>
+          <td><div class="team-cell ${mine ? "mine" : ""}" data-team-id="${row.team.id}">${crestImg(row.team, "team-crest")}<span class="team-name-text">${row.team.shortName || row.team.name}</span>${mine ? '<span class="mine-star" title="나의 팀">★</span>' : ""}${row.live ? `<span class="${dotClass}" title="경기 진행 중 - 현재 스코어 기준 승/무/패"></span>` : ""}</div></td>
           <td class="num">${row.playedGames}</td>
           <td class="num">${row.won}</td>
           <td class="num">${row.draw}</td>
@@ -439,7 +439,7 @@ function renderTables(tables, silent, comp) {
       const anyLive = table.table.some((row) => row.live);
       return `
         ${showGroupTitle ? `<div class="standings-group-title">${table.type}</div>` : ""}
-        ${anyLive ? '<div class="live-standings-note">🟢 진행 중인 경기의 현재 스코어를 반영한 실시간 순위입니다.</div>' : ""}
+        ${anyLive ? '<div class="live-standings-note">🟢 진행 중인 경기가 있어요 - 팀명 옆 점 색깔은 현재 스코어 기준 승/무/패예요. 승점 등 기록은 경기가 끝나야 반영돼요.</div>' : ""}
         <table class="standings-table">
           <thead>
             <tr>
