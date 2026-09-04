@@ -7,11 +7,17 @@ import { notifyMatchEvents } from "./notifyMatchEvents.js";
 import { detectCardsAndNotify } from "./detectCardsAndNotify.js";
 import { alertAdminOfFailure } from "../lib/adminAlert.js";
 
-// 1초 간격(사용자 요청, 2026-08-09 - 3초도 여전히 느리다는 피드백으로 더 줄임). live=all은 대회 수와
-// 무관하게 호출 1번으로 끝나는 가벼운 엔드포인트라, Ultra 플랜 분당 한도(450회) 대비 이 빈도(틱당 최대
-// 50콜)도 여유가 충분하다. 다만 이보다 더 줄여도 체감 개선은 크지 않다 - 실제 골 발생 시각과 API-Football
-// 자체가 그걸 반영하는 시각 사이의 지연(우리가 통제 불가)이 이제 더 큰 병목이기 때문.
-const POLL_INTERVAL_MS = 1 * 1000;
+// 원래 1초 간격이었는데(사용자 요청, 2026-08-09 - 3초도 느리다는 피드백으로 줄임), "Ultra 플랜 분당
+// 한도(450회) 대비 여유 충분"이라던 그 가정이 실제로는 안 맞았던 것으로 보인다 - admin 알림 로그를
+// 보면 2026-08-30부터 거의 매일, 특히 유럽 5대리그가 동시에 여러 경기 열리는 시간대에 레이트리밋이
+// 시간당 1~4번씩 반복돼서 그동안 골/라인업 알림이 통째로 끊기고 있었다(2026-09-04 "알림이 이상해"
+// 제보로 발견 - 5일치 로그가 200개 한도를 이미 채운 상태였음). 알림이 몇 초 늦게 오는 것보다 아예
+// 안 오는 게 훨씬 나쁘므로, 이 폴링 루프의 분당 호출 수를 절반 이하로 줄인다.
+const POLL_INTERVAL_MS = 2.5 * 1000;
+// 레이트리밋에 걸리기 시작하면 남은 틱 예산(최대 50초)을 다 써가며 계속 재시도해봤자 매번 또
+// 걸리기만 해서 오히려 다른 대회/작업의 분당 한도까지 같이 갉아먹는다 - 연속으로 이만큼 실패하면
+// 이번 틱은 깨끗하게 포기하고 다음 크론 틱(최대 1분 뒤)에 다시 시도한다.
+const MAX_CONSECUTIVE_RATE_LIMITS = 3;
 // 크론이 1분마다 도는데, 다음 tick과 겹치지 않도록 50초 정도에서 멈춘다(Cloudflare 실행시간 여유도 남김).
 const POLL_DURATION_MS = 50 * 1000;
 // 카드(경고/퇴장)는 경기당 별도 events 조회가 필요해 매초 부르기엔 비용이 크다(라이브 경기가 여러 개면
@@ -43,6 +49,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function pollLiveMatches(env) {
   const deadline = Date.now() + POLL_DURATION_MS;
   let lastCardCheck = 0;
+  let consecutiveRateLimits = 0;
 
   while (Date.now() < deadline) {
     const matchesBlob = await getJSON(env, KV_KEYS.matches);
@@ -52,6 +59,7 @@ export async function pollLiveMatches(env) {
     let liveRaw;
     try {
       liveRaw = await apiFootball.getLiveFixtures(env, { retries: 1 });
+      consecutiveRateLimits = 0;
     } catch (err) {
       console.error("live=all fetch failed:", err);
       // 라이브 경기가 있는 동안 이 호출이 막히면(레이트리밋 등) 골/카드 감지가 그 몇 초~몇 분간
@@ -59,6 +67,10 @@ export async function pollLiveMatches(env) {
       const isRateLimit = /rateLimit/.test(err.message);
       if (isRateLimit) {
         await alertAdminOfFailure(env, "livepoll-ratelimit", err).catch(() => {});
+        consecutiveRateLimits++;
+        // 연속으로 계속 걸리면 한도가 지금 당장은 안 돌아온다는 뜻 - 이번 틱 남은 예산을 다 써가며
+        // 재시도하는 대신 깨끗이 포기하고 다음 크론 틱(최대 1분 뒤)에 다시 시도한다.
+        if (consecutiveRateLimits >= MAX_CONSECUTIVE_RATE_LIMITS) return;
       }
       await sleep(isRateLimit ? RATE_LIMIT_BACKOFF_MS : POLL_INTERVAL_MS);
       continue;

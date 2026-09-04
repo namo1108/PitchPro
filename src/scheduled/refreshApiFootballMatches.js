@@ -87,9 +87,19 @@ export async function fetchAndStoreMatches(env, existing) {
   const allMatches = [];
   let attempted = 0;
   let rateLimited = 0;
+  let consecutiveRateLimits = 0;
+  // 우선순위(urgencyByCode) 순으로 이미 정렬돼 있어서, 이 시점부터는 라이브/임박 경기처럼 정말
+  // 급한 대회는 이미 다 시도해본 뒤다 - 계속 레이트리밋에 걸리는데도 나머지 "덜 급한" 대회까지
+  // 끝까지 다 시도하면 pollLiveMatches(골 감지)가 쓸 이번 분의 한도까지 마저 갉아먹는다
+  // (2026-09-04, admin 알림 로그에 5일간 반복 확인 - "300ms→1000ms로 늘려도 여전히 걸림"). 연속으로
+  // 계속 걸리면 남은 대회는 캐시로 대체하고 이번 스윕을 조기 종료한다.
   for (const comp of orderedCompetitions) {
     const cached = existingByCode.get(comp.code) || [];
     if (isActive && cached.length && urgencyByCode.get(comp.code) === 2) {
+      allMatches.push(...cached);
+      continue;
+    }
+    if (consecutiveRateLimits >= 3) {
       allMatches.push(...cached);
       continue;
     }
@@ -99,15 +109,22 @@ export async function fetchAndStoreMatches(env, existing) {
         retries: 1,
       });
       allMatches.push(...(raw.response || []).map(normalizeFixture));
+      consecutiveRateLimits = 0;
     } catch (err) {
       console.error(`fixtures fetch failed for ${comp.code}:`, err);
-      if (/rateLimit/.test(err.message)) rateLimited++;
+      if (/rateLimit/.test(err.message)) {
+        rateLimited++;
+        consecutiveRateLimits++;
+      } else {
+        consecutiveRateLimits = 0;
+      }
       allMatches.push(...cached);
     }
-    // 300ms 간격으로는 대회 29개를 순차 호출할 때(다른 크론 작업·실사용자 요청과 겹치면 더욱)
-    // 분당 요청 한도에 걸려 전체 대회가 한꺼번에 실패하는 사고가 있었다(2026-08-08, EL/ECL 추가
-    // 직후 확인 - 새 대회 자체의 문제가 아니라 이 전체 스윕이 분당 한도를 넘기고 있었음).
-    await sleep(1000);
+    // 원래 300ms였다가 분당 한도 초과 사고로 1000ms로 늘렸는데도(2026-08-08) 계속 걸려서
+    // (admin 알림 로그 기준 5일간 시간당 1~4회씩, 2026-09-04 확인) 한 번 더 늘린다 - 다른 크론
+    // 작업·실사용자 요청과 겹치면 이 정도 간격도 부족할 수 있지만, 최소한 이 스윕 혼자서 한도를
+    // 다 써버리는 일은 줄인다.
+    await sleep(1500);
   }
 
   // 이 틱에서 시도한 대회 절반 이상이 레이트리밋으로 실패하면(2026-08-20 확인 - 전 대회가 한꺼번에
