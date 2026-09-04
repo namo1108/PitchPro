@@ -48,10 +48,11 @@ export function applyLiveDeltas(table, matches, competitionCode) {
     const awayRow = rowById.get(m.awayTeam.id);
     if (!homeRow || !awayRow) continue;
 
-    // 경기수(playedGames)는 안 늘린다 - 아직 안 끝난 경기라 "몇 경기 치렀는지"는 실제로 그대로다.
-    // 예전엔 승점/득실과 함께 +1 했는데, 그러면 라이브 중엔 확정된 경기수보다 하나 많게 보여서
-    // "24경기인데 25경기로 나온다"는 문제로 이어졌다(2026-09-04 제보) - 승점/득실/승무패는 "지금
-    // 스코어 그대로 끝난다면"이라는 가정이 자연스럽지만, 경기수는 그 가정과 무관하게 아직 사실 그대로여야 한다.
+    // 경기수(playedGames)와 승/무/패는 안 늘린다 - 아직 안 끝난 경기라 "몇 경기를 이겼/비겼/졌는지"는
+    // 실제로 그대로다. 예전엔 이 넷(경기수/승/무/패)을 승점/득실과 함께 다 같이 +1 했는데, 경기수만
+    // 먼저 고쳤더니(2026-09-04) 이번엔 승+무+패 합이 경기수보다 하나 많아지는 새 불일치가 생겼다
+    // (예: 24경기인데 14승+6무+5패=25) - 승점/득실/득점만 "지금 스코어 그대로 끝난다면"이라는 가정을
+    // 보여주는 실시간 지표로 남기고, 경기수/승/무/패는 전부 아직 사실 그대로(확정된 기록)를 유지한다.
     homeRow.points += resultPoints(home, away);
     awayRow.points += resultPoints(away, home);
     homeRow.goalDifference += home - away;
@@ -61,18 +62,12 @@ export function applyLiveDeltas(table, matches, competitionCode) {
     awayRow.goalsFor = (awayRow.goalsFor ?? 0) + away;
     awayRow.goalsAgainst = (awayRow.goalsAgainst ?? 0) + home;
     if (home > away) {
-      homeRow.won += 1;
-      awayRow.lost += 1;
       homeRow.liveResult = "win";
       awayRow.liveResult = "loss";
     } else if (home < away) {
-      awayRow.won += 1;
-      homeRow.lost += 1;
       homeRow.liveResult = "loss";
       awayRow.liveResult = "win";
     } else {
-      homeRow.draw += 1;
-      awayRow.draw += 1;
       homeRow.liveResult = "draw";
       awayRow.liveResult = "draw";
     }
