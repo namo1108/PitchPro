@@ -153,7 +153,11 @@ export async function fetchAndStoreMatches(env, existing) {
   const merged = allMatches.map((m) => {
     const prevLive = liveById.get(m.id);
     if (prevLive && !TERMINAL_STATUSES.has(m.status)) {
-      return { ...m, score: prevLive.score };
+      // score 외에도, detectCardsAndNotify.js가 이 경기 캐시에 덧붙여둔 redCardTeamIds(경기 목록
+      // 화면의 레드카드 표기용, 2026-09-06) 같은 값이 이 정규화된 fixture 재조회로 지워지지 않게
+      // 살려둔다 - normalizeFixture는 그런 필드를 모르는 값이라 항상 undefined라, prevLive 쪽 값이
+      // 있으면 그걸 우선한다.
+      return { ...m, score: prevLive.score, redCardTeamIds: m.redCardTeamIds ?? prevLive.redCardTeamIds };
     }
     return m;
   });

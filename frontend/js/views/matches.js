@@ -806,6 +806,7 @@ function renderHeroCard(m) {
       <div class="hero-match-team" data-team-id="${m.homeTeam.id}">
         ${crestImg(m.homeTeam, "hero-match-crest")}
         <span>${m.homeTeam.shortName || m.homeTeam.name}</span>
+        ${redCardBadgeHtml(m, m.homeTeam.id)}
       </div>
       <div class="hero-match-center">
         <div class="hero-match-score">${hasScore ? `${home} - ${away}` : "vs"}</div>
@@ -814,6 +815,7 @@ function renderHeroCard(m) {
       <div class="hero-match-team" data-team-id="${m.awayTeam.id}">
         ${crestImg(m.awayTeam, "hero-match-crest")}
         <span>${m.awayTeam.shortName || m.awayTeam.name}</span>
+        ${redCardBadgeHtml(m, m.awayTeam.id)}
       </div>
     </div>
   `;
@@ -824,6 +826,13 @@ function renderHeroCard(m) {
 
   card.addEventListener("click", () => loadMatchDetail(m.id, m));
   return card;
+}
+
+// 경기 목록(메인 화면)에서 퇴장당한 선수가 있는 팀 옆에 표기한다 - detectCardsAndNotify.js가
+// 구독자 있는 라이브 경기에서 이미 조회하던 이벤트를 재사용해 채워둔 값이라(2026-09-06), API 호출이
+// 추가로 들지 않는다. 대신 아무도 구독 안 한 라이브 경기는 값 자체가 안 채워질 수 있음(의도된 제한).
+function redCardBadgeHtml(m, teamId) {
+  return m.redCardTeamIds?.includes(String(teamId)) ? '<span class="red-card-badge" title="퇴장 있음">🟥</span>' : "";
 }
 
 function renderMatchRow(m, opts = {}) {
@@ -869,11 +878,13 @@ function renderMatchRow(m, opts = {}) {
     <div class="team home" data-team-id="${m.homeTeam.id}">
       ${crestImg(m.homeTeam, "team-crest")}
       <span class="team-name">${m.homeTeam.shortName || m.homeTeam.name}</span>
+      ${redCardBadgeHtml(m, m.homeTeam.id)}
     </div>
     ${scoreHtml}
     <div class="team away" data-team-id="${m.awayTeam.id}">
       ${crestImg(m.awayTeam, "team-crest")}
       <span class="team-name">${m.awayTeam.shortName || m.awayTeam.name}</span>
+      ${redCardBadgeHtml(m, m.awayTeam.id)}
     </div>
     <div class="match-row-actions">
       ${watchBellHtml(m.id)}

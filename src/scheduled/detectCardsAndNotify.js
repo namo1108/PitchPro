@@ -91,7 +91,12 @@ export async function detectCardsAndNotify(env) {
   if (!watchedLive.length) return;
 
   const notified = (await getJSON(env, KV_KEYS.notifiedCards)) || {};
-  let changed = false;
+  let notifiedChanged = false;
+  // 경기 목록(메인) 화면에 "퇴장당한 팀" 표기를 붙이기 위한 것 - 이미 알림 때문에 조회하던 이벤트를
+  // 그대로 재사용하는 거라 API 호출이 추가로 들지 않는다(2026-09-06 요청). 다만 구독자가 있는
+  // 라이브 경기만 조회 대상이라, 아무도 안 본 라이브 경기는 표기가 안 붙을 수 있음 - 알림 비용을
+  // 더 늘리지 않기 위한 의도적인 제한(레이트리밋 문제가 있는 상황이라 범위를 넓히지 않기로 함).
+  let matchesChanged = false;
 
   for (const match of watchedLive) {
     let events;
@@ -104,6 +109,14 @@ export async function detectCardsAndNotify(env) {
     }
 
     const { redCards, yellowCards } = extractCards(events);
+
+    const redCardTeamIds = [...new Set(redCards.map((c) => c.teamId))];
+    const prevRedCardTeamIds = match.redCardTeamIds || [];
+    if (redCardTeamIds.length !== prevRedCardTeamIds.length || redCardTeamIds.some((id) => !prevRedCardTeamIds.includes(id))) {
+      match.redCardTeamIds = redCardTeamIds;
+      matchesChanged = true;
+    }
+
     if (!redCards.length && !yellowCards.length) continue;
 
     const seen = new Set(notified[match.id] || []);
@@ -116,13 +129,16 @@ export async function detectCardsAndNotify(env) {
       notifyCards(env, match, subscriptions, freshYellow, "yellow"),
     ]);
     for (const key of [...redResult.keys, ...yellowResult.keys]) seen.add(key);
-    if (redResult.changed || yellowResult.changed) changed = true;
+    if (redResult.changed || yellowResult.changed) notifiedChanged = true;
 
     notified[match.id] = [...seen];
   }
 
-  if (changed) {
+  if (notifiedChanged) {
     // 하루 지나면 자동 만료 - 지난 경기의 중복방지 기록을 굳이 따로 청소할 필요가 없게 한다.
     await putJSON(env, KV_KEYS.notifiedCards, notified, { expirationTtl: 60 * 60 * 24 });
+  }
+  if (matchesChanged) {
+    await putJSON(env, KV_KEYS.matches, { ...matchesBlob, lastUpdated: new Date().toISOString() });
   }
 }
