@@ -60,8 +60,19 @@ async function buildTeam(env, teamId) {
       hadFetchError = true;
       return { response: [] };
     }),
-    apiFootball.getSquad(env, teamId).catch(() => ({ response: [] })),
-    apiFootball.getCoach(env, teamId).catch(() => null),
+    // 스쿼드/감독 조회 실패도 recent/upcoming과 똑같이 hadFetchError로 표시한다 - 예전엔 여기만
+    // 빠져있어서, 레이트리밋에 걸린 순간의 빈 스쿼드가 "진짜로 스쿼드가 없다"로 캐시에 굳어버렸다
+    // (2026-09-06 제보 - 맨체스터시티 스쿼드가 계속 안 나옴, 감독도 실제와 다르게 오래 고정돼 보임).
+    apiFootball.getSquad(env, teamId).catch((err) => {
+      console.error("team squad fetch failed:", err);
+      hadFetchError = true;
+      return { response: [] };
+    }),
+    apiFootball.getCoach(env, teamId).catch((err) => {
+      console.error("team coach fetch failed:", err);
+      hadFetchError = true;
+      return null;
+    }),
     getKLeaguePlayerPhotoMap(env),
     getKLeagueCoachPhotoMap(env),
   ]);
