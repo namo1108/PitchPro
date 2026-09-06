@@ -468,6 +468,9 @@ const COACH_OVERRIDES = {
   // 사진은 API-Football coachs?search=Alonso로 찾은 그의 실제 coach 레코드(id 6801, 레버쿠젠/레알마드리드
   // 재임 시절 등록분)에서 가져온 것 - 같은 소스라 별도로 이미지를 호스팅할 필요가 없다(확인일 2026-07-26).
   49: { id: "override-alonso", name: "Xabi Alonso", nationality: "Spain", age: null, photo: "https://media.api-sports.io/football/coachs/6801.png" },
+  // Manchester City: Enzo Maresca - API-Football coachs?team=50 엔드포인트가 아직 과르디올라로 준다
+  // (사용자 확인, 2026-09-06).
+  50: { id: "override-maresca", name: "Enzo Maresca", nationality: "Italy", age: null, photo: null },
   // 김해FC: API가 최명성으로 주는데 현재 감독은 손현준(사용자 확인, 2026-08-09).
   7076: { id: "override-son-hyun-jun", name: "손현준", nationality: "Korea Republic", age: null, photo: null },
   // 대구FC: API가 감독 정보 자체를 안 줌, 현재 감독은 최성용(사용자 확인, 2026-08-09).
@@ -543,6 +546,8 @@ export function applyManualCoachFallback(coach, teamId) {
 const SQUAD_REMOVALS = {
   // Chelsea -> Real Madrid, 2026-06-15 공식 발표(Real Madrid 스쿼드에는 이미 반영됨, Chelsea 쪽만 안 빠짐)
   49: ["47380"], // Marc Cucurella
+  // Manchester City -> Everton 임대, 사용자 확인(2026-09-06) - API-Football이 아직 City 스쿼드에서 안 뺌.
+  50: ["19187"], // Jack Grealish
 };
 
 export function applySquadRemovals(players, teamId) {
