@@ -40,7 +40,10 @@ async function getLatestTransfer(env, playerId) {
 }
 
 async function notifyTransfer(env, subscriptions, { playerId, playerName, transfer }) {
-  const dedupeKey = `transfernotified:${playerId}:${transfer.date}`;
+  // refreshTransferMarket.js와 같은 키 형식(playerId만, date는 안 씀) - date가 껴 있으면 API-Football이
+  // 같은 이적 건에도 ±1일씩 다르게 주는 경우가 있어서 그 값이 흔들릴 때마다 "새 이적"으로 오인해
+  // 알림이 반복되는 문제가 있었다(2026-09-06 제보, 화성FC 이적 알림 반복).
+  const dedupeKey = `transfernotified:${playerId}`;
   const already = await env.CACHE.get(dedupeKey);
   if (already) return;
 

@@ -10,12 +10,17 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // 같은 이적을 두 번 알리지 않도록(이 순환 조회 + 즐겨찾기 팀 스쿼드 대조 detectTransfersAndNotify.js
 // 양쪽이 같은 이적을 다른 시점에 발견할 수 있음) 두 코드가 같은 키 형식을 공유한다.
+// date를 키에서 뺐다(2026-09-06 제보 - 화성FC 이적 알림이 한동안 계속 반복돼서 왔음) - API-Football이
+// 같은 이적 건의 date 필드를 조회할 때마다 ±1일씩 다르게 주는 경우가 있어서(수원삼성블루윙즈 이적
+// 목록에서 같은 선수/같은 이동이 "2026-07-25"/"2026-07-26" 두 날짜로 각각 잡혀있던 걸 직접 확인,
+// 2026-09-04), date가 껴 있으면 그 값이 흔들릴 때마다 "새로운 이적"으로 오인해서 매번 다시 알림이
+// 나갔다. playerId(+direction)만으로 판단하면 이 흔들림에 영향을 안 받는다.
 const TRANSFER_DEDUPE_TTL_SECONDS = 60 * 24 * 60 * 60;
-function transferDedupeKey(playerId, date) {
-  return `transfernotified:${playerId}:${date}`;
+function transferDedupeKey(playerId) {
+  return `transfernotified:${playerId}`;
 }
 function transferIdentity(t) {
-  return `${t.playerId}:${t.date}:${t.direction}`;
+  return `${t.playerId}:${t.direction}`;
 }
 // API-Football의 type 필드는 대부분 "Free"/"Loan"/"N/A"/"Transfer" 같은 정성적 문구고, 실제 이적료
 // 금액("€ 55M" 등)이 오는 경우는 드물다 - 그런 값은 아래 어떤 정규식에도 안 걸려서 그대로 통과되므로
@@ -40,7 +45,7 @@ async function notifyNewTransfers(env, subscriptions, teamId, freshTransfers) {
   if (!interested.length) return;
 
   for (const t of freshTransfers) {
-    const dedupeKey = transferDedupeKey(t.playerId, t.date);
+    const dedupeKey = transferDedupeKey(t.playerId);
     if (await env.CACHE.get(dedupeKey)) continue;
 
     const fee = formatMoveType(t.moveType);
