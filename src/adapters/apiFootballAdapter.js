@@ -470,7 +470,7 @@ const COACH_OVERRIDES = {
   49: { id: "override-alonso", name: "Xabi Alonso", nationality: "Spain", age: null, photo: "https://media.api-sports.io/football/coachs/6801.png" },
   // Manchester City: Enzo Maresca - API-Football coachs?team=50 엔드포인트가 아직 과르디올라로 준다
   // (사용자 확인, 2026-09-06).
-  50: { id: "override-maresca", name: "Enzo Maresca", nationality: "Italy", age: null, photo: null },
+  50: { id: "override-maresca", name: "Enzo Maresca", nationality: "Italy", age: null, photo: "/img/coaches/enzo-maresca.jpg" },
   // 김해FC: API가 최명성으로 주는데 현재 감독은 손현준(사용자 확인, 2026-08-09).
   7076: { id: "override-son-hyun-jun", name: "손현준", nationality: "Korea Republic", age: null, photo: null },
   // 대구FC: API가 감독 정보 자체를 안 줌, 현재 감독은 최성용(사용자 확인, 2026-08-09).
