@@ -897,9 +897,17 @@ function renderMatchRow(m, opts = {}) {
   return row;
 }
 
+// 알림 배너를 눌러서 들어온 경우(골 알림 -> 정보 탭, 라인업 알림 -> 라인업 탭 등) 강제로 열어줄
+// 탭 - loadMatchDetail 진입 시점에 한 번만 정해두고, renderMatchDetail이 여기 값을 읽기만 한다
+// (아래에서 지우지 않는 이유: knownMatch로 먼저 한 번, 네트워크 응답으로 또 한 번 renderMatchDetail이
+// 두 번 불릴 수 있는데 그 사이에 값이 사라지면 두 번째 렌더에서 다시 "정보" 탭으로 튕긴다 - 다음
+// loadMatchDetail 호출(어떤 경로로든) 맨 앞에서 항상 새로 정해지므로 여기서 안 지워도 stale 값이 남지 않는다).
+let pendingDetailTab = null;
+
 // knownMatch가 있으면(목록에서 이미 갖고 있던 경기 정보) 네트워크 응답을 기다리지 않고 스코어보드부터
 // 바로 그려서 "뚝뚝 끊기는" 느낌 없이 전환되게 하고, 득점자/스탯/라인업처럼 상세 전용 데이터만 뒤이어 채운다.
-export async function loadMatchDetail(matchId, knownMatch) {
+export async function loadMatchDetail(matchId, knownMatch, targetTab) {
+  pendingDetailTab = targetTab || null;
   pushDetail("detail");
   saveViewState({ view: "detail", matchId });
   if (knownMatch) {
@@ -1595,7 +1603,7 @@ function renderMatchDetail(m) {
   // 리셋돼서, 로딩 딜레이 동안 라인업 탭을 눌러도 데이터가 도착하는 순간 정보 탭으로 튕겨나갔다.
   // 다른 경기로 넘어온 경우(id가 다름)는 지금처럼 "정보"부터 보여주는 게 맞다.
   const isSameMatch = state.detailMatchId === m.id;
-  const previousActiveTab = isSameMatch ? el.detailContent.querySelector(".team-tab-btn.active")?.dataset.detailTab : null;
+  const previousActiveTab = pendingDetailTab || (isSameMatch ? el.detailContent.querySelector(".team-tab-btn.active")?.dataset.detailTab : null);
   state.detailMatchId = m.id;
 
   // 리그 탭(leagues.js의 LEAGUE_GROUPS.theme)과 같은 매핑 - 경기 상세도 그 리그 경기면 같은 테마

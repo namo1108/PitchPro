@@ -165,7 +165,7 @@ async function refreshPostDetail(id) {
 
 // 목록에서 글을 눌러 처음 들어올 때만 호출 - 뒤로가기(하드웨어/제스처 포함)로 목록에 돌아갈 수
 // 있도록 history에 등록해둔다.
-async function openPost(id) {
+export async function openPost(id) {
   el.listWrap.style.display = "none";
   el.writeWrap.style.display = "none";
   el.detailWrap.style.display = "block";

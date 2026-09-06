@@ -119,7 +119,10 @@ self.addEventListener("push", (event) => {
     // 설정 탭에서 "알림 소리 끄기"를 켜면 서버가 payload.silent를 실어 보낸다 - true면 OS가
     // 소리/진동 없이 조용히 알림만 띄운다(vibrate 배열이 있어도 silent가 우선한다).
     silent: !!payload.silent,
-    data: { matchId: payload.matchId },
+    // 알림 배너를 눌렀을 때 종류에 맞는 화면으로 바로 이동시키기 위한 정보(2026-09-06 요청) -
+    // matchId/playerId/postId 중 이 알림 종류에 해당하는 것만 실제로 채워져 있고 나머지는
+    // undefined인 채로 notificationclick에 그대로 넘어간다.
+    data: { type: payload.type, matchId: payload.matchId, playerId: payload.playerId, postId: payload.postId },
   };
 
   // 골 알림은 서버가 그때그때 득점팀 엠블럼+득점자+시간으로 그려주는 이미지 URL을 같이 보낸다
@@ -140,9 +143,31 @@ self.addEventListener("push", (event) => {
   );
 });
 
+// 알림 배너를 누르면 그 종류에 맞는 화면으로 바로 이동한다(2026-09-06 요청 - "골이면 골 정보,
+// 라인업이면 라인업 페이지로"). 이미 열려있는 창이 있으면(대부분의 경우 - PWA/설치된 앱은 보통
+// 하나만 떠 있음) 새 창을 또 띄우지 않고 그 창에 포커스만 준 뒤 postMessage로 이동할 곳을 알려준다
+// (app.js가 이 메시지를 받아서 실제 화면 전환을 처리 - 서비스워커 자신은 페이지 내부 상태/라우팅을
+// 몰라서 직접 화면을 못 바꾼다). 열린 창이 하나도 없으면(앱이 완전히 종료된 상태) 새 창을 여는데,
+// 그 경우엔 라우팅 정보를 쿼리스트링에 실어서 app.js가 첫 로드 시점에 읽고 처리한다.
 self.addEventListener("notificationclick", (event) => {
+  const data = event.notification.data || {};
   event.notification.close();
-  event.waitUntil(clients.openWindow("/"));
+  event.waitUntil(
+    (async () => {
+      const allClients = await clients.matchAll({ type: "window", includeUncontrolled: true });
+      const target = allClients.find((c) => "focus" in c);
+      if (target) {
+        await target.focus();
+        target.postMessage({ type: "notification-navigate", data });
+        return;
+      }
+      const params = new URLSearchParams({ notif: "1" });
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== undefined && value !== null) params.set(key, value);
+      }
+      await clients.openWindow(`/?${params.toString()}`);
+    })()
+  );
 });
 
 // 브라우저/OS 푸시 서비스가 구독을 만료시키거나 교체하는 경우(장기 미접속, PWA 재설치, OS 푸시

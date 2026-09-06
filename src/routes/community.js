@@ -84,6 +84,7 @@ export async function handleCreatePost(request, env) {
         type: "comment",
         title: "💬 게시글에서 언급됐어요",
         body: `${user.nickname}님이 "${title}"에서 회원님을 언급했어요: ${preview}`,
+        postId: id,
       })
     )
   );
@@ -149,7 +150,11 @@ export async function handleCreateComment(request, env, id) {
   // 태그된 사람에게도 따로 알림을 보낸다. sendPushToUsername은 그 계정이 알림을 구독한 적 없으면
   // 조용히 아무 일도 안 하므로(반환값 무시), 실패해도 댓글 등록 자체는 이미 끝난 뒤라 안전하다.
   const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
-  await Promise.all(GOAT_USERNAMES.map((admin) => sendPushToUsername(env, admin, { type: "comment", title: "💬 새 댓글", body: `${post.title} · ${user.nickname}: ${preview}` })));
+  await Promise.all(
+    GOAT_USERNAMES.map((admin) =>
+      sendPushToUsername(env, admin, { type: "comment", title: "💬 새 댓글", body: `${post.title} · ${user.nickname}: ${preview}`, postId: id })
+    )
+  );
 
   const mentioned = await findMentionedUsers(env, text, user.username);
   await Promise.all(
@@ -158,6 +163,7 @@ export async function handleCreateComment(request, env, id) {
         type: "comment",
         title: "💬 댓글에서 언급됐어요",
         body: `${user.nickname}님이 "${post.title}"에서 회원님을 언급했어요: ${preview}`,
+        postId: id,
       })
     )
   );
