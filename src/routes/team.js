@@ -10,6 +10,7 @@ import {
   applyCoachOverride,
   applyManualCoachFallback,
   applySquadRemovals,
+  applySquadAdditions,
   koreanizeTeam,
 } from "../adapters/apiFootballAdapter.js";
 import {
@@ -91,7 +92,7 @@ async function buildTeam(env, teamId) {
   });
   // API-Football이 K3/K4는 스쿼드를 거의 안 줘서(팀 정보/일정만 있음), 비어있을 때 나무위키 기반
   // 수동 명단(manualK3K4Squads.js)으로 대체한다 - 사용자 요청, 2026-08-08.
-  const squad = lookupManualK3K4Squad(teamId, apiSquad.length) || apiSquad;
+  const squad = lookupManualK3K4Squad(teamId, apiSquad.length) || applySquadAdditions(apiSquad, teamId);
   // API-Football의 K리그2 감독 사진은 깨진 방패 아이콘인 경우가 많아서(null이 아니라 URL 자체가
   // 플레이스홀더라 "없음" 판정으로는 못 거름), kleague 스크랩 사진을 먼저 깔고 그 위에 수동 보정을 얹는다.
   let baseCoach = normalizeCoach(selectCurrentCoach(coachRaw?.response, teamId));

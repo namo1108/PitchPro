@@ -471,6 +471,18 @@ const COACH_OVERRIDES = {
   // Manchester City: Enzo Maresca - API-Football coachs?team=50 엔드포인트가 아직 과르디올라로 준다
   // (사용자 확인, 2026-09-06).
   50: { id: "override-maresca", name: "Enzo Maresca", nationality: "Italy", age: null, photo: "/img/coaches/enzo-maresca.jpg" },
+  // 프리미어리그 전체 감독 검증(2026-09-06, 사용자 요청 - 웹서치로 실제 현재 감독 교차 확인) - 아래 8개
+  // 팀은 API-Football이 옛 감독을 그대로 주거나(에버튼/토트넘) 아예 안 줘서(뉴캐슬/리즈/팰리스/입스위치/
+  // 본머스/노팅엄포레스트/코번트리) 실제 감독으로 수동 보정한다.
+  45: { id: "override-moyes", name: "David Moyes", nationality: "Scotland", age: null, photo: null }, // Everton - API가 아직 전 선수 L. Baines를 줌
+  34: { id: "override-jaissle", name: "Matthias Jaissle", nationality: "Germany", age: null, photo: null }, // Newcastle - 2026-08-05 부임(에디 하우 후임)
+  63: { id: "override-farke", name: "Daniel Farke", nationality: "Germany", age: null, photo: null }, // Leeds
+  52: { id: "override-sage", name: "Pierre Sage", nationality: "France", age: null, photo: null }, // Crystal Palace - 2026-06-15 부임(글라스너 후임)
+  57: { id: "override-oneil", name: "Gary O'Neil", nationality: "England", age: null, photo: null }, // Ipswich Town - 2026-06-23 부임
+  35: { id: "override-rose", name: "Marco Rose", nationality: "Germany", age: null, photo: null }, // Bournemouth - 이라올라 리버풀 이적 후임
+  65: { id: "override-glasner", name: "Oliver Glasner", nationality: "Austria", age: null, photo: null }, // Nottingham Forest - 2026-07 부임
+  47: { id: "override-dezerbi", name: "Roberto De Zerbi", nationality: "Italy", age: null, photo: null }, // Tottenham - API가 아직 브루누 살토르(임시감독)를 줌, 실제로는 2026-03 데제르비 부임
+  1346: { id: "override-lampard", name: "Frank Lampard", nationality: "England", age: null, photo: null }, // Coventry City - 2024-11부터 재임, 승격 이끔
   // 김해FC: API가 최명성으로 주는데 현재 감독은 손현준(사용자 확인, 2026-08-09).
   7076: { id: "override-son-hyun-jun", name: "손현준", nationality: "Korea Republic", age: null, photo: null },
   // 대구FC: API가 감독 정보 자체를 안 줌, 현재 감독은 최성용(사용자 확인, 2026-08-09).
@@ -543,17 +555,172 @@ export function applyManualCoachFallback(coach, teamId) {
 }
 
 // 이적이 확정됐는데도 스쿼드 목록에서 아직 안 빠진 선수를 수동으로 제거한다(구단 발표/보도로 확인된 건만).
+// 2026-09-06: 프리미어리그 20개 구단 전체를 사용자 요청으로 웹서치 교차 검증(2개 이상 출처) - 여름
+// 이적시장(2026-09-01 마감)이 아직 API-Football 스쿼드에 반영 안 된 건들을 정리. PL 팀 간 이적은
+// SQUAD_ADDITIONS 쪽에 같은 선수 id로 추가해뒀다(예: Enzo Fernández 5996 첼시->맨시티).
 const SQUAD_REMOVALS = {
   // Chelsea -> Real Madrid, 2026-06-15 공식 발표(Real Madrid 스쿼드에는 이미 반영됨, Chelsea 쪽만 안 빠짐)
-  49: ["47380"], // Marc Cucurella
+  49: [
+    "47380", // Marc Cucurella -> Real Madrid
+    "19145", // Tosin Adarabioyo -> Tottenham (permanent)
+    "392270", // Marc Guiu -> RB Leipzig (permanent)
+    "5996", // Enzo Fernández -> Manchester City (permanent, £125m)
+    "18959", // Robert Sánchez -> Como (loan)
+    "63577", // Mykhailo Mudryk -> Tottenham (loan)
+    "308678", // Dário Essugo -> RC Strasbourg (loan)
+    "359117", // Shumaira Mheuka -> Celtic (loan)
+    "454935", // L. Emenalo -> Celtic (loan)
+    "298061", // Ted Curd -> Boreham Wood (loan)
+  ],
   // Manchester City -> Everton 임대, 사용자 확인(2026-09-06) - API-Football이 아직 City 스쿼드에서 안 뺌.
-  50: ["19187"], // Jack Grealish
+  50: [
+    "19187", // Jack Grealish -> Everton (loan)
+    "414385", // C. Echeverri -> Benfica (loan)
+    "460853", // J. Monga -> Swansea City (loan)
+    "347305", // Jaden Heskey -> Sheffield Wednesday (loan)
+  ],
+  64: [
+    "153411", // C. Drameh -> Genoa (permanent)
+    "44798", // L. Millar -> Birmingham City (loan)
+    "129713", // M. Jacob -> Newport County (loan)
+  ],
+  42: [
+    "643", // Gabriel Jesus -> Barcelona (permanent)
+    "127769", // Gabriel Martinelli -> Al-Hilal (permanent)
+    "41725", // Fábio Vieira -> Hamburger SV (permanent)
+    "727", // Reiss Nelson -> released
+    "313236", // Ethan Nwaneri -> Borussia Dortmund (loan)
+    "342243", // Tommy Setford -> Stevenage (loan)
+  ],
+  55: ["350625"], // J. Meghoma -> Portsmouth (loan)
+  40: ["19035"], // H. Elliott -> Valencia (loan)
+  63: ["162128"], // W. Gnonto -> Fiorentina (loan)
+  45: [
+    "125743", // Beto -> Fiorentina (permanent)
+    "138417", // N. Patterson -> Torino (permanent)
+    "18592", // I. Ndiaye -> Manchester City (permanent, ~£65m)
+  ],
+  746: ["301771"], // S. Adingra -> Ajax (loan)
+  33: [
+    "408896", // J. Devaney -> Hibernian (loan)
+    "362270", // E. Wheatley -> Lincoln City (loan)
+  ],
+  52: [
+    "13736", // D. Muñoz -> Nottingham Forest (permanent, £22m)
+    "26303", // B. Sosa -> FC Köln (loan)
+    "286458", // J. Devenny -> Stoke City (permanent)
+    "402640", // R. Esse -> Millwall (loan)
+    "311157", // Matheus França -> FC Alverca (loan)
+    "304320", // D. Ozoh -> Derby County (permanent)
+    "284449", // J. Rak-Sakyi -> Kasımpaşa (loan)
+  ],
+  57: [
+    "326763", // C. Humphreys -> Huddersfield Town (loan)
+    "19365", // C. Ogbene -> Lincoln City (loan)
+  ],
+  66: [
+    "19599", // E. Martínez -> Chelsea (permanent) - Chelsea 쪽엔 이미 반영돼있음
+    "19354", // Ezri Konsa -> Arsenal (permanent, £51m)
+    "19366", // Ollie Watkins -> Al-Hilal (permanent)
+  ],
+  47: [
+    "414455", // Souza -> FC Porto (loan)
+    "337593", // Kota Takai -> Sint-Truidense VV (loan)
+    "25287", // Kevin Danso -> Sunderland (loan)
+  ],
+  1346: [
+    "18202", // Liam Kitching -> Sheffield United (loan)
+    "47899", // Oliver Dovin -> Leyton Orient (loan)
+    "153626", // Raphael Borges Rodrigues -> Burton Albion (loan)
+  ],
 };
 
 export function applySquadRemovals(players, teamId) {
   const removals = SQUAD_REMOVALS[String(teamId)];
   if (!removals || !removals.length) return players;
   return players.filter((p) => !removals.includes(p.id));
+}
+
+// 이번 여름 이적으로 새로 들어왔는데 API-Football 스쿼드에 아직 안 반영된 선수를 수동으로 추가한다
+// (2026-09-06, 프리미어리그 20개 구단 웹서치 검증). 같은 선수가 우리 데이터의 다른 PL 팀 스쿼드에도
+// 있었으면(위 SQUAD_REMOVALS에서 그 팀 쪽은 뺐음) 같은 id를 그대로 써서 두 쪽 다 일관되게 유지한다.
+// PL 밖에서 온 선수는 API-Football id를 알 방법이 없어 "manual-add-" 접두사의 임시 id를 쓴다.
+const SQUAD_ADDITIONS = {
+  50: [
+    { id: "5996", name: "Enzo Fernández", position: "Midfielder", number: null },
+    { id: "18592", name: "I. Ndiaye", position: "Midfielder", number: null },
+  ],
+  64: [
+    { id: "manual-add-ansah", name: "Ilyas Ansah", position: "Attacker", number: null },
+    { id: "manual-add-mouzakitis", name: "Christos Mouzakitis", position: "Midfielder", number: null },
+    { id: "manual-add-norton-cuffy", name: "Brooke Norton-Cuffy", position: "Defender", number: null },
+    { id: "manual-add-sorba-thomas", name: "Sorba Thomas", position: "Attacker", number: null },
+    { id: "manual-add-robinio-vaz", name: "Robinio Vaz", position: "Attacker", number: null },
+  ],
+  42: [{ id: "19354", name: "Ezri Konsa", position: "Defender", number: null }],
+  34: [{ id: "manual-add-fernandez-pardo", name: "Matias Fernandez-Pardo", position: "Attacker", number: 20 }],
+  63: [
+    { id: "manual-add-melvin-bard", name: "Melvin Bard", position: "Defender", number: null },
+    { id: "manual-add-bahoya", name: "Jean-Matteo Bahoya", position: "Attacker", number: null },
+  ],
+  45: [
+    { id: "19187", name: "Jack Grealish", position: "Midfielder", number: null },
+    { id: "manual-add-maitland-niles", name: "Ainsley Maitland-Niles", position: "Defender", number: null },
+  ],
+  746: [
+    { id: "manual-add-fofana", name: "Malick Fofana", position: "Attacker", number: null },
+    { id: "manual-add-riquelme-angulo", name: "Juan Riquelme Angulo", position: "Midfielder", number: null },
+    { id: "25287", name: "Kevin Danso", position: "Defender", number: null },
+  ],
+  65: [{ id: "13736", name: "Daniel Muñoz", position: "Defender", number: null }],
+  66: [
+    { id: "manual-add-jackson", name: "Nicolas Jackson", position: "Attacker", number: null },
+    { id: "manual-add-suzuki", name: "Zion Suzuki", position: "Goalkeeper", number: null },
+    { id: "manual-add-ruggeri", name: "Matteo Ruggeri", position: "Defender", number: null },
+    { id: "manual-add-goretzka", name: "Leon Goretzka", position: "Midfielder", number: null },
+    { id: "manual-add-wan-bissaka", name: "Aaron Wan-Bissaka", position: "Defender", number: null },
+    { id: "manual-add-harwood-bellis", name: "Taylor Harwood-Bellis", position: "Defender", number: null },
+    { id: "manual-add-ibrahim-mbaye", name: "Ibrahim Mbaye", position: "Attacker", number: null },
+  ],
+  47: [
+    { id: "19145", name: "Tosin Adarabioyo", position: "Defender", number: null },
+    { id: "63577", name: "Mykhailo Mudryk", position: "Attacker", number: null },
+  ],
+  52: [
+    { id: "manual-add-chilwell", name: "Ben Chilwell", position: "Defender", number: null },
+    { id: "manual-add-timber", name: "Quinten Timber", position: "Midfielder", number: null },
+  ],
+  36: [
+    { id: "manual-add-larsson", name: "Hugo Larsson", position: "Midfielder", number: null },
+    { id: "manual-add-affengruber", name: "David Affengruber", position: "Defender", number: null },
+    { id: "manual-add-manuel-angel", name: "Manuel Ángel", position: "Midfielder", number: null },
+  ],
+};
+
+// 이름 끝 단어(성)만 비교한다 - API-Football은 "N. Jackson"처럼 이름 이니셜+성으로 주는 경우가 많아서,
+// SQUAD_ADDITIONS에 적어둔 풀네임("Nicolas Jackson")과 정확히 일치하진 않아도 같은 선수인 경우가 많다.
+function surname(name) {
+  return (name || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .trim()
+    .split(/\s+/)
+    .pop()
+    ?.toLowerCase();
+}
+
+export function applySquadAdditions(players, teamId) {
+  const additions = SQUAD_ADDITIONS[String(teamId)];
+  if (!additions || !additions.length) return players;
+  const existingIds = new Set(players.map((p) => p.id));
+  // API-Football 자체 데이터가 시간이 지나 따라잡으면(레이트리밋으로 처음엔 불완전하게 왔다가 나중에
+  // 정상화되는 경우 포함) 수동 추가 목록과 실제 선수가 겹칠 수 있어, id뿐 아니라 성(姓)으로도 한 번 더
+  // 걸러 중복 표시를 막는다(2026-09-06, 애스턴빌라에서 확인 - Suzuki/Ruggeri 등 5명이 이미 반영돼 있었음).
+  const existingSurnames = new Set(players.map((p) => surname(p.name)));
+  const toAdd = additions
+    .filter((a) => !existingIds.has(a.id) && !existingSurnames.has(surname(a.name)))
+    .map((a) => ({ nationality: null, age: null, photo: null, ...a }));
+  return [...players, ...toAdd];
 }
 
 // 일부 선수는 raw.height/weight에 단위가 이미 붙어 오고(예: "185 cm"), 일부는 숫자만 온다(예: "183") ->
