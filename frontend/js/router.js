@@ -118,3 +118,15 @@ els.navButtons.forEach((btn) => {
 els.backButtons.forEach((btn) => {
   btn.addEventListener("click", () => history.back());
 });
+
+// 앱인토스 심사 반려(2026-09-08) - "상단 뒤로가기를 눌렀으나 이전 경기 목록이 아니라 미니앱이
+// 종료됩니다." 토스가 자체적으로 그려주는 상단 뒤로가기(웹뷰 native back)는 우리 SPA의 history
+// 스택과 무관하게 동작해서, 지금까지는 그냥 미니앱을 닫아버렸다. toss-app/src/toss-back-button.js가
+// (window.__pitchProTossNotify 등과 같은 방식으로) 이 함수를 찾아서, 토스의 backEvent가 올 때마다
+// "앱 안에 더 되돌아갈 화면이 있으면 그리로, 없으면(맨 처음 화면) false를 돌려줘서 그쪽에서 미니앱을
+// 닫게" 한다. 일반 웹/PWA/안드로이드 빌드에서는 이 전역을 아무도 안 불러서 아무 영향이 없다.
+window.__pitchProTossHandleBack = function handleTossBackEvent() {
+  if (backStack.length === 0 && state.view === "matches") return false;
+  history.back();
+  return true;
+};

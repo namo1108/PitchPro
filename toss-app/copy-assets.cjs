@@ -39,9 +39,22 @@ esbuild.buildSync({
   target: "es2020",
   outfile: path.join(DEST, "js", "toss-notifications.js"),
 });
+
+// toss-back-button.js(graniteEvent/closeView) - 상단 뒤로가기가 경기 목록으로 안 돌아가고 미니앱을
+// 바로 닫아버린다는 반려(2026-09-08) 대응. Notification/User만큼 무거운 SDK는 아니지만(이벤트 구독
+// 하나뿐) 아직 단독 검증 전이니, 문제가 생기면 이 스크립트 태그부터 빼고 toss-notifications.js처럼
+// "빌드는 하되 로드는 안 함" 상태로 되돌리면 된다.
+esbuild.buildSync({
+  entryPoints: [path.join(__dirname, "src", "toss-back-button.js")],
+  bundle: true,
+  format: "esm",
+  target: "es2020",
+  outfile: path.join(DEST, "js", "toss-back-button.js"),
+});
+
 indexHtml = indexHtml.replace(
   '<script type="module" src="/js/app.js"></script>',
-  '<script type="module" async src="/js/toss-ads.js"></script>\n  <script type="module" src="/js/app.js"></script>'
+  '<script type="module" async src="/js/toss-ads.js"></script>\n  <script type="module" src="/js/toss-back-button.js"></script>\n  <script type="module" src="/js/app.js"></script>'
 );
 
 fs.writeFileSync(indexPath, indexHtml);
