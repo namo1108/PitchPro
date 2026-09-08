@@ -138,8 +138,12 @@ export async function loadMatches(opts = {}) {
 const elapsedBaseMap = new Map();
 const MAX_INTERPOLATED_MINUTES = 4;
 
-function getDisplayElapsed(matchId, elapsed) {
+function getDisplayElapsed(matchId, elapsed, extraElapsed) {
   if (elapsed === null || elapsed === undefined) return elapsed;
+  // 추가시간(90+3 등)이 이미 온 상태면 실시간 흐름을 임의로 더 흘려 보내지 않는다 - 다음 서버
+  // 갱신까지는 마지막으로 확인된 실제 추가시간을 그대로 보여준다(90+3 -> 90+4 -> ... 처럼
+  // 추측해서 늘리면 실제 심판 표시판과 어긋날 수 있음).
+  if (extraElapsed) return elapsed;
   const prev = elapsedBaseMap.get(matchId);
   if (!prev || prev.elapsed !== elapsed) {
     elapsedBaseMap.set(matchId, { elapsed, seenAt: Date.now() });
@@ -784,7 +788,7 @@ function renderHeroCard(m) {
   const statusText = m.dataStale
     ? "업데이트 지연"
     : isLive
-    ? liveMinuteLabel(m.status, getDisplayElapsed(m.id, m.elapsed))
+    ? liveMinuteLabel(m.status, getDisplayElapsed(m.id, m.elapsed, m.extraElapsed), m.extraElapsed)
     : isFinished
     ? "종료"
     : m.status === "TIME_TBD"
@@ -851,7 +855,7 @@ function renderMatchRow(m, opts = {}) {
   if (m.dataStale) {
     statusHtml = `<div class="match-status stale" title="실시간 정보 갱신이 지연되고 있습니다">⏱ 지연</div>`;
   } else if (isLive) {
-    statusHtml = `<div class="match-status live"><span class="live-dot"></span>${liveMinuteLabel(m.status, getDisplayElapsed(m.id, m.elapsed))}</div>`;
+    statusHtml = `<div class="match-status live"><span class="live-dot"></span>${liveMinuteLabel(m.status, getDisplayElapsed(m.id, m.elapsed, m.extraElapsed), m.extraElapsed)}</div>`;
   } else if (isFinished) {
     statusHtml = `<div class="match-status finished">종료</div>`;
   } else if (["POSTPONED", "SUSPENDED", "CANCELLED"].includes(m.status)) {
@@ -1630,7 +1634,7 @@ function renderMatchDetail(m) {
   const statusText = m.dataStale
     ? "⏱ 업데이트 지연"
     : isLive
-    ? `🟢 ${liveMinuteLabel(m.status, getDisplayElapsed(m.id, m.elapsed))}`
+    ? `🟢 ${liveMinuteLabel(m.status, getDisplayElapsed(m.id, m.elapsed, m.extraElapsed), m.extraElapsed)}`
     : isFinished
     ? "경기 종료"
     : m.status === "TIME_TBD"

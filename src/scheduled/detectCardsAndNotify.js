@@ -77,28 +77,24 @@ async function notifyCards(env, match, subscriptions, cards, kind) {
   return { changed: true, keys: notifiedKeys };
 }
 
-// 이벤트 API 호출 자체가 비용이 크기 때문에, 진행 중인 경기 중에서도 실제로 관심있는 구독자가
-// 있는 경기만 조회한다(아무도 안 보는 경기까지 매 틱 events를 부르면 낭비).
+// 원래는 "관심있는 구독자가 있는 경기"만 events를 조회했는데(API 호출 절감 목적), 그러면 정작
+// 메인 화면에서 아무 경기나 보고 있는 사용자에게는 그 경기에 구독자가 없으면 레드카드 표기 자체가
+// 절대 안 뜨는 문제가 있었다(2026-09-08 제보 - "주말 내내 지켜봤는데 안 보였어"). 사용자가 이
+// 트레이드오프를 알고도 전체 라이브 경기로 넓히길 선택해서(레이트리밋이 심해질 수 있다고 안내함),
+// 진행 중인 모든 경기를 대상으로 조회한다 - 다만 실제 푸시 알림 전송은 여전히 관심있는 구독자가
+// 있을 때만 나간다(아래 notifyCards 내부의 filterInterested가 그대로 처리).
 export async function detectCardsAndNotify(env) {
   const matchesBlob = await getJSON(env, KV_KEYS.matches);
   const live = (matchesBlob?.matches || []).filter((m) => m.status === "IN_PLAY" || m.status === "PAUSED");
   if (!live.length) return;
 
   const subscriptions = await loadSubscriptions(env);
-  if (!subscriptions.length) return;
-
-  const watchedLive = live.filter((m) => filterInterested(subscriptions, m).length > 0);
-  if (!watchedLive.length) return;
 
   const notified = (await getJSON(env, KV_KEYS.notifiedCards)) || {};
   let notifiedChanged = false;
-  // 경기 목록(메인) 화면에 "퇴장당한 팀" 표기를 붙이기 위한 것 - 이미 알림 때문에 조회하던 이벤트를
-  // 그대로 재사용하는 거라 API 호출이 추가로 들지 않는다(2026-09-06 요청). 다만 구독자가 있는
-  // 라이브 경기만 조회 대상이라, 아무도 안 본 라이브 경기는 표기가 안 붙을 수 있음 - 알림 비용을
-  // 더 늘리지 않기 위한 의도적인 제한(레이트리밋 문제가 있는 상황이라 범위를 넓히지 않기로 함).
   let matchesChanged = false;
 
-  for (const match of watchedLive) {
+  for (const match of live) {
     let events;
     try {
       const raw = await apiFootball.getFixtureEvents(env, match.id);
@@ -118,6 +114,7 @@ export async function detectCardsAndNotify(env) {
     }
 
     if (!redCards.length && !yellowCards.length) continue;
+    if (!subscriptions.length) continue; // 알림 받을 사람이 없으면(위 redCardTeamIds는 이미 갱신됐으니) 더 할 일 없음
 
     const seen = new Set(notified[match.id] || []);
     const freshRed = redCards.filter((c) => !seen.has(`red:${c.playerId}:${c.minute}`));

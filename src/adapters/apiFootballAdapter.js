@@ -167,6 +167,9 @@ export function normalizeFixture(raw) {
     utcDate: raw.fixture.date,
     status: mapStatus(raw.fixture.status.short),
     elapsed: raw.fixture.status.elapsed ?? null,
+    // 전/후반 추가시간(예: 90+3) - API-Football이 status.extra로 따로 준다(득점 이벤트의
+    // time.extra와 같은 개념, 사용자 요청 2026-09-08 - "90분 옆에 몇분인지 표기해줘").
+    extraElapsed: raw.fixture.status.extra ?? null,
     matchday: raw.league.round || null,
     competition: {
       code: comp?.code || String(raw.league.id),

@@ -55,10 +55,10 @@ export function formatMatchDateTime(utcDate) {
 }
 
 // API-Football이 실시간 경과 분(elapsed)을 직접 주므로 그대로 표시한다.
-export function liveMinuteLabel(status, elapsed) {
+export function liveMinuteLabel(status, elapsed, extraElapsed) {
   if (status === "PAUSED") return "HT";
   if (elapsed === null || elapsed === undefined) return "LIVE";
-  return `${elapsed}'`;
+  return extraElapsed ? `${elapsed}+${extraElapsed}'` : `${elapsed}'`;
 }
 
 const FALLBACK_CREST =
