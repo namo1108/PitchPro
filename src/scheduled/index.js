@@ -22,7 +22,7 @@ import { detectTransfersAndNotify } from "./detectTransfersAndNotify.js";
 import { refreshTransferMarket } from "./refreshTransferMarket.js";
 import { resolveCheckinOutcomes } from "./resolveCheckinOutcomes.js";
 import { scrapeKLeagueAdidasPoints } from "./scrapeKLeagueAdidasPoints.js";
-import { shouldRun } from "../lib/kv.js";
+import { shouldRun, getJSON } from "../lib/kv.js";
 import { KV_KEYS, REFRESH_INTERVALS_MS } from "../lib/config.js";
 import { alertAdminOfFailure } from "../lib/adminAlert.js";
 
@@ -33,10 +33,21 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 // (refreshApiFootballStandings)는 매 tick 전체(14개 대회)를 한꺼번에 부르지 않고 자체적으로 몇 개씩만
 // 순환 조회한다(내부 커서 방식).
 export async function runScheduledTasks(env) {
-  const tasks = [
-    ["matches", () => refreshApiFootballMatches(env)],
-    ["standings", () => refreshApiFootballStandings(env)],
-  ];
+  const tasks = [];
+
+  // pollLiveMatches(이 파일 맨 아래, 라이브 경기가 있으면 최대 50초짜리 빠른 폴링 루프)가 지난 크론
+  // 틱에서 아직도 도는 중이면(크론은 1분마다 도는데 이 루프 자체가 50초까지 걸릴 수 있어 겹칠 수
+  // 있음, 2026-09-09 "골 알림이 늦다" 제보 조사 중 발견) refreshApiFootballMatches는 이번 틱에
+  // 건너뛴다 - 대회 10~14개를 순차 조회하는 무거운 작업이 라이브 폴링과 동시에 같은 분당 한도를
+  // 나눠 먹는 걸 막기 위함. 라이브 폴링 쪽이 이미 그 순간의 실시간 스코어/상태는 갱신해주고 있어서,
+  // 건너뛰어도 골/알림 자체가 끊기진 않는다(스코어 아닌 다른 대회 메타데이터 갱신만 한 틱 늦어짐).
+  const livePollActive = await getJSON(env, KV_KEYS.livePollActive);
+  if (livePollActive) {
+    console.log("live poll still active from previous tick - skipping refreshApiFootballMatches this tick");
+  } else {
+    tasks.push(["matches", () => refreshApiFootballMatches(env)]);
+  }
+  tasks.push(["standings", () => refreshApiFootballStandings(env)]);
 
   if (await shouldRun(env, `${KV_KEYS.lastRunPrefix}news`, REFRESH_INTERVALS_MS.news)) {
     tasks.push(["news", () => refreshNews(env)]);

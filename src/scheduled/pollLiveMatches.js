@@ -56,11 +56,26 @@ export async function pollLiveMatches(env) {
   const deadline = Date.now() + POLL_DURATION_MS;
   let lastCardCheck = 0;
   let consecutiveRateLimits = 0;
+  // 이 틱이 실제로 최대 50초짜리 빠른 폴링 루프를 도는지 표시해둔다(최초 1회만 씀 - 매 2.5초 반복문
+  // 안에서 매번 쓰면 KV 무료 플랜 하루 쓰기 한도(1,000회)를 이 표시 하나로 다 써버린다). 크론이
+  // 1분마다 도는데 이 루프 자체가 50초까지 걸릴 수 있어서, 라이브 경기가 많은 시간대엔 한 틱의
+  // 폴링이 끝나기도 전에 다음 크론 틱이 겹쳐 들어오는 게 실제로 확인됐다(2026-09-09, "골 알림이
+  // 늦다" 제보 조사 중 발견) - refreshApiFootballMatches(대회 10~14개 순차 조회, 그 자체로도
+  // 15~20초+ 걸림)가 이 표시를 보고 겹치는 틱엔 자기 차례를 건너뛰어서, 가장 비싼 두 작업이 동시에
+  // 레이트리밋 한도를 나눠 먹는 걸 막는다.
+  let markedActive = false;
 
   while (Date.now() < deadline) {
     const matchesBlob = await getJSON(env, KV_KEYS.matches);
     const cached = matchesBlob?.matches || [];
     if (!cached.some((m) => (m.status === "IN_PLAY" || m.status === "PAUSED") && TRACKED_CODES.has(m.competition.code))) return; // 우리 대회 중 라이브 경기가 없으면 더 돌 필요 없음
+
+    if (!markedActive) {
+      markedActive = true;
+      // TTL(70초)로 자동 만료 - 이 틱이 끝나기 전에 죽어도(Cloudflare가 강제 종료 등) 다음 틱이
+      // 영원히 막히지 않는다.
+      await putJSON(env, KV_KEYS.livePollActive, { startedAt: Date.now() }, { expirationTtl: 70 });
+    }
 
     let liveRaw;
     try {

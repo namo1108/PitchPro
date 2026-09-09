@@ -146,6 +146,10 @@ export const KV_KEYS = {
   tossUsernameIndexPrefix: "toss:byusername:",
   prevScores: "scores:prev:v1",
   prevStatuses: "status:prev:v1",
+  // pollLiveMatches가 지금 이 틱에서 실제로 빠른 폴링 루프(최대 50초)를 도는 중인지 표시 - TTL로
+  // 자동 만료되니 별도 해제(delete) 없이 "쓰고 방치"만 해도 된다. refreshApiFootballMatches처럼
+  // 무거운 작업이 겹치는 크론 틱에서 또 도는 걸 막을 때 쓴다(2026-09-09, pollLiveMatches.js 참고).
+  livePollActive: "livepoll:active:v1",
   lastRunPrefix: "lastrun:",
   detailPrefix: "detail:",
   // 로그인/집관인증/레벨/친구/명예의 전당(선택 기능) 관련 저장소.
