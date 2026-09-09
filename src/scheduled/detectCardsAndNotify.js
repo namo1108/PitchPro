@@ -79,22 +79,30 @@ async function notifyCards(env, match, subscriptions, cards, kind) {
 
 // 원래는 "관심있는 구독자가 있는 경기"만 events를 조회했는데(API 호출 절감 목적), 그러면 정작
 // 메인 화면에서 아무 경기나 보고 있는 사용자에게는 그 경기에 구독자가 없으면 레드카드 표기 자체가
-// 절대 안 뜨는 문제가 있었다(2026-09-08 제보 - "주말 내내 지켜봤는데 안 보였어"). 사용자가 이
-// 트레이드오프를 알고도 전체 라이브 경기로 넓히길 선택해서(레이트리밋이 심해질 수 있다고 안내함),
-// 진행 중인 모든 경기를 대상으로 조회한다 - 다만 실제 푸시 알림 전송은 여전히 관심있는 구독자가
-// 있을 때만 나간다(아래 notifyCards 내부의 filterInterested가 그대로 처리).
+// 절대 안 뜨는 문제가 있었다(2026-09-08 제보 - "주말 내내 지켜봤는데 안 보였어"). 그래서 한 번은
+// 전체 라이브 경기로 넓혔었는데(2026-09-08), 다음날 바로 "알림이 잘 안 온다" 제보가 왔고 확인해보니
+// API-Football 레이트리밋이 여전히 시간당 ~2회씩 발생 중이었다(2026-09-09) - 이 확장이 라이브
+// 경기당 15초마다 events를 추가로 조회해서 분당 한도를 상당히 갉아먹고 있었다. 사용자가 직접
+// "레드카드는 알림이 올 때 같이 추가하면 되지 않겠냐"고 제안해서(2026-09-09), 다시 "구독자가 있는
+// 경기만" 조회하는 원래 방식으로 되돌린다 - 이러면 카드 알림을 보내려고 어차피 하는 조회에 얹혀서
+// redCardTeamIds도 같이 갱신되니 추가 비용이 전혀 없다. 대가로 아무도 구독 안 한 경기는 목록 화면에
+// 레드카드 표기가 안 뜰 수 있음 - 사용자도 이 트레이드오프를 알고 선택함(알림 안정성을 우선).
 export async function detectCardsAndNotify(env) {
   const matchesBlob = await getJSON(env, KV_KEYS.matches);
   const live = (matchesBlob?.matches || []).filter((m) => m.status === "IN_PLAY" || m.status === "PAUSED");
   if (!live.length) return;
 
   const subscriptions = await loadSubscriptions(env);
+  if (!subscriptions.length) return;
+
+  const watchedLive = live.filter((m) => filterInterested(subscriptions, m).length > 0);
+  if (!watchedLive.length) return;
 
   const notified = (await getJSON(env, KV_KEYS.notifiedCards)) || {};
   let notifiedChanged = false;
   let matchesChanged = false;
 
-  for (const match of live) {
+  for (const match of watchedLive) {
     let events;
     try {
       const raw = await apiFootball.getFixtureEvents(env, match.id);
@@ -114,7 +122,6 @@ export async function detectCardsAndNotify(env) {
     }
 
     if (!redCards.length && !yellowCards.length) continue;
-    if (!subscriptions.length) continue; // 알림 받을 사람이 없으면(위 redCardTeamIds는 이미 갱신됐으니) 더 할 일 없음
 
     const seen = new Set(notified[match.id] || []);
     const freshRed = redCards.filter((c) => !seen.has(`red:${c.playerId}:${c.minute}`));
