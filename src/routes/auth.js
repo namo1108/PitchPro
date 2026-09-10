@@ -2,6 +2,7 @@ import { json } from "../lib/http.js";
 import { getJSON, putJSON } from "../lib/kv.js";
 import { KV_KEYS } from "../lib/config.js";
 import { clientIp, isRateLimited, isBlockedByFailures, recordFailure, clearFailures } from "../lib/rateLimit.js";
+import { getUsernameIndexKeys } from "../lib/subscriptions.js";
 import {
   hashPassword,
   verifyPassword,
@@ -137,11 +138,11 @@ export async function handleDeleteAccount(request, env) {
     return json({ detail: "비밀번호가 올바르지 않습니다." }, 401);
   }
 
-  const subKey = await env.CACHE.get(`${KV_KEYS.pushUsernameIndexPrefix}${user.username}`);
-  if (subKey) {
-    await env.CACHE.delete(subKey);
-    await env.CACHE.delete(`${KV_KEYS.pushUsernameIndexPrefix}${user.username}`);
-  }
+  // 계정에 연결된 기기가 여러 개일 수 있어(2026-09-10) 전부 지운다 - 하나만 지우면 나머지 기기의
+  // 구독 레코드가 삭제된 계정 이름을 단 채로 고아처럼 남는다.
+  const subKeys = await getUsernameIndexKeys(env, KV_KEYS.pushUsernameIndexPrefix, user.username);
+  for (const subKey of subKeys) await env.CACHE.delete(subKey);
+  if (subKeys.length) await env.CACHE.delete(`${KV_KEYS.pushUsernameIndexPrefix}${user.username}`);
 
   await env.CACHE.delete(userKey(user.username));
   if (user.nickname) await env.CACHE.delete(nicknameIndexKey(user.nickname));

@@ -1,6 +1,7 @@
 import { json } from "../lib/http.js";
 import { KV_KEYS } from "../lib/config.js";
 import { getAuthedUser } from "../lib/auth.js";
+import { addToUsernameIndex } from "../lib/subscriptions.js";
 
 // 토스 미니앱은 브라우저 구독 객체가 없어 anonKey(User.getAnonymousKey 해시값)로 수신자를 구분한다 -
 // 이미 해시라 push.js의 hashEndpoint 같은 별도 해싱 없이 그대로 키에 쓴다.
@@ -25,7 +26,7 @@ export async function handleTossSubscribe(request, env) {
         updatedAt: new Date().toISOString(),
       })
     );
-    if (user) await env.CACHE.put(`${KV_KEYS.tossUsernameIndexPrefix}${user.username}`, key);
+    if (user) await addToUsernameIndex(env, KV_KEYS.tossUsernameIndexPrefix, user.username, key);
   } catch (err) {
     console.error("toss subscribe write failed:", err);
     return json({ detail: "일시적으로 알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요." }, 503);

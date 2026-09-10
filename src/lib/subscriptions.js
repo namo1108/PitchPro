@@ -20,6 +20,36 @@ async function loadPrefixedSubs(env, prefix, kind) {
   return subs.filter(Boolean);
 }
 
+// username -> 구독 색인은 예전엔 "username당 키 하나"(마지막으로 로그인/구독한 기기로 덮어씀)였는데,
+// 그러면 같은 계정으로 두 기기(예: 아이폰+갤럭시)에서 로그인하면 나중에 로그인한 기기만 색인에
+// 남아서 친구 요청/댓글 알림 등(sendPushToUsername 계열)이 한 기기에만 갔다(2026-09-10 제보 - "두
+// 기기 다 접속했는데 한쪽만 알림이 온다"). 이제 배열로 저장해서 계정에 연결된 기기를 전부 남긴다.
+export async function getUsernameIndexKeys(env, indexPrefix, username) {
+  const raw = await env.CACHE.get(`${indexPrefix}${username}`);
+  if (!raw) return [];
+  // 배열로 바꾸기 전 예전 레코드는 키 문자열이 그대로 들어있었다(JSON이 아님) - 마이그레이션 없이도
+  // 안전하게 배열 하나짜리로 취급한다.
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [raw];
+  } catch {
+    return [raw];
+  }
+}
+
+export async function addToUsernameIndex(env, indexPrefix, username, subKey) {
+  const keys = await getUsernameIndexKeys(env, indexPrefix, username);
+  if (!keys.includes(subKey)) keys.push(subKey);
+  await env.CACHE.put(`${indexPrefix}${username}`, JSON.stringify(keys));
+}
+
+export async function removeFromUsernameIndex(env, indexPrefix, username, subKey) {
+  const keys = await getUsernameIndexKeys(env, indexPrefix, username);
+  const remaining = keys.filter((k) => k !== subKey);
+  if (remaining.length) await env.CACHE.put(`${indexPrefix}${username}`, JSON.stringify(remaining));
+  else await env.CACHE.delete(`${indexPrefix}${username}`);
+}
+
 export async function loadSubscriptions(env) {
   const [pushSubs, tossSubs] = await Promise.all([
     loadPrefixedSubs(env, KV_KEYS.pushSubscriptionPrefix, "webpush"),
@@ -64,8 +94,9 @@ export async function cleanupDeadSubscription(env, sub) {
   try {
     await env.CACHE.delete(sub.key);
     if (sub.username) {
+      // 색인 전체를 지우면(예전 방식) 같은 계정의 다른 기기까지 같이 끊긴다 - 이 기기 항목만 뺀다.
       const indexPrefix = sub.kind === "toss" ? KV_KEYS.tossUsernameIndexPrefix : KV_KEYS.pushUsernameIndexPrefix;
-      await env.CACHE.delete(`${indexPrefix}${sub.username}`);
+      await removeFromUsernameIndex(env, indexPrefix, sub.username, sub.key);
     }
   } catch (err) {
     console.error("dead subscription cleanup failed:", err);

@@ -1,6 +1,7 @@
 import { sendPushNotification, deserializeVapidKeys } from "web-push-browser";
 import { getJSON } from "./kv.js";
 import { KV_KEYS } from "./config.js";
+import { getUsernameIndexKeys } from "./subscriptions.js";
 
 let cachedKeyPair = null;
 
@@ -33,21 +34,29 @@ export async function sendGoalPush(env, subscription, payload) {
 }
 
 // 친구 요청/수락처럼 "이 계정에게" 보내야 하는 알림용 - 로그인 시 등록해둔 username -> 구독 색인을 통해 찾는다.
-// 그 계정이 그 기기에서 알림을 켜둔 적이 없으면(구독 없음) 조용히 아무 일도 하지 않는다.
+// 한 계정이 여러 기기(아이폰+갤럭시 등)에서 로그인해뒀을 수 있어 색인에 담긴 기기 전부에 보낸다
+// (2026-09-10 - 예전엔 기기 하나만 남는 색인이라 나중에 로그인한 기기에만 갔었다). 하나라도 성공하면
+// true - 기존 호출부(community.js/friends.js)가 "성공/실패" 불리언만 확인해서 쓰는 걸 유지한다.
 export async function sendPushToUsername(env, username, payload) {
-  const subKey = await env.CACHE.get(`${KV_KEYS.pushUsernameIndexPrefix}${username}`);
-  if (!subKey) return false;
-  const record = await getJSON(env, subKey);
-  if (!record?.subscription) return false;
-  try {
-    const res = await sendGoalPush(env, record.subscription, payload);
-    if (!res.ok) {
-      console.error(`push to username ${username} failed: ${res.status} ${await res.text().catch(() => "")}`);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error(`push to username ${username} failed:`, err);
-    return false;
-  }
+  const subKeys = await getUsernameIndexKeys(env, KV_KEYS.pushUsernameIndexPrefix, username);
+  if (!subKeys.length) return false;
+
+  const results = await Promise.all(
+    subKeys.map(async (subKey) => {
+      const record = await getJSON(env, subKey);
+      if (!record?.subscription) return false;
+      try {
+        const res = await sendGoalPush(env, record.subscription, payload);
+        if (!res.ok) {
+          console.error(`push to username ${username} (${subKey}) failed: ${res.status} ${await res.text().catch(() => "")}`);
+          return false;
+        }
+        return true;
+      } catch (err) {
+        console.error(`push to username ${username} (${subKey}) failed:`, err);
+        return false;
+      }
+    })
+  );
+  return results.some(Boolean);
 }

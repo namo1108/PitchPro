@@ -4,6 +4,7 @@
 // 하나씩이라, 우리가 보내는 값이 곧 사용자가 보는 알림 문구 그대로다.
 import { KV_KEYS } from "./config.js";
 import { getJSON } from "./kv.js";
+import { getUsernameIndexKeys } from "./subscriptions.js";
 
 const TOSS_SEND_URL = "https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/messenger/send-message";
 export const TOSS_TEMPLATE_CODE = "pitchpro-notify";
@@ -34,13 +35,20 @@ export async function sendTossPush(env, sub, { title, body }) {
   return { ok: res.ok && data.resultType === "SUCCESS", status: res.status, data };
 }
 
-// push.js의 sendPushToUsername과 대응되는 토스 버전 - 관리자 테스트 발송용.
+// push.js의 sendPushToUsername과 대응되는 토스 버전 - 관리자 테스트 발송용. 같은 계정이 여러 기기에
+// 연결돼있으면(2026-09-10) 전부에 보낸다.
 export async function sendTossPushToUsername(env, username, payload) {
-  const subKey = await env.CACHE.get(`${KV_KEYS.tossUsernameIndexPrefix}${username}`);
-  if (!subKey) return false;
-  const record = await getJSON(env, subKey);
-  if (!record?.anonKey) return false;
-  const result = await sendTossPush(env, record, payload);
-  if (!result.ok) console.error(`toss push to username ${username} failed:`, JSON.stringify(result.data));
-  return result.ok;
+  const subKeys = await getUsernameIndexKeys(env, KV_KEYS.tossUsernameIndexPrefix, username);
+  if (!subKeys.length) return false;
+
+  const results = await Promise.all(
+    subKeys.map(async (subKey) => {
+      const record = await getJSON(env, subKey);
+      if (!record?.anonKey) return false;
+      const result = await sendTossPush(env, record, payload);
+      if (!result.ok) console.error(`toss push to username ${username} (${subKey}) failed:`, JSON.stringify(result.data));
+      return result.ok;
+    })
+  );
+  return results.some(Boolean);
 }

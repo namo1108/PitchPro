@@ -3,6 +3,7 @@ import { KV_KEYS, NOTIFICATION_TYPES } from "../lib/config.js";
 import { getAuthedUser } from "../lib/auth.js";
 import { sendPushToUsername } from "../lib/push.js";
 import { sendTossPushToUsername } from "../lib/tossPush.js";
+import { addToUsernameIndex, removeFromUsernameIndex } from "../lib/subscriptions.js";
 
 async function hashEndpoint(endpoint) {
   const data = new TextEncoder().encode(endpoint);
@@ -55,7 +56,7 @@ export async function handleSubscribe(request, env) {
         updatedAt: new Date().toISOString(),
       })
     );
-    if (user) await env.CACHE.put(`${KV_KEYS.pushUsernameIndexPrefix}${user.username}`, key);
+    if (user) await addToUsernameIndex(env, KV_KEYS.pushUsernameIndexPrefix, user.username, key);
   } catch (err) {
     console.error("push subscribe write failed:", err);
     return json({ detail: "일시적으로 알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요." }, 503);
@@ -71,7 +72,7 @@ export async function handleUnsubscribe(request, env) {
   const key = `${KV_KEYS.pushSubscriptionPrefix}${id}`;
   const raw = await env.CACHE.get(key);
   const existing = raw ? JSON.parse(raw) : null;
-  if (existing?.username) await env.CACHE.delete(`${KV_KEYS.pushUsernameIndexPrefix}${existing.username}`);
+  if (existing?.username) await removeFromUsernameIndex(env, KV_KEYS.pushUsernameIndexPrefix, existing.username, key);
 
   await env.CACHE.delete(key);
   return json({ status: "ok" });
