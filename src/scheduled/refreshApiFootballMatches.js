@@ -88,18 +88,24 @@ export async function fetchAndStoreMatches(env, existing) {
   let attempted = 0;
   let rateLimited = 0;
   let consecutiveRateLimits = 0;
-  // 우선순위(urgencyByCode) 순으로 이미 정렬돼 있어서, 이 시점부터는 라이브/임박 경기처럼 정말
-  // 급한 대회는 이미 다 시도해본 뒤다 - 계속 레이트리밋에 걸리는데도 나머지 "덜 급한" 대회까지
-  // 끝까지 다 시도하면 pollLiveMatches(골 감지)가 쓸 이번 분의 한도까지 마저 갉아먹는다
+  // 우선순위(urgencyByCode) 순으로 정렬돼 있어서, 계속 레이트리밋에 걸리는데도 나머지 "덜 급한" 대회
+  // 까지 끝까지 다 시도하면 pollLiveMatches(골 감지)가 쓸 이번 분의 한도까지 마저 갉아먹는다
   // (2026-09-04, admin 알림 로그에 5일간 반복 확인 - "300ms→1000ms로 늘려도 여전히 걸림"). 연속으로
-  // 계속 걸리면 남은 대회는 캐시로 대체하고 이번 스윕을 조기 종료한다.
+  // 계속 걸리면 남은 대회는 캐시로 대체하고 이번 스윕을 조기 종료한다 - 단, urgency 0(지금 당장
+  // 라이브 중인 대회)에는 이 서킷브레이커를 적용하지 않는다. 챔피언스리그처럼 동시에 라이브인 대회가
+  // 3개보다 많으면(주중 챔스는 8~9경기가 한꺼번에 열림) 앞쪽 몇 개가 레이트리밋에 걸렸다는 이유로
+  // 뒤쪽의 "똑같이 지금 라이브인" 대회까지 캐시로 넘어가버려서, 경기가 끝나도(그 대회 caches가
+  // 다음 기회까지 안 갱신되니) IN_PLAY에 갇힌 채 "업데이트 지연"으로 오래 남는 문제가 있었다
+  // (2026-09-12 제보 - "챔피언스리그도 끝나면 업데이트 지연"). urgency 1/2(임박/한가함)만 서킷
+  // 브레이커 대상으로 남긴다 - 그쪽은 지금 당장 화면에 뜨는 스코어가 아니라 놓쳐도 다음 주기에
+  // 따라잡을 수 있다.
   for (const comp of orderedCompetitions) {
     const cached = existingByCode.get(comp.code) || [];
     if (isActive && cached.length && urgencyByCode.get(comp.code) === 2) {
       allMatches.push(...cached);
       continue;
     }
-    if (consecutiveRateLimits >= 3) {
+    if (consecutiveRateLimits >= 3 && urgencyByCode.get(comp.code) !== 0) {
       allMatches.push(...cached);
       continue;
     }
