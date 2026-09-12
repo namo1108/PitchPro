@@ -34,7 +34,13 @@ function competitionUrgency(comp, existingByCode) {
   if (!matches.length) return 0; // 캐시가 아예 없는(새로 추가된) 대회는 항상 최우선으로 채운다
   const now = Date.now();
   if (matches.some((m) => m.status === "IN_PLAY" || m.status === "PAUSED")) return 0;
-  if (matches.some((m) => ["SCHEDULED", "TIMED"].includes(m.status) && new Date(m.utcDate).getTime() < now)) return 1;
+  // 킥오프 시각이 이미 지났는데도 여전히 SCHEDULED/TIMED로 보이는 경기 - 실제로 라이브 중인데
+  // pollLiveMatches가 아직 못 잡았거나(그러면 진짜 라이브와 다를 바 없음), 레이트리밋 때문에 우리
+  // 크론이 몇 시간째 이 대회를 갱신 못 해서 "경기가 열렸는지조차" 모르는 상태일 수 있다(2026-09-12
+  // 제보 - "새벽에 끝난 경기 업데이트가 안 됨", 확인해보니 matches 캐시가 3시간 넘게 그대로였음).
+  // 어느 쪽이든 지금 라이브인 경기와 똑같이 최우선으로 취급해야 한다 - urgency 1로 두면 서킷브레이커
+  // 대상이라 앞선 대회들이 레이트리밋에 걸리면 이 대회까지 계속 밀려서 영영 안 잡힐 수 있다.
+  if (matches.some((m) => ["SCHEDULED", "TIMED"].includes(m.status) && new Date(m.utcDate).getTime() < now)) return 0;
   if (matches.some((m) => ["SCHEDULED", "TIMED"].includes(m.status) && new Date(m.utcDate).getTime() - now <= UPCOMING_BUFFER_MS)) return 1;
   // 연기(POSTPONED)된 경기는 "아직 결론이 안 난 상태"라 계속 지켜봐야 하는데, 여기서 안 걸러지면
   // urgency 2(당분간 조용함)로 떨어져서 다른 대회가 라이브라 활성 시간대인 동안은 계속 재조회를 건너뛴다

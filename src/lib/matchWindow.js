@@ -29,7 +29,13 @@ export function hasLiveOrImminentMatches(matches) {
     // 로직(임박/직후 판단)에 넣으면 오히려 잘못된 타이밍에 갱신을 트리거할 수 있어 제외한다.
     if (!["SCHEDULED", "TIMED", "FINISHED"].includes(m.status)) return false;
     const kickoff = new Date(m.utcDate).getTime();
-    const upperBound = kickoff + MATCH_DURATION_BUFFER_MS + (m.status === "FINISHED" ? RECENTLY_FINISHED_MS : 0);
-    return kickoff - IMMINENT_KICKOFF_MS <= now && now <= upperBound;
+    if (m.status === "FINISHED") return now <= kickoff + MATCH_DURATION_BUFFER_MS + RECENTLY_FINISHED_MS;
+    // SCHEDULED/TIMED는 킥오프가 지났어도 위쪽 상한을 안 둔다 - 레이트리밋이 몇 시간씩 계속되면
+    // "킥오프+150분이 지났으니 이미 끝났겠지"라고 넘겨짚어 활성 시간대(2분 간격) 판정을 풀어버리는
+    // 바람에, 정작 갱신이 막혀서 상태를 모르는 경기를 오히려 덜 자주 확인하게 되는 악순환이 있었다
+    // (2026-09-12 제보 - "새벽에 끝난 경기 업데이트가 안 됨", 확인해보니 matches 캐시가 3시간 넘게
+    // 그대로였음). SCHEDULED/TIMED로 남아있다는 것 자체가 "아직 결론을 확인 못 했다"는 뜻이라, 실제로
+    // 갱신에 성공해서 IN_PLAY/FINISHED 등으로 바뀌기 전까진 계속 활성으로 취급해야 한다.
+    return kickoff - IMMINENT_KICKOFF_MS <= now;
   });
 }
