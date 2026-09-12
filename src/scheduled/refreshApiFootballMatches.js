@@ -97,21 +97,27 @@ export async function fetchAndStoreMatches(env, existing) {
   // 우선순위(urgencyByCode) 순으로 정렬돼 있어서, 계속 레이트리밋에 걸리는데도 나머지 "덜 급한" 대회
   // 까지 끝까지 다 시도하면 pollLiveMatches(골 감지)가 쓸 이번 분의 한도까지 마저 갉아먹는다
   // (2026-09-04, admin 알림 로그에 5일간 반복 확인 - "300ms→1000ms로 늘려도 여전히 걸림"). 연속으로
-  // 계속 걸리면 남은 대회는 캐시로 대체하고 이번 스윕을 조기 종료한다 - 단, urgency 0(지금 당장
-  // 라이브 중인 대회)에는 이 서킷브레이커를 적용하지 않는다. 챔피언스리그처럼 동시에 라이브인 대회가
-  // 3개보다 많으면(주중 챔스는 8~9경기가 한꺼번에 열림) 앞쪽 몇 개가 레이트리밋에 걸렸다는 이유로
-  // 뒤쪽의 "똑같이 지금 라이브인" 대회까지 캐시로 넘어가버려서, 경기가 끝나도(그 대회 caches가
-  // 다음 기회까지 안 갱신되니) IN_PLAY에 갇힌 채 "업데이트 지연"으로 오래 남는 문제가 있었다
-  // (2026-09-12 제보 - "챔피언스리그도 끝나면 업데이트 지연"). urgency 1/2(임박/한가함)만 서킷
-  // 브레이커 대상으로 남긴다 - 그쪽은 지금 당장 화면에 뜨는 스코어가 아니라 놓쳐도 다음 주기에
-  // 따라잡을 수 있다.
+  // 계속 걸리면 남은 대회는 캐시로 대체하고 이번 스윕을 조기 종료한다.
+  //
+  // urgency 0(지금 라이브 중이거나, 킥오프가 지났는데 아직도 SCHEDULED로 남은 대회)는 한도를 더
+  // 넉넉하게 준다(2026-09-12) - 챔피언스리그처럼 동시에 라이브인 대회가 3개보다 많으면(주중 챔스는
+  // 8~9경기) 앞쪽 몇 개가 레이트리밋에 걸렸다는 이유로 뒤쪽의 "똑같이 지금 라이브인" 대회까지
+  // 건너뛰면 안 되기 때문이다. 다만 완전히 무제한으로 뒀더니(첫 시도), 레이트리밋이 몇 시간째
+  // 계속되는 상황에서는 "킥오프 지났는데 여전히 SCHEDULED"인 대회가 거의 전부(16개)로 늘어나
+  // 버려서, 서킷브레이커가 사실상 없는 것과 같아져 매 스윕마다 100% 실패할 걸 뻔히 알면서도 16개를
+  // 전부 다시 때리는 꼴이 됐다(사용자 지적 - "경기도 없는데 왜 한도가 꽉 차있냐"). 그래서 urgency
+  // 0도 상한을 두되(6번), 일반(urgency 1/2, 3번)보다는 넉넉하게 - 진짜 몇 개 안 되는 동시 라이브
+  // 상황은 커버하면서, 이미 다 막혀있는 상황에서 무의미한 재시도를 계속 쌓는 건 막는다.
+  const MAX_CONSECUTIVE_RATE_LIMITS = 3;
+  const MAX_CONSECUTIVE_RATE_LIMITS_URGENT = 6;
   for (const comp of orderedCompetitions) {
     const cached = existingByCode.get(comp.code) || [];
     if (isActive && cached.length && urgencyByCode.get(comp.code) === 2) {
       allMatches.push(...cached);
       continue;
     }
-    if (consecutiveRateLimits >= 3 && urgencyByCode.get(comp.code) !== 0) {
+    const limit = urgencyByCode.get(comp.code) === 0 ? MAX_CONSECUTIVE_RATE_LIMITS_URGENT : MAX_CONSECUTIVE_RATE_LIMITS;
+    if (consecutiveRateLimits >= limit) {
       allMatches.push(...cached);
       continue;
     }
