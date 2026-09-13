@@ -284,9 +284,7 @@ function openLeague(code) {
   applyViewTheme(THEME_BY_CODE.get(code) || null, comp.emblem);
 
   if (comp.hasBracket) {
-    el.bracketWrap.style.display = "block";
-    el.standingsWrap.style.display = "none";
-    loadBracket(code);
+    loadBracketOrStandings(code);
   } else {
     el.bracketWrap.style.display = "none";
     el.standingsWrap.style.display = "block";
@@ -294,6 +292,33 @@ function openLeague(code) {
     startStandingsPoll();
   }
   loadTopPlayers(code);
+}
+
+// 챔피언스리그 등(hasBracket: true인 대회)은 2024-25시즌 개편 이후 "리그 페이즈"(전 참가팀이 한 표에
+// 들어가는 순위표) 기간엔 순위표로, 그 이후 진짜 토너먼트 단계로 넘어가면 대진표로 보여줘야 한다
+// (2026-09-13 사용자 요청 - "챔스는 대진표 대신 리그페이즈 순위표로"). 순위 데이터가 있으면(리그
+// 페이즈 진행 중) 표를 보여주고, 없으면(토너먼트 단계라 순위 개념 자체가 없음) 대진표로 폴백한다 -
+// FA컵/코리아컵처럼 원래부터 순수 토너먼트인 대회는 순위 데이터가 애초에 없어서 자동으로 대진표로
+// 가니 대회별로 따로 분기할 필요가 없다.
+async function loadBracketOrStandings(code) {
+  el.bracketWrap.style.display = "none";
+  el.standingsWrap.style.display = "block";
+  el.standingsWrap.innerHTML = skeletonList(6);
+  try {
+    const data = await fetchJSON(`/standings/${code}`);
+    const hasTable = (data.standings || []).some((t) => t.table?.length);
+    if (hasTable) {
+      const comp = state.competitions.find((c) => c.code === code);
+      renderTables(data.standings, false, comp);
+      startStandingsPoll();
+      return;
+    }
+  } catch {
+    // 순위 조회 자체가 실패해도 대진표로 폴백한다(아래에서 처리).
+  }
+  el.standingsWrap.style.display = "none";
+  el.bracketWrap.style.display = "block";
+  loadBracket(code);
 }
 
 async function loadBracket(code) {

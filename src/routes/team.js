@@ -59,7 +59,8 @@ async function buildTeam(env, teamId) {
       hadFetchError = true;
       return { response: [] };
     }),
-    apiFootball.getTeamUpcomingFixtures(env, teamId, 20).catch((err) => {
+    // 남은 시즌 일정도 마찬가지로 넉넉하게(2026-09-13, recentFixtures와 같은 요청).
+    apiFootball.getTeamUpcomingFixtures(env, teamId, 40).catch((err) => {
       console.error("team upcoming fixtures fetch failed:", err);
       hadFetchError = true;
       return { response: [] };
