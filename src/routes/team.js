@@ -51,7 +51,10 @@ async function buildTeam(env, teamId) {
   // 조회해서, 그 왕복 시간만큼 응답이 더 늦어졌다 - "팀 정보 불러오는 속도가 느리다" 제보, 2026-09-02).
   const [teamRaw, recentRaw, upcomingRaw, squadRaw, coachRaw, kleaguePhotos, kleagueCoachPhotos] = await Promise.all([
     apiFootball.getTeam(env, teamId),
-    apiFootball.getTeamRecentFixtures(env, teamId, 10).catch((err) => {
+    // 시즌 전체 경기 결과를 보고 싶다는 요청(2026-09-13) - K리그1 정규 38라운드 등 웬만한 리그의
+    // 한 시즌 전체 경기 수를 넉넉히 커버하도록 60으로 늘렸다. API-Football의 last= 파라미터는 호출
+    // 1번은 그대로라(응답이 커질 뿐) 레이트리밋에 추가 부담이 없다.
+    apiFootball.getTeamRecentFixtures(env, teamId, 60).catch((err) => {
       console.error("team recent fixtures fetch failed:", err);
       hadFetchError = true;
       return { response: [] };
