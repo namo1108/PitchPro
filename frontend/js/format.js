@@ -245,7 +245,9 @@ export function escapeHtml(str) {
 // 승격/강등/대륙컵 진출 구간은 리그마다 규정이 달라서, config.js에 리그별로 명시해둔 값
 // (promotionSpots/relegationSpots)이 있으면 그걸 쓰고, 없는 리그는 기존 근사 규칙(상위 4=진출권,
 // 하위 3=강등권 - 유럽 5대리그 기준 근사치)을 그대로 쓴다.
-function standingsTableRowsHtml(table, comp) {
+// highlightTeamIds: 경기 상세의 "순위" 탭에서 지금 보고 있는 두 팀(홈/원정)을 표 안에서 바로 찾을 수
+// 있게 초록색으로 강조 표시한다(2026-09-14 요청) - 리그 탭에서 부를 땐 안 넘기니 기존과 동일하다.
+function standingsTableRowsHtml(table, comp, highlightTeamIds) {
   const promotionSpots = comp?.promotionSpots;
   const relegationSpots = comp?.relegationSpots;
   return table.table
@@ -256,8 +258,9 @@ function standingsTableRowsHtml(table, comp) {
       const dotClass = row.live ? `live-dot result-${row.liveResult}` : "";
       const ptsClass = row.live ? `pts live-${row.liveResult}` : "pts";
       const mine = isFavorite(row.team.id);
+      const isHighlighted = highlightTeamIds?.includes(row.team.id);
       return `
-        <tr class="${row.live ? "live-row" : ""}">
+        <tr class="${row.live ? "live-row" : ""} ${isHighlighted ? "match-team-row" : ""}">
           <td><div class="pos-cell"><span class="pos-badge ${badgeClass}"></span>${row.position}</div></td>
           <td><div class="team-cell ${mine ? "mine" : ""}" data-team-id="${row.team.id}">${crestImg(row.team, "team-crest")}<span class="team-name-text">${row.team.shortName || row.team.name}</span>${mine ? '<span class="mine-star" title="나의 팀">★</span>' : ""}${row.live ? `<span class="${dotClass}" title="경기 진행 중 - 현재 스코어 기준 승/무/패"></span>` : ""}</div></td>
           <td class="num">${row.playedGames}</td>
@@ -277,7 +280,8 @@ function standingsTableRowsHtml(table, comp) {
 // tables(대회 하나의 순위 그룹 배열, MLS 컨퍼런스처럼 여러 개일 수 있음)를 표 HTML로 통째로 만든다 -
 // 빈 그룹은 걸러내고, 그룹이 여럿이면 그룹명 소제목을 붙인다. comp가 없으면(matches.js처럼 대회
 // 설정 객체를 안 들고 있는 호출부) 승격/강등 표시와 이름별 특수 규정 안내만 생략된 채로 나온다.
-export function standingsTablesHtml(tables, comp) {
+// highlightTeamIds(선택): 넘기면 그 팀(들)의 행을 초록색으로 강조한다(경기 상세 "순위" 탭용).
+export function standingsTablesHtml(tables, comp, highlightTeamIds) {
   const nonEmpty = (tables || []).filter((t) => t.table?.length);
   if (!nonEmpty.length) return "";
   const showGroupTitle = nonEmpty.length > 1;
@@ -293,7 +297,7 @@ export function standingsTablesHtml(tables, comp) {
               <th>#</th><th>팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득점</th><th>실점</th><th>득실</th><th>승점</th>
             </tr>
           </thead>
-          <tbody>${standingsTableRowsHtml(table, comp)}</tbody>
+          <tbody>${standingsTableRowsHtml(table, comp, highlightTeamIds)}</tbody>
         </table>
       `;
     })

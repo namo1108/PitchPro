@@ -1594,7 +1594,7 @@ function renderMatchStandings(data, m) {
   const wrap = document.getElementById("match-standings-section");
   if (!wrap) return;
 
-  const tablesHtml = standingsTablesHtml(data.standings || [], null);
+  const tablesHtml = standingsTablesHtml(data.standings || [], null, [m.homeTeam.id, m.awayTeam.id]);
   if (!tablesHtml) {
     wrap.innerHTML = '<h3 class="team-section-title">순위</h3><div class="empty-state">순위 정보가 없습니다.</div>';
     return;
