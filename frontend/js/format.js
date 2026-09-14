@@ -1,3 +1,5 @@
+import { isFavorite } from "./favorites.js";
+
 export const STATUS_KO = {
   SCHEDULED: "예정",
   TIMED: "예정",
@@ -234,4 +236,66 @@ export function skeletonList(count = 4) {
 // (안 그러면 <script> 등을 제목에 넣는 식으로 다른 사용자 화면에서 코드가 실행되는 stored XSS가 생김).
 export function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// 순위표 한 줄 - 리그 탭(leagues.js)과 경기 상세의 "순위" 탭(matches.js) 둘 다에서 쓴다
+// (2026-09-14, 경기 상세에서도 소속리그 순위를 보고 싶다는 요청) - 두 파일이 서로를 이미 import하고
+// 있어서(leagues.js가 matches.js의 loadMatchDetail을 씀) 어느 한쪽이 다른 쪽을 직접 import하면
+// 순환 참조가 생긴다 - 그래서 순수 렌더링 함수만 둘 다 이미 쓰고 있는 이 파일로 옮겨뒀다.
+// 승격/강등/대륙컵 진출 구간은 리그마다 규정이 달라서, config.js에 리그별로 명시해둔 값
+// (promotionSpots/relegationSpots)이 있으면 그걸 쓰고, 없는 리그는 기존 근사 규칙(상위 4=진출권,
+// 하위 3=강등권 - 유럽 5대리그 기준 근사치)을 그대로 쓴다.
+function standingsTableRowsHtml(table, comp) {
+  const promotionSpots = comp?.promotionSpots;
+  const relegationSpots = comp?.relegationSpots;
+  return table.table
+    .map((row) => {
+      const isQualify = promotionSpots != null ? row.position <= promotionSpots : row.position <= 4;
+      const isRelegate = relegationSpots != null ? row.position > table.table.length - relegationSpots : row.position > table.table.length - 3;
+      const badgeClass = isQualify ? "qualify" : isRelegate ? "relegate" : "";
+      const dotClass = row.live ? `live-dot result-${row.liveResult}` : "";
+      const ptsClass = row.live ? `pts live-${row.liveResult}` : "pts";
+      const mine = isFavorite(row.team.id);
+      return `
+        <tr class="${row.live ? "live-row" : ""}">
+          <td><div class="pos-cell"><span class="pos-badge ${badgeClass}"></span>${row.position}</div></td>
+          <td><div class="team-cell ${mine ? "mine" : ""}" data-team-id="${row.team.id}">${crestImg(row.team, "team-crest")}<span class="team-name-text">${row.team.shortName || row.team.name}</span>${mine ? '<span class="mine-star" title="나의 팀">★</span>' : ""}${row.live ? `<span class="${dotClass}" title="경기 진행 중 - 현재 스코어 기준 승/무/패"></span>` : ""}</div></td>
+          <td class="num">${row.playedGames}</td>
+          <td class="num">${row.won}</td>
+          <td class="num">${row.draw}</td>
+          <td class="num">${row.lost}</td>
+          <td class="num">${row.goalsFor ?? "-"}</td>
+          <td class="num">${row.goalsAgainst ?? "-"}</td>
+          <td class="num">${row.goalDifference}</td>
+          <td class="${ptsClass}">${row.points}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+// tables(대회 하나의 순위 그룹 배열, MLS 컨퍼런스처럼 여러 개일 수 있음)를 표 HTML로 통째로 만든다 -
+// 빈 그룹은 걸러내고, 그룹이 여럿이면 그룹명 소제목을 붙인다. comp가 없으면(matches.js처럼 대회
+// 설정 객체를 안 들고 있는 호출부) 승격/강등 표시와 이름별 특수 규정 안내만 생략된 채로 나온다.
+export function standingsTablesHtml(tables, comp) {
+  const nonEmpty = (tables || []).filter((t) => t.table?.length);
+  if (!nonEmpty.length) return "";
+  const showGroupTitle = nonEmpty.length > 1;
+  return nonEmpty
+    .map((table) => {
+      const anyLive = table.table.some((row) => row.live);
+      return `
+        ${showGroupTitle ? `<div class="standings-group-title">${table.type}</div>` : ""}
+        ${anyLive ? '<div class="live-standings-note">🟢 진행 중인 경기가 있어요 - 팀명 옆 점 색깔은 현재 스코어 기준 승/무/패예요. 승점 등 기록은 경기가 끝나야 반영돼요.</div>' : ""}
+        <table class="standings-table">
+          <thead>
+            <tr>
+              <th>#</th><th>팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득점</th><th>실점</th><th>득실</th><th>승점</th>
+            </tr>
+          </thead>
+          <tbody>${standingsTableRowsHtml(table, comp)}</tbody>
+        </table>
+      `;
+    })
+    .join("");
 }

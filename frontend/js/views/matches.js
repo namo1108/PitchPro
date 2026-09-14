@@ -16,6 +16,7 @@ import {
   playerAvatarImg,
   teamHintFromElement,
   playerHintFromElement,
+  standingsTablesHtml,
 } from "../format.js";
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
@@ -931,6 +932,11 @@ export async function loadMatchDetail(matchId, knownMatch, targetTab) {
     fetchJSON(`/head2head?a=${m.homeTeam.id}&b=${m.awayTeam.id}`)
       .then((h2h) => renderHeadToHead(h2h, m))
       .catch(() => {});
+
+    // 소속 리그 순위도 마찬가지로 별도 엔드포인트라 이어서 채운다(2026-09-14 요청).
+    fetchJSON(`/standings/${m.competition.code}`)
+      .then((standings) => renderMatchStandings(standings, m))
+      .catch(() => {});
   } catch (err) {
     if (!knownMatch) {
       el.detailContent.innerHTML = `<div class="error-state">경기 상세 정보를 불러오지 못했습니다.<br>${err.message}</div>`;
@@ -1581,6 +1587,30 @@ function renderHeadToHead(h2h, m) {
   `;
 }
 
+// 경기 상세에서 소속 리그 순위를 바로 보여준다(2026-09-14 요청) - 표 자체는 리그 탭과 공유하는
+// format.js의 standingsTablesHtml을 그대로 쓴다. 승격/강등 규정 안내 같은 리그 탭 전용 꾸밈은 뺀
+// 간단한 버전 - 자세히 보고 싶으면 아래 "전체 순위 보기" 링크로 리그 탭 상세로 넘어가면 된다.
+function renderMatchStandings(data, m) {
+  const wrap = document.getElementById("match-standings-section");
+  if (!wrap) return;
+
+  const tablesHtml = standingsTablesHtml(data.standings || [], null);
+  if (!tablesHtml) {
+    wrap.innerHTML = '<h3 class="team-section-title">순위</h3><div class="empty-state">순위 정보가 없습니다.</div>';
+    return;
+  }
+
+  wrap.innerHTML = `
+    <h3 class="team-section-title">${m.competition.name} 순위</h3>
+    ${tablesHtml}
+    <button type="button" class="detail-action-btn" id="match-full-standings-btn">전체 순위 보기</button>
+  `;
+  wrap.querySelectorAll("[data-team-id]").forEach((cell) => {
+    cell.addEventListener("click", () => goToTeam(cell.dataset.teamId, teamHintFromElement(cell)));
+  });
+  document.getElementById("match-full-standings-btn")?.addEventListener("click", () => openLeagueStandings(m.competition.code));
+}
+
 // "45+2"처럼 추가시간 표기가 섞여 있어도 실제 시간 순으로 정렬되도록, 추가시간은 소수점으로 얹는다
 // (본 시간 45분 골보다 45+2분 골이 항상 뒤로 오게).
 function parseMinuteValue(minute) {
@@ -1728,6 +1758,7 @@ function renderMatchDetail(m) {
       <button class="team-tab-btn" data-detail-tab="lineup">라인업</button>
       <button class="team-tab-btn" data-detail-tab="stats">통계</button>
       <button class="team-tab-btn" data-detail-tab="h2h">상대전적</button>
+      <button class="team-tab-btn" data-detail-tab="standings">순위</button>
     </div>
 
     <div class="detail-tab-panels">
@@ -1737,6 +1768,11 @@ function renderMatchDetail(m) {
       <div class="detail-tab-panel" data-detail-panel="h2h" style="display: none;">
         <div class="team-section" id="h2h-section">
           <div class="loading">상대전적 불러오는 중...</div>
+        </div>
+      </div>
+      <div class="detail-tab-panel" data-detail-panel="standings" style="display: none;">
+        <div class="team-section" id="match-standings-section">
+          <div class="loading">순위 불러오는 중...</div>
         </div>
       </div>
     </div>
@@ -1753,7 +1789,7 @@ function renderMatchDetail(m) {
 
   el.detailContent.querySelectorAll("[data-dominance-chart]").forEach((wrap) => wireDominanceChart(wrap));
 
-  const DETAIL_TAB_ORDER = ["info", "lineup", "stats", "h2h"];
+  const DETAIL_TAB_ORDER = ["info", "lineup", "stats", "h2h", "standings"];
 
   function activateDetailTab(tabName) {
     el.detailContent.querySelectorAll(".team-tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.detailTab === tabName));

@@ -1,10 +1,9 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange, pushSubView, setLeagueStandingsOpener } from "../router.js";
-import { crestImg, emblemImg, playerAvatarImg, fadeIn, skeletonList, teamHintFromElement, playerHintFromElement } from "../format.js";
+import { crestImg, emblemImg, playerAvatarImg, fadeIn, skeletonList, teamHintFromElement, playerHintFromElement, standingsTablesHtml } from "../format.js";
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
 import { loadMatchDetail } from "./matches.js";
-import { isFavorite } from "../favorites.js";
 
 // 대회 27개를 한 줄짜리 긴 리스트로 두면 원하는 리그를 찾기 힘들어서, 지역/성격별로 묶어
 // 트리(아코디언)로 접었다 펼치게 한다. 코드에 없는 대회는 자동으로 "기타"에 담긴다.
@@ -407,38 +406,6 @@ async function loadStandings(code, opts = {}) {
   }
 }
 
-// 승격/강등/대륙컵 진출 구간은 리그마다 규정이 달라서, config.js에 리그별로 명시해둔 값
-// (promotionSpots/relegationSpots)이 있으면 그걸 쓰고, 없는 리그는 기존 근사 규칙(상위 4=진출권,
-// 하위 3=강등권 - 유럽 5대리그 기준 근사치)을 그대로 쓴다.
-function tableRowsHtml(table, comp) {
-  const promotionSpots = comp?.promotionSpots;
-  const relegationSpots = comp?.relegationSpots;
-  return table.table
-    .map((row) => {
-      const isQualify = promotionSpots != null ? row.position <= promotionSpots : row.position <= 4;
-      const isRelegate = relegationSpots != null ? row.position > table.table.length - relegationSpots : row.position > table.table.length - 3;
-      const badgeClass = isQualify ? "qualify" : isRelegate ? "relegate" : "";
-      const dotClass = row.live ? `live-dot result-${row.liveResult}` : "";
-      const ptsClass = row.live ? `pts live-${row.liveResult}` : "pts";
-      const mine = isFavorite(row.team.id);
-      return `
-        <tr class="${row.live ? "live-row" : ""}">
-          <td><div class="pos-cell"><span class="pos-badge ${badgeClass}"></span>${row.position}</div></td>
-          <td><div class="team-cell ${mine ? "mine" : ""}" data-team-id="${row.team.id}">${crestImg(row.team, "team-crest")}<span class="team-name-text">${row.team.shortName || row.team.name}</span>${mine ? '<span class="mine-star" title="나의 팀">★</span>' : ""}${row.live ? `<span class="${dotClass}" title="경기 진행 중 - 현재 스코어 기준 승/무/패"></span>` : ""}</div></td>
-          <td class="num">${row.playedGames}</td>
-          <td class="num">${row.won}</td>
-          <td class="num">${row.draw}</td>
-          <td class="num">${row.lost}</td>
-          <td class="num">${row.goalsFor ?? "-"}</td>
-          <td class="num">${row.goalsAgainst ?? "-"}</td>
-          <td class="num">${row.goalDifference}</td>
-          <td class="${ptsClass}">${row.points}</td>
-        </tr>
-      `;
-    })
-    .join("");
-}
-
 // 2026시즌 기준(K리그 하나로 승강제 개편안) 요약 - 리그마다 규정이 달라 표 위에 한 줄로 간단히
 // 알려준다. 정확한 세부 조건(라이선스 보유 여부 등)은 생략하고 사용자가 궁금해할 핵심만 담는다.
 const PROMOTION_RULE_NOTE = {
@@ -447,36 +414,16 @@ const PROMOTION_RULE_NOTE = {
   K4: "⬆ 우승 시 자동 승격, 2위는 K3리그 최하위팀과 승격 플레이오프를 치러요.",
 };
 
-// MLS처럼 리그가 컨퍼런스(조)로 나뉘어 있으면 표가 여러 개 온다 - 그룹명 소제목과 함께 각각 따로 그린다.
-// 대부분의 리그는 그룹이 하나뿐이라 이 경우엔 기존과 동일하게 소제목 없이 표 하나만 보여준다.
+// 표 자체(그룹 나누기, 행 렌더링)는 format.js의 standingsTablesHtml 공용 함수가 만들어준다(경기 상세의
+// "순위" 탭과 공유, 2026-09-14) - 여기서는 이 화면 전용인 승강 규정 안내와 DOM 반영/이벤트만 처리한다.
 function renderTables(tables, silent, comp) {
-  const nonEmpty = tables.filter((t) => t.table?.length);
-  if (!nonEmpty.length) {
+  const tablesHtml = standingsTablesHtml(tables, comp);
+  if (!tablesHtml) {
     el.standingsWrap.innerHTML = '<div class="empty-state">순위 정보가 없습니다.</div>';
     return;
   }
 
-  const showGroupTitle = nonEmpty.length > 1;
   const ruleNote = PROMOTION_RULE_NOTE[comp?.code];
-
-  const tablesHtml = nonEmpty
-    .map((table) => {
-      const anyLive = table.table.some((row) => row.live);
-      return `
-        ${showGroupTitle ? `<div class="standings-group-title">${table.type}</div>` : ""}
-        ${anyLive ? '<div class="live-standings-note">🟢 진행 중인 경기가 있어요 - 팀명 옆 점 색깔은 현재 스코어 기준 승/무/패예요. 승점 등 기록은 경기가 끝나야 반영돼요.</div>' : ""}
-        <table class="standings-table">
-          <thead>
-            <tr>
-              <th>#</th><th>팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득점</th><th>실점</th><th>득실</th><th>승점</th>
-            </tr>
-          </thead>
-          <tbody>${tableRowsHtml(table, comp)}</tbody>
-        </table>
-      `;
-    })
-    .join("");
-
   el.standingsWrap.innerHTML = (ruleNote ? `<div class="promotion-rule-note">${ruleNote}</div>` : "") + tablesHtml;
 
   if (!silent) fadeIn(el.standingsWrap);
