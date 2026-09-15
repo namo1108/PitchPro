@@ -42,6 +42,9 @@ export const COMPETITIONS = [
   // AI 분석 대상에서 뺐다(2026-08-29) - 리그 탭/경기 목록에는 그대로 나온다.
   { code: "WC", name: "World Cup", emblem: "/img/emblems/worldcup.jpg", apiFootballLeagueId: 1, apiFootballSeason: 2026, hasBracket: true },
   { code: "EC", name: "European Championship", emblem: "https://media.api-sports.io/football/leagues/4.png", apiFootballLeagueId: 4, apiFootballSeason: 2024, hasBracket: true },
+  // 아시안게임 축구(남자, 23세 이하+와일드카드) - 2026 아이치·나고야 대회(사용자가 API-Football
+  // 대시보드에서 리그 id 확인해줌, 2026-09-15).
+  { code: "AG", name: "아시안게임", emblem: "https://media.api-sports.io/football/leagues/803.png", apiFootballLeagueId: 803, apiFootballSeason: 2026, hasBracket: true },
   { code: "KL1", name: "K리그1", emblem: "https://media.api-sports.io/football/leagues/292.png", apiFootballLeagueId: 292, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }], featured: true },
   // promotionSpots: K리그2는 1~2위 자동 승격 + 3~6위 승격 플레이오프라 1~6위 전체가 "승격권"이다
   // (사용자 확인, 2026-07). 지정 안 한 다른 리그는 순위표 렌더링 쪽의 기존 근사 규칙(상위 4/하위 3)을 쓴다.
