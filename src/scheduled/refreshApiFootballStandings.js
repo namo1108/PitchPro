@@ -34,9 +34,22 @@ export async function refreshApiFootballStandings(env) {
   const cursorRaw = await env.CACHE.get(CURSOR_KEY);
   const cursor = Number(cursorRaw || "0") % COMPETITIONS.length;
 
-  const batch = neverFetched.length
-    ? neverFetched.slice(0, COMPETITIONS_PER_TICK)
-    : Array.from({ length: COMPETITIONS_PER_TICK }, (_, i) => COMPETITIONS[(cursor + i) % COMPETITIONS.length]);
+  // 순위표 회전 순서(cursor)는 대회가 37개라 한 바퀴 도는 데 최대 24분(5개씩 3분 간격)이 걸린다 -
+  // 지금 라이브 중인 대회가 하필 순서상 늦게 걸리면 경기가 끝나고도 한참 뒤에야 승점이 반영되는
+  // 것처럼 보인다(2026-09-15 제보 - "아시아챔피언스리그 등 대륙대회 순위가 실시간 반영이 안 됨").
+  // refreshApiFootballMatches.js의 urgency 우선순위와 같은 방식으로, 지금 라이브 중인 대회는
+  // 회전 순서와 무관하게 항상 이번 틱에 끼워 넣는다(중복되면 한 번만).
+  const liveCodes = new Set((matchesBlob?.matches || []).filter((m) => m.status === "IN_PLAY" || m.status === "PAUSED").map((m) => m.competition.code));
+  const liveComps = COMPETITIONS.filter((c) => liveCodes.has(c.code));
+  const rotationComps = Array.from({ length: COMPETITIONS_PER_TICK }, (_, i) => COMPETITIONS[(cursor + i) % COMPETITIONS.length]);
+
+  let batch;
+  if (neverFetched.length) {
+    batch = neverFetched.slice(0, COMPETITIONS_PER_TICK);
+  } else {
+    const seen = new Set();
+    batch = [...liveComps, ...rotationComps].filter((c) => (seen.has(c.code) ? false : (seen.add(c.code), true)));
+  }
 
   const beforeSnapshot = JSON.stringify(existing.byCode);
 
