@@ -43,11 +43,11 @@ export const COMPETITIONS = [
   { code: "WC", name: "World Cup", emblem: "/img/emblems/worldcup.jpg", apiFootballLeagueId: 1, apiFootballSeason: 2026, hasBracket: true },
   { code: "EC", name: "European Championship", emblem: "https://media.api-sports.io/football/leagues/4.png", apiFootballLeagueId: 4, apiFootballSeason: 2024, hasBracket: true },
   // 아시안게임 축구(남자, 23세 이하+와일드카드) - 2026 아이치·나고야 대회(사용자가 API-Football
-  // 대시보드에서 리그 id 확인해줌, 2026-09-15).
-  // 803으로 며칠째 시도했는데 경기가 하나도 안 잡혀서(2026-09-15 확인 - 다른 대회는 다 정상 갱신되는데
-  // AG만 계속 빈 결과) 대시보드 표에 같이 있던 다른 숫자(8804)로 바꿔서 시도해본다 - 둘 중 어느 게
-  // 실제 리그 id인지 표 컬럼 순서가 불확실했음.
-  { code: "AG", name: "아시안게임", emblem: "https://media.api-sports.io/football/leagues/8804.png", apiFootballLeagueId: 8804, apiFootballSeason: 2026, hasBracket: true },
+  // 대시보드에서 리그 id 확인해줌, 2026-09-15 - 컬럼이 "ID (V3)"=803, "ID (V2)"=8804 둘이 있었는데,
+  // 우리는 v3.football.api-sports.io를 쓰니 803이 맞다. 803으로 며칠째 경기가 하나도 안 잡혔던 건
+  // ID가 틀려서가 아니라 다른 이유(대회가 아직 API-Football에 등록만 되고 실제 경기 데이터가
+  // 안 채워졌을 가능성 등) - 계속 지켜봐야 함.
+  { code: "AG", name: "아시안게임", emblem: "https://media.api-sports.io/football/leagues/803.png", apiFootballLeagueId: 803, apiFootballSeason: 2026, hasBracket: true },
   { code: "KL1", name: "K리그1", emblem: "https://media.api-sports.io/football/leagues/292.png", apiFootballLeagueId: 292, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }], featured: true },
   // promotionSpots: K리그2는 1~2위 자동 승격 + 3~6위 승격 플레이오프라 1~6위 전체가 "승격권"이다
   // (사용자 확인, 2026-07). 지정 안 한 다른 리그는 순위표 렌더링 쪽의 기존 근사 규칙(상위 4/하위 3)을 쓴다.
