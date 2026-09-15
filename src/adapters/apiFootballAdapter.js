@@ -48,6 +48,10 @@ const CREST_OVERRIDES = {
   23089: "/img/emblems/namyangju.png", // Namyangju FC (K4)
   7105: "/img/emblems/시흥.png", // Siheung Citizen FC (K3)
   27858: "/img/emblems/geumsan.svg", // Geumsan Insam FC (K4) - API-Football이 제천 로고를 잘못 줌(2026-08-23 제보, 유저 제공 이미지로 교체)
+  // 대한민국 축구 국가대표팀(성인, id 17) - API-Football이 실제 대한축구협회(KFA) 엠블럼이 아니라
+  // 그냥 태극기를 준다(2026-09-15 제보 - "한국 팀 엠블럼이 예전 엠블럼이다"). 아시안게임 U23 대표팀
+  // (id 10177)은 API-Football이 이미 정상적인 KFA 호랑이 엠블럼을 주고 있어서, 같은 이미지를 그대로 쓴다.
+  17: "https://media.api-sports.io/football/teams/10177.png",
 };
 
 function safeCrest(teamId, logo) {
