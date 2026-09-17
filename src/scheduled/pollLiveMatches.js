@@ -42,7 +42,9 @@ const RATE_LIMIT_BACKOFF_MS = 5 * 1000;
 // 이 루프 혼자서(최대 분당 50콜) 갉아먹는 주범이었다. 우리가 실제로 다루는 대회에 라이브 경기가 있을
 // 때만 이 빠른 폴링을 계속한다(매치 자체 캐시/알림 대상 필터링과는 무관 - 그건 이미 detectCardsAndNotify
 // 등에서 구독자 기준으로 한 번 더 거른다).
-const TRACKED_CODES = new Set(COMPETITIONS.map((c) => c.code));
+// realtime: false 대회(2026-09-17 사용자 확인 - 노르웨이/덴마크/스코틀랜드/호주/사우디/중국/J2/J3/
+// 브라질)는 여기서도 빼서, 그 대회만 라이브라고 이 비싼 빠른 폴링(최대 분당 24콜)이 도는 일이 없게 한다.
+const TRACKED_CODES = new Set(COMPETITIONS.filter((c) => c.realtime !== false).map((c) => c.code));
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

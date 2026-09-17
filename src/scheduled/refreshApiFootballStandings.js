@@ -40,7 +40,9 @@ export async function refreshApiFootballStandings(env) {
   // refreshApiFootballMatches.js의 urgency 우선순위와 같은 방식으로, 지금 라이브 중인 대회는
   // 회전 순서와 무관하게 항상 이번 틱에 끼워 넣는다(중복되면 한 번만).
   const liveCodes = new Set((matchesBlob?.matches || []).filter((m) => m.status === "IN_PLAY" || m.status === "PAUSED").map((m) => m.competition.code));
-  const liveComps = COMPETITIONS.filter((c) => liveCodes.has(c.code));
+  // realtime: false 대회(2026-09-17 사용자 확인)는 지금 라이브여도 이 우선순위를 안 준다 - 순번이
+  // 돌아올 때만(최대 24분 대기) 갱신되고, 그만큼 다른 대회에 API-Football 분당 한도 여유가 간다.
+  const liveComps = COMPETITIONS.filter((c) => liveCodes.has(c.code) && c.realtime !== false);
   const rotationComps = Array.from({ length: COMPETITIONS_PER_TICK }, (_, i) => COMPETITIONS[(cursor + i) % COMPETITIONS.length]);
 
   let batch;

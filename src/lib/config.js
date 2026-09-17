@@ -29,7 +29,12 @@ export const COMPETITIONS = [
   { code: "PPL", name: "Primeira Liga", emblem: "https://media.api-sports.io/football/leagues/94.png", apiFootballLeagueId: 94, apiFootballSeason: 2026, transferWindows: EU_WINDOWS },
   { code: "ELC", name: "Championship", emblem: "https://media.api-sports.io/football/leagues/40.png", apiFootballLeagueId: 40, apiFootballSeason: 2026, transferWindows: EU_WINDOWS },
   { code: "EFL", name: "EFL컵(카라바오컵)", emblem: "https://media.api-sports.io/football/leagues/48.png", apiFootballLeagueId: 48, apiFootballSeason: 2026, hasBracket: true, featured: true },
-  { code: "BSA", name: "Brasileirão", emblem: "https://media.api-sports.io/football/leagues/71.png", apiFootballLeagueId: 71, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-03" }, { start: "07-15", end: "09-18" }] },
+  // realtime: false - 실사용자가 거의 안 보는 리그라(2026-09-17 사용자 확인), 라이브 폴링/순위
+  // 회전에서 우선순위를 안 받게 뺀다(matchWindow.js/refreshApiFootballMatches.js/
+  // refreshApiFootballStandings.js 참고) - 그만큼 K리그·유럽 5대리그·아시아 대회 등 실제로 보는
+  // 대회에 API-Football 분당 한도 여유가 더 간다. 리그 탭/팀 검색/경기 상세는 그대로 동작하고,
+  // 갱신 주기만 "조용한 시간대" 취급(최소 1시간에 한 번)으로 느려진다.
+  { code: "BSA", name: "Brasileirão", emblem: "https://media.api-sports.io/football/leagues/71.png", apiFootballLeagueId: 71, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-03" }, { start: "07-15", end: "09-18" }], realtime: false },
   { code: "CL", name: "Champions League", emblem: "https://media.api-sports.io/football/leagues/2.png", apiFootballLeagueId: 2, apiFootballSeason: 2026, hasBracket: true, featured: true },
   { code: "EL", name: "Europa League", emblem: "https://media.api-sports.io/football/leagues/3.png", apiFootballLeagueId: 3, apiFootballSeason: 2026, hasBracket: true, featured: true },
   { code: "ECL", name: "유로파 컨퍼런스리그", emblem: "https://media.api-sports.io/football/leagues/848.png", apiFootballLeagueId: 848, apiFootballSeason: 2026, hasBracket: true, featured: true },
@@ -59,19 +64,19 @@ export const COMPETITIONS = [
   { code: "K3", name: "K3리그", emblem: "/img/emblems/k3리그.png", apiFootballLeagueId: 295, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }] },
   { code: "K4", name: "K4리그", emblem: "/img/emblems/k4리그.png", apiFootballLeagueId: 1234, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }] },
   { code: "J1", name: "J1리그", emblem: "https://media.api-sports.io/football/leagues/98.png", apiFootballLeagueId: 98, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }] },
-  { code: "J2", name: "J2리그", emblem: "https://media.api-sports.io/football/leagues/99.png", apiFootballLeagueId: 99, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }] },
-  { code: "J3", name: "J3리그", emblem: "https://media.api-sports.io/football/leagues/100.png", apiFootballLeagueId: 100, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }] },
+  { code: "J2", name: "J2리그", emblem: "https://media.api-sports.io/football/leagues/99.png", apiFootballLeagueId: 99, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }], realtime: false },
+  { code: "J3", name: "J3리그", emblem: "https://media.api-sports.io/football/leagues/100.png", apiFootballLeagueId: 100, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }], realtime: false },
   { code: "MLS", name: "MLS", emblem: "https://media.api-sports.io/football/leagues/253.png", apiFootballLeagueId: 253, apiFootballSeason: 2026, transferWindows: [{ start: "01-20", end: "04-02" }, { start: "07-06", end: "09-09" }] },
-  { code: "NOR", name: "노르웨이 1부", emblem: "https://media.api-sports.io/football/leagues/103.png", apiFootballLeagueId: 103, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-15" }, { start: "07-01", end: "08-10" }] },
-  { code: "DEN", name: "덴마크 1부", emblem: "https://media.api-sports.io/football/leagues/119.png", apiFootballLeagueId: 119, apiFootballSeason: 2026, transferWindows: EU_WINDOWS },
-  { code: "SCO", name: "스코틀랜드 1부", emblem: "https://media.api-sports.io/football/leagues/179.png", apiFootballLeagueId: 179, apiFootballSeason: 2026, transferWindows: EU_WINDOWS },
+  { code: "NOR", name: "노르웨이 1부", emblem: "https://media.api-sports.io/football/leagues/103.png", apiFootballLeagueId: 103, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-15" }, { start: "07-01", end: "08-10" }], realtime: false },
+  { code: "DEN", name: "덴마크 1부", emblem: "https://media.api-sports.io/football/leagues/119.png", apiFootballLeagueId: 119, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, realtime: false },
+  { code: "SCO", name: "스코틀랜드 1부", emblem: "https://media.api-sports.io/football/leagues/179.png", apiFootballLeagueId: 179, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, realtime: false },
   // 친선경기는 순위표/득점왕 개념이 없어 리그 탭에는 노출하지 않는다(경기 목록에는 그대로 나온다).
   { code: "FRIENDLY", name: "클럽 친선경기", emblem: "https://media.api-sports.io/football/leagues/667.png", apiFootballLeagueId: 667, apiFootballSeason: 2026, hideFromLeagueTab: true },
   // 호주는 남반구라 시즌(10월~5월)에 맞춰 시즌 개막 전(8~11월)/중반(1월) 두 창구를 쓴다.
-  { code: "AUS", name: "호주 1부(A-League)", emblem: "https://media.api-sports.io/football/leagues/188.png", apiFootballLeagueId: 188, apiFootballSeason: 2025, transferWindows: [{ start: "01-01", end: "01-31" }, { start: "08-01", end: "11-15" }] },
+  { code: "AUS", name: "호주 1부(A-League)", emblem: "https://media.api-sports.io/football/leagues/188.png", apiFootballLeagueId: 188, apiFootballSeason: 2025, transferWindows: [{ start: "01-01", end: "01-31" }, { start: "08-01", end: "11-15" }], realtime: false },
   // 사우디는 최근 몇 시즌 유럽보다 살짝 더 늦게까지 등록을 받아줘서 마감을 여유 있게 잡는다.
-  { code: "KSA", name: "사우디 1부", emblem: "https://media.api-sports.io/football/leagues/307.png", apiFootballLeagueId: 307, apiFootballSeason: 2025, transferWindows: [{ start: "01-01", end: "02-10" }, { start: "06-01", end: "09-15" }] },
-  { code: "CHN", name: "중국 슈퍼리그", emblem: "https://media.api-sports.io/football/leagues/169.png", apiFootballLeagueId: 169, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-05" }, { start: "06-20", end: "08-10" }] },
+  { code: "KSA", name: "사우디 1부", emblem: "https://media.api-sports.io/football/leagues/307.png", apiFootballLeagueId: 307, apiFootballSeason: 2025, transferWindows: [{ start: "01-01", end: "02-10" }, { start: "06-01", end: "09-15" }], realtime: false },
+  { code: "CHN", name: "중국 슈퍼리그", emblem: "https://media.api-sports.io/football/leagues/169.png", apiFootballLeagueId: 169, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-05" }, { start: "06-20", end: "08-10" }], realtime: false },
   // 국가대표 친선경기(A매치): 클럽 친선경기(667)와 별개로 API-Football은 국가대표 친선경기를 리그
   // id 10 "Friendlies"로 묶어서 제공한다(유소년/여자 대표팀 경기도 섞여 있지만 팀 검색과 마찬가지로
   // 여기선 성인 남자 대표팀 경기 위주로 노출). 친선경기라 순위표/득점왕 개념이 없어 리그 탭엔 안 보여준다.

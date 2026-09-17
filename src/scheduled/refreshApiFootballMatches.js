@@ -30,6 +30,11 @@ const UPCOMING_BUFFER_MS = 3 * 60 * 60 * 1000;
 // 0/1(급함)은 아래 fetchAndStoreMatches가 활성 시간대에도 항상 다시 불러오고, 2(당분간 조용함)는
 // 활성 시간대엔 새로 안 부르고 기존 캐시를 그대로 재사용한다(연말까지 이미 캐싱돼 있어 안전함).
 function competitionUrgency(comp, existingByCode) {
+  // 실시간 추적에서 뺀 대회(config.js의 realtime: false, 2026-09-17 사용자 확인)는 라이브 중이든
+  // 킥오프가 지났든 상관없이 항상 "당분간 조용함" 취급 - 활성 시간대엔 아예 재조회 대상에서
+  // 빠지고(아래 fetchAndStoreMatches의 urgency===2 스킵), 조용한 시간대(1시간 간격) 스윕에서만
+  // 갱신된다.
+  if (comp.realtime === false) return 2;
   const matches = existingByCode.get(comp.code) || [];
   if (!matches.length) return 0; // 캐시가 아예 없는(새로 추가된) 대회는 항상 최우선으로 채운다
   const now = Date.now();
