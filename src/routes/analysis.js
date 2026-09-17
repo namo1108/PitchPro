@@ -36,7 +36,7 @@ const CONCURRENCY = 6;
 const AI_ANALYSIS_TIERS = [
   ["KL1", "KL2"],
   ["CL", "ACL", "PL", "PD", "BL1", "SA", "FL1"],
-  ["EL", "ECL", "KFA", "FA", "EFL"],
+  ["EL", "ECL", "ACL2", "KFA", "FA", "EFL"],
 ];
 const FEATURED_CODES = new Set(COMPETITIONS.filter((c) => c.featured).map((c) => c.code));
 
