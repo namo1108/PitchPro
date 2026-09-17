@@ -5305,6 +5305,12 @@ table.standings-table {
   font-weight: 800;
 }
 
+.update-notes-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: -6px 0 10px;
+}
+
 .update-notes-list {
   margin: 0;
   padding: 0;
