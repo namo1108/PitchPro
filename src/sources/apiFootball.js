@@ -2,23 +2,39 @@ import { API_FOOTBALL_BASE } from "../lib/config.js";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// 분당 한도 진단용(2026-09-20) - 코드를 아무리 손봐도(순간 버스트 방지 등) 레이트리밋이 안 풀려서,
+// API-Football이 매 응답에 실어주는 실제 남은 분당/일일 한도 헤더를 직접 찍어본다. 남은 분당 한도가
+// 얼마 안 남았을 때만(50 미만) 로그를 남겨서 평소엔 로그가 너무 많아지지 않게 한다. 헤더 이름은
+// API-Football 문서 기준(대소문자는 Headers.get()이 알아서 구분 안 함) - requests-limit/remaining은
+// 일일 한도, limit/remaining(접두사 없음)은 분당 한도.
+function logRateLimitHeaders(res, url) {
+  const minuteRemaining = res.headers.get("x-ratelimit-remaining");
+  const minuteLimit = res.headers.get("x-ratelimit-limit");
+  if (minuteRemaining !== null && Number(minuteRemaining) < 50) {
+    console.warn(`API-Football 분당 한도 얼마 안 남음: remaining=${minuteRemaining}/${minuteLimit} url=${url.pathname}${url.search}`);
+  }
+  return { minuteRemaining, minuteLimit };
+}
+
 async function fetchOnce(env, url) {
   const res = await fetch(url, {
     headers: { "x-apisports-key": env.API_FOOTBALL_KEY || "" },
   });
+  const { minuteRemaining, minuteLimit } = logRateLimitHeaders(res, url);
+
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`API-Football ${res.status}: ${body}`);
+    throw new Error(`API-Football ${res.status}: ${body} [분당한도 remaining=${minuteRemaining}/${minuteLimit}]`);
   }
 
   const data = await res.json();
   if (data.errors && (Array.isArray(data.errors) ? data.errors.length : Object.keys(data.errors).length)) {
-    throw new Error(`API-Football error: ${JSON.stringify(data.errors)}`);
+    throw new Error(`API-Football error: ${JSON.stringify(data.errors)} [분당한도 remaining=${minuteRemaining}/${minuteLimit}]`);
   }
   return data;
 }
 
-// 계정 전체 한도(분당 300회)는 여유가 있는데도, 실사용 트래픽(온디맨드 팀/선수 조회)과 크론이
+// 계정 전체 한도(메가플랜, 분당 900회)는 여유가 있는데도, 실사용 트래픽(온디맨드 팀/선수 조회)과 크론이
 // 겹치는 순간에 종종 레이트리밋에 걸리는 것으로 확인됨 -> 지수 백오프로 재시도한다.
 // 단, 대회 14~16개를 순차 조회하는 크론 벌크 작업(retries:1)에서까지 이 백오프를 적용하면
 // 레이트리밋이 걸린 순간 재시도가 재시도를 부르며 한 틱 전체가 Cloudflare CPU/실행시간 한도를
