@@ -3,6 +3,8 @@ import { KV_KEYS } from "../lib/config.js";
 import * as apiFootball from "../sources/apiFootball.js";
 import { loadSubscriptions, filterInterested, sendToSubscriber } from "../lib/subscriptions.js";
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // 킥오프 60분 전부터 확인 시작(사용자 요청, 2026-08-08 - API-Football은 보통 킥오프 1시간 전쯤 라인업을 올림).
 // 한 번 발표됐다고 확인되면(match.lineupsAnnounced=true) 그 경기는 다시 조회하지 않는다 -> API 절약.
 // 이 플래그는 /api/matches 응답에도 그대로 실려 나가서, 프론트가 경기 상세를 매번 다시 안 불러도
@@ -40,7 +42,10 @@ export async function notifyLineups(env) {
 
   let matchesChanged = false;
 
-  for (const match of candidates) {
+  // 경기 사이에 짧게 쉬어서 여러 경기를 한꺼번에(대기 없이) 조회할 때 순간 호출량이 튀는 걸 막는다
+  // (2026-09-20, "레이트리밋이 계속 걸린다" 재조사 중 발견 - 일일/시간별 총량 자체는 여유 있었음).
+  for (const [idx, match] of candidates.entries()) {
+    if (idx > 0) await sleep(250);
     let lineupsRaw;
     try {
       lineupsRaw = await apiFootball.getFixtureLineups(env, match.id);

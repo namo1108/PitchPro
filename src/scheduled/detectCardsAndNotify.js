@@ -3,6 +3,8 @@ import { KV_KEYS } from "../lib/config.js";
 import * as apiFootball from "../sources/apiFootball.js";
 import { loadSubscriptions, filterInterested, cleanupDeadSubscription, sendToSubscriber } from "../lib/subscriptions.js";
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function formatMinute(time) {
   if (!time) return "";
   return time.extra ? `${time.elapsed}+${time.extra}` : `${time.elapsed}`;
@@ -102,7 +104,12 @@ export async function detectCardsAndNotify(env) {
   let notifiedChanged = false;
   let matchesChanged = false;
 
-  for (const match of watchedLive) {
+  // 경기별로 순서대로 조회하되, 사이사이 짧게 쉬어서 짧은 순간에 호출이 몰리는 걸 막는다 - 하루/시간
+  // 총량은 여유가 있어도(2026-09-20 확인, 메가플랜 일일 사용량 6%) 이렇게 연달아(대기 없이) 여러
+  // 경기를 한꺼번에 조회하면 그 찰나의 순간엔 순간 호출량이 튈 수 있다("레이트리밋이 계속 걸린다"는
+  // 제보를 다시 조사하다 대시보드에서 일일/시간별 총량 자체는 낮다는 걸 확인하고 나서 발견).
+  for (const [idx, match] of watchedLive.entries()) {
+    if (idx > 0) await sleep(250); // 다음 경기 조회 전에 한 번만 쉰다(맨 처음 경기는 바로 조회)
     let events;
     try {
       const raw = await apiFootball.getFixtureEvents(env, match.id);

@@ -4,6 +4,8 @@ import * as apiFootball from "../sources/apiFootball.js";
 import { normalizeGoalEvents } from "../adapters/apiFootballAdapter.js";
 import { loadSubscriptions, filterInterested, cleanupDeadSubscription, sendToSubscriber } from "../lib/subscriptions.js";
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // 골이 감지된 경기는 이벤트 조회로 득점자 이름까지 알아내서 알림 문구에 붙인다(실패해도 알림 자체는 보냄).
 async function getTeamGoalEvents(env, matchId, teamId) {
   try {
@@ -138,11 +140,18 @@ export async function detectGoalsAndNotify(env) {
   const subscriptions = await loadSubscriptions(env);
   if (subscriptions.length === 0) return;
 
+  // 실제로 이벤트를 조회한 횟수만 세서, 그 사이에만 짧게 쉰다(관심 없어서 건너뛴 경기는 안 셈) -
+  // 골이 여러 경기에서 한꺼번에 터지는 순간에도 호출이 몰리지 않게 한다(2026-09-20, "레이트리밋이
+  // 계속 걸린다" 재조사 중 발견 - 일일/시간별 총량 자체는 여유 있었음).
+  let fetchedCount = 0;
   for (const { match, scoringTeamId, otherTeamId, count } of scoredEvents) {
     // live=all이 전세계 라이브 경기를 전부 캐시에 합쳐두기 때문에(pollLiveMatches.js), 아무도 구독
     // 안 한 해외 경기의 골까지 매번 득점자 조회(getFixtureEvents)를 하면 레이트리밋만 갉아먹는다
     // (2026-08-22) - 관심있는 구독자가 없으면 이벤트 조회 자체를 건너뛴다.
     if (filterInterested(subscriptions, match).length === 0) continue;
+
+    if (fetchedCount > 0) await sleep(250);
+    fetchedCount++;
 
     const home = match.score.fullTime.home;
     const away = match.score.fullTime.away;

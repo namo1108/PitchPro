@@ -5,6 +5,7 @@ import { sendToSubscriber } from "../lib/subscriptions.js";
 import { lookupAndCacheFee } from "../lib/transfermarkt.js";
 
 const TRANSFER_DEDUPE_TTL_SECONDS = 60 * 24 * 60 * 60; // 같은 이적을 두 번 알리지 않도록 60일 보관
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function loadSubscriptions(env) {
   const list = await env.CACHE.list({ prefix: KV_KEYS.pushSubscriptionPrefix });
@@ -100,7 +101,10 @@ export async function detectTransfersAndNotify(env) {
   const watchedTeamIds = [...new Set(subscriptions.flatMap((s) => s.teamIds || []))];
   if (!watchedTeamIds.length) return;
 
-  for (const teamId of watchedTeamIds) {
+  // 팀 사이/이적 조회 사이에 짧게 쉬어서 순간 호출량이 몰리지 않게 한다(2026-09-20, "레이트리밋이
+  // 계속 걸린다" 재조사 중 발견 - 일일/시간별 총량 자체는 여유 있었음).
+  for (const [idx, teamId] of watchedTeamIds.entries()) {
+    if (idx > 0) await sleep(250);
     try {
       const squadRaw = await apiFootball.getSquad(env, teamId);
       const players = squadRaw.response?.[0]?.players || [];
@@ -114,7 +118,8 @@ export async function detectTransfersAndNotify(env) {
         const currentSet = new Set(currentIds);
         const changedIds = [...new Set([...prevIds.filter((id) => !currentSet.has(id)), ...currentIds.filter((id) => !prevSet.has(id))])];
 
-        for (const playerId of changedIds) {
+        for (const [playerIdx, playerId] of changedIds.entries()) {
+          if (playerIdx > 0) await sleep(250);
           const transfer = await getLatestTransfer(env, playerId);
           if (!transfer) continue;
           const playerName = players.find((p) => String(p.id) === playerId)?.name || null;
