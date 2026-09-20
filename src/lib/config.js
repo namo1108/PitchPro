@@ -1,4 +1,9 @@
-export const API_FOOTBALL_BASE = "https://v3.football.api-sports.io";
+// Cloudflare Workers는 다른 고객들과 발신 IP를 공유하는데(전용 고정 IP는 엔터프라이즈 플랜 전용),
+// 그 공유 IP가 API-Football 방화벽에 걸려서 계정 자체 한도(메가플랜, 분당 900)는 여유로운데도
+// 계속 레이트리밋에 걸리는 것으로 확인됨(2026-09-20). 그래서 직접 호출 대신, 고정 IP를 가진
+// 릴레이 서버(VPS + Caddy)를 하나 두고 그걸 거쳐서 나가도록 바꿨다 - 실제 API-Football 키는
+// 이제 그 서버에만 있고, Worker는 PROXY_SECRET으로만 그 서버에 인증한다(apiFootball.js 참고).
+export const API_FOOTBALL_BASE = "https://147-182-141-54.sslip.io";
 
 // api-football.com(api-sports.io) 유료(Pro) 플랜으로 해외 리그 + K리그를 한 소스로 통합.
 // apiFootballSeason은 API-Football이 각 리그에 대해 "current"로 표시하는 시즌 연도(리그마다 회계연도가

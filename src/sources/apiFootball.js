@@ -16,9 +16,12 @@ function logRateLimitHeaders(res, url) {
   return { minuteRemaining, minuteLimit };
 }
 
+// 이제 API-Football을 직접 호출하지 않고 고정 IP 릴레이 서버(VPS)를 거친다 - 실제 API-Football
+// 키는 그 서버에만 있고(env.API_FOOTBALL_KEY는 더 이상 안 씀), 여기서는 그 서버 자체에 대한
+// 인증용 비밀값만 보낸다(2026-09-20, config.js의 API_FOOTBALL_BASE 주석 참고).
 async function fetchOnce(env, url) {
   const res = await fetch(url, {
-    headers: { "x-apisports-key": env.API_FOOTBALL_KEY || "" },
+    headers: { "x-proxy-secret": env.PROXY_SECRET || "" },
   });
   const { minuteRemaining, minuteLimit } = logRateLimitHeaders(res, url);
 
