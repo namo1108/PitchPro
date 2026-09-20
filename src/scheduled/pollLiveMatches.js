@@ -1,5 +1,6 @@
 import { getJSON, putJSON } from "../lib/kv.js";
 import { KV_KEYS, COMPETITIONS } from "../lib/config.js";
+import { MATCH_DURATION_BUFFER_MS } from "../lib/matchWindow.js";
 import * as apiFootball from "../sources/apiFootball.js";
 import { normalizeFixture } from "../adapters/apiFootballAdapter.js";
 import { detectGoalsAndNotify } from "./detectGoalsAndNotify.js";
@@ -70,7 +71,20 @@ export async function pollLiveMatches(env) {
   while (Date.now() < deadline) {
     const matchesBlob = await getJSON(env, KV_KEYS.matches);
     const cached = matchesBlob?.matches || [];
-    if (!cached.some((m) => (m.status === "IN_PLAY" || m.status === "PAUSED") && TRACKED_CODES.has(m.competition.code))) return; // 우리 대회 중 라이브 경기가 없으면 더 돌 필요 없음
+    // 킥오프 후 150분(연장/승부차기 포함 넉넉한 시간)이 지나도록 캐시가 여전히 IN_PLAY/PAUSED라고
+    // 들고 있으면, 실제로는 이미 끝난 경기가 (레이트리밋 등으로) 상태 갱신이 안 된 채 멈춘 것이다.
+    // live=all은 이미 끝난 경기를 다시는 돌려주지 않으니 이 루프로는 절대 못 고친다 - 그런데도
+    // "라이브 경기가 있다"고 계속 판단하면 이 폴링 루프가 매 틱 50초씩 돌면서 livePollActive를
+    // 계속 세워둬서, 실제로 이 상태를 바로잡을 수 있는 유일한 수단인 refreshApiFootballMatches(날짜
+    // 범위로 다시 조회)가 영원히 스킵된다(2026-09-20, 레이트리밋 원인 수정 후에도 지난 경기가 계속
+    // "지연"으로 남아있어서 발견 - 자기 자신을 계속 막는 교착상태였다). 그래서 이 판단에서는 너무
+    // 오래된(스테일) IN_PLAY 경기는 빼고, 진짜 "지금 볼 가치가 있는" 라이브 경기만 센다.
+    const now = Date.now();
+    const isTrulyLive = (m) =>
+      (m.status === "IN_PLAY" || m.status === "PAUSED") &&
+      TRACKED_CODES.has(m.competition.code) &&
+      now - new Date(m.utcDate).getTime() <= MATCH_DURATION_BUFFER_MS;
+    if (!cached.some(isTrulyLive)) return; // 우리 대회 중 (스테일하지 않은) 라이브 경기가 없으면 더 돌 필요 없음
 
     if (!markedActive) {
       markedActive = true;
