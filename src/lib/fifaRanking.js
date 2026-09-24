@@ -1,0 +1,70 @@
+// FIFA 남자 국가대표팀 랭킹 - API-Football에는 이 데이터가 없어서(rankings 엔드포인트 자체가 없음,
+// 2026-09-25 확인) 정적 스냅샷으로 관리한다(kleagueVenues.js/broadcastLinks 같은 패턴). FIFA
+// 랭킹은 한 달에 한 번(대개 목요일)만 갱신되니 정적 파일로도 충분하고, 실시간 API 호출로 매번
+// 긁어올 정도로 자주 바뀌는 데이터가 아니다.
+// 출처: FIFA/Coca-Cola Men's World Ranking, 2026-07-20 발표분(다음 발표는 2026-10-07 예정).
+// 팀 이름은 API-Football이 `team.name`으로 주는 영어 표기 기준(예: 대한민국은 koreanizeTeam으로
+// 나중에 한글화되기 전, 원본이 "South Korea") - 키를 대소문자 무시하고 매칭한다.
+const FIFA_RANKING_BY_NAME = {
+  spain: 1,
+  argentina: 2,
+  france: 3,
+  england: 4,
+  brazil: 5,
+  morocco: 6,
+  portugal: 7,
+  belgium: 8,
+  netherlands: 9,
+  mexico: 10,
+  colombia: 11,
+  germany: 12,
+  croatia: 13,
+  switzerland: 14,
+  italy: 15,
+  usa: 16,
+  "united states": 16,
+  japan: 17,
+  senegal: 18,
+  norway: 19,
+  uruguay: 20,
+  denmark: 21,
+  iran: 22,
+  austria: 23,
+  egypt: 24,
+  ecuador: 25,
+  nigeria: 26,
+  turkey: 27,
+  türkiye: 27,
+  australia: 28,
+  algeria: 29,
+  canada: 30,
+  "ivory coast": 31,
+  "côte d'ivoire": 31,
+  "south korea": 32,
+  "korea republic": 32,
+  ukraine: 33,
+  paraguay: 34,
+  russia: 35,
+  poland: 36,
+  sweden: 37,
+  wales: 38,
+  hungary: 39,
+  serbia: 40,
+  "dr congo": 41,
+  "congo dr": 41,
+  scotland: 42,
+  cameroon: 43,
+  panama: 44,
+  slovakia: 45,
+  greece: 46,
+  venezuela: 47,
+  czechia: 48,
+  "czech republic": 48,
+  chile: 49,
+  peru: 50,
+};
+
+export function findFifaRanking(teamName) {
+  if (!teamName) return null;
+  return FIFA_RANKING_BY_NAME[teamName.trim().toLowerCase()] ?? null;
+}

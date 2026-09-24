@@ -22,6 +22,7 @@ import {
 import { findKLeagueVenue } from "../lib/kleagueVenues.js";
 import { lookupManualK3K4Squad } from "../lib/manualK3K4Squads.js";
 import { lookupK3PhotoByNumber } from "../lib/k3PhotoOverrides.js";
+import { findFifaRanking } from "../lib/fifaRanking.js";
 
 const TEAM_CACHE_TTL_SECONDS = 600;
 const TEAM_STALE_KEY_PREFIX = "team:stale:";
@@ -29,9 +30,14 @@ const TEAM_STALE_KEY_PREFIX = "team:stale:";
 // 팀 한글명 매핑을 나중에 추가/수정해도, 캐시(10분)나 업스트림 장애 시 대체용 stale 캐시(TTL 없음)에
 // 남아있는 예전 이름이 그대로 나가지 않도록 응답 직전에 한 번 더 보정한다.
 function reKoreanize(result) {
+  const team = koreanizeTeam(result.team);
+  // FIFA 랭킹도 venue처럼 캐시에 얼려 넣지 않고 응답 직전에 항상 최신 정적 데이터를 덧붙인다(월 1회
+  // 갱신되는 fifaRanking.js를 고쳐도 팀 상세 캐시(10분)가 만료될 때까지 안 기다려도 되게 하기 위함).
+  // 국가대표팀(isNational)만 표기하고, 클럽팀은 랭킹 개념이 없으니 항상 null.
+  const fifaRanking = team.isNational ? findFifaRanking(team.name) : null;
   return {
     ...result,
-    team: koreanizeTeam(result.team),
+    team: { ...team, fifaRanking },
     recentMatches: (result.recentMatches || []).map((m) => ({ ...m, homeTeam: koreanizeTeam(m.homeTeam), awayTeam: koreanizeTeam(m.awayTeam) })),
     upcomingMatches: (result.upcomingMatches || []).map((m) => ({ ...m, homeTeam: koreanizeTeam(m.homeTeam), awayTeam: koreanizeTeam(m.awayTeam) })),
   };

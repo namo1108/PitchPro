@@ -15,7 +15,7 @@ import { loadMatchDetail } from "./matches.js";
 // 묶어뒀음)를 리그별로 쪼갰다 - 그래야 그룹 하나 = 리그 하나 = 테마 하나가 맞아떨어진다. 같은 이유로
 // UEFA 챔피언스리그(원래 "국제대회"에 있었음)와 MLS(원래 "아메리카·기타"에 있었음)도 따로 뺐다.
 const LEAGUE_GROUPS = [
-  { title: "국제대회", codes: ["WC", "EC", "AG", "ACL", "ACL2", "ACUP"] },
+  { title: "국제대회", codes: ["WC", "EC", "AG", "UNL", "CNL", "ACL", "ACL2", "ACUP"] },
   { title: "UEFA 챔피언스리그", codes: ["CL"], theme: "cl" },
   { title: "국내(K리그)", codes: ["KL1", "KL2", "KFA", "K3", "K4"], theme: "kleague" },
   { title: "프리미어리그", codes: ["PL"], theme: "pl" },

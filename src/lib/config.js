@@ -58,6 +58,12 @@ export const COMPETITIONS = [
   // ID가 틀려서가 아니라 다른 이유(대회가 아직 API-Football에 등록만 되고 실제 경기 데이터가
   // 안 채워졌을 가능성 등) - 계속 지켜봐야 함.
   { code: "AG", name: "아시안게임", emblem: "https://media.api-sports.io/football/leagues/803.png", apiFootballLeagueId: 803, apiFootballSeason: 2026, hasBracket: true },
+  // 리그별로 League A/B/C 조 편성 후 조별리그(순위표) -> 파이널포(대진표) 순서로 진행되는 대회라
+  // hasBracket로 등록해두면 leagues.js의 loadBracketOrStandings가 알아서 조별리그 기간엔 순위표를,
+  // 파이널포에 들어가면 대진표를 보여준다(챔피언스리그 리그페이즈와 동일한 패턴, 2026-09-25).
+  { code: "UNL", name: "UEFA 네이션스리그", emblem: "https://media.api-sports.io/football/leagues/5.png", apiFootballLeagueId: 5, apiFootballSeason: 2026, hasBracket: true },
+  // CONCACAF는 API-Football이 대회 시즌을 "2025"로 표기(확인 2026-09-25, 유럽과 시즌 표기 연도가 다름).
+  { code: "CNL", name: "CONCACAF 네이션스리그", emblem: "https://media.api-sports.io/football/leagues/536.png", apiFootballLeagueId: 536, apiFootballSeason: 2025, hasBracket: true },
   { code: "KL1", name: "K리그1", emblem: "https://media.api-sports.io/football/leagues/292.png", apiFootballLeagueId: 292, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }], featured: true },
   // promotionSpots: K리그2는 1~2위 자동 승격 + 3~6위 승격 플레이오프라 1~6위 전체가 "승격권"이다
   // (사용자 확인, 2026-07). 지정 안 한 다른 리그는 순위표 렌더링 쪽의 기존 근사 규칙(상위 4/하위 3)을 쓴다.

@@ -174,6 +174,7 @@ function openDirections(venue) {
 
 function renderTeamInfoStrip(team) {
   const items = [];
+  if (team.fifaRanking) items.push({ label: "FIFA 랭킹", value: `${team.fifaRanking}위` });
   if (team.founded) items.push({ label: "창단", value: `${team.founded}년` });
   if (team.venueCity) items.push({ label: "연고지", value: team.venueCity });
   if (team.venueCapacity) items.push({ label: "수용인원", value: `${team.venueCapacity.toLocaleString()}명` });
