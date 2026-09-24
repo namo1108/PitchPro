@@ -8,6 +8,14 @@ const SEEN_KEY_PREFIX = "update-notes-seen-";
 
 const UPDATE_NOTES = [
   {
+    date: "2026-09-25",
+    notes: [
+      "🏆 UEFA 네이션스리그, CONCACAF 네이션스리그를 리그 목록에 추가했어요",
+      "🌍 국가대표팀 정보에 FIFA 랭킹이 표기돼요",
+      "🇰🇷 대한민국 국가대표팀 엠블럼을 최신 버전으로 교체했어요",
+    ],
+  },
+  {
     date: "2026-09-17",
     notes: [
       "🏅 아시안게임을 리그 목록에 추가했어요",
