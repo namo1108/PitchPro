@@ -51,8 +51,10 @@ const CREST_OVERRIDES = {
   // 대한민국 축구 국가대표팀(성인, id 17) - API-Football이 실제 대한축구협회(KFA) 엠블럼이 아니라
   // 그냥 태극기를 준다(2026-09-15 제보 - "한국 팀 엠블럼이 예전 엠블럼이다"). 처음엔 아시안게임 U23
   // 대표팀(id 10177) 이미지를 대신 썼는데, 사용자가 최신 KFA 엠블럼 파일을 직접 제공해서(2026-09-25)
-  // 그걸로 교체한다.
+  // 그걸로 교체한다. U23 대표팀(id 10177)은 API-Football이 옛날 KFA 엠블럼을 주고 있어서(교체 전
+  // 성인팀이 쓰던 것과 같은 이미지), 같은 요청으로 이것도 최신 엠블럼으로 통일한다.
   17: "/img/emblems/korea.png",
+  10177: "/img/emblems/korea.png",
 };
 
 export function safeCrest(teamId, logo) {
