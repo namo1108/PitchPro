@@ -55,7 +55,7 @@ const CREST_OVERRIDES = {
   17: "/img/emblems/korea.png",
 };
 
-function safeCrest(teamId, logo) {
+export function safeCrest(teamId, logo) {
   const override = CREST_OVERRIDES[String(teamId)];
   return override || logo || null;
 }

@@ -2,7 +2,7 @@ import { json } from "../lib/http.js";
 import { getJSON } from "../lib/kv.js";
 import { KV_KEYS, findCompetition } from "../lib/config.js";
 import { matchesKoreanAlias } from "../lib/teamAliases.js";
-import { koreanizeTeam } from "../adapters/apiFootballAdapter.js";
+import { koreanizeTeam, safeCrest } from "../adapters/apiFootballAdapter.js";
 
 const MAX_RESULTS = 20;
 
@@ -42,13 +42,22 @@ export async function handleTeamSearch(request, env, url) {
   }
 
   // 국가대표팀은 순위표가 없어 위 클럽 검색에 안 걸리니, 캐싱해둔 대표팀 명단에서 따로 찾아 뒤에 덧붙인다.
+  // refreshNationalTeams.js가 캐시에 저장해둔 crest는 API-Football 원본 그대로라(예: 대한민국이
+  // 태극기) CREST_OVERRIDES가 안 걸려있다 - 응답 직전에 safeCrest로 한 번 더 보정해야 교체된
+  // 엠블럼이 검색 결과에도 바로 반영된다(2026-09-25 제보 - "한국팀 로고는 왜 안 바뀌어있어").
   for (const team of nationalBlob?.teams || []) {
     if (seen.size >= MAX_RESULTS) break;
     if (seen.has(team.id)) continue;
     const name = (team.name || "").toLowerCase();
     const matches = name.includes(q) || matchesKoreanAlias(q, team.name, team.shortName);
     if (!matches) continue;
-    seen.set(team.id, { id: team.id, name: team.name, shortName: team.shortName || null, crest: team.crest || null, competitionName: "국가대표" });
+    seen.set(team.id, {
+      id: team.id,
+      name: team.name,
+      shortName: team.shortName || null,
+      crest: safeCrest(team.id, team.crest),
+      competitionName: "국가대표",
+    });
   }
 
   return json({ teams: [...seen.values()] });
