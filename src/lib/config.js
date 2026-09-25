@@ -306,6 +306,12 @@ export const GOAT_USERNAMES = ["bongmars"];
 // analysis.js, 2026-09-25 국가대표 친선경기 추가하면서 발견) 둘 다 이 필터가 필요해 공유한다.
 export const YOUTH_OR_WOMEN_TEAM_NAME_PATTERN = /U1[5-9]|U2[0-3]| W$/;
 
+// 국가대표 대회 코드 - 경기 수가 클럽 대회 대비 훨씬 적어서(국제 A매치 주간에만, 그것도 하루 몇 경기),
+// notifyLineups.js가 구독자 유무와 무관하게 항상 라인업을 확인해도 API 부담이 작다(2026-09-26 사용자
+// 요청 - "국가대표경기도 라인업 나오도록 해줘", 클럽 경기처럼 구독자 기준으로 걸렀더니 아무도 그 나라를
+// 즐겨찾기 안 해서 라인업 발표 여부가 영영 확인이 안 되고 있었음).
+export const NATIONAL_TEAM_COMPETITION_CODES = new Set(["INTFRIENDLY", "UNL", "CNL", "EC", "WC", "ACUP", "AG"]);
+
 function monthDayNumber(date) {
   return (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
 }

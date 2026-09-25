@@ -1,5 +1,5 @@
 import { getJSON, putJSON } from "../lib/kv.js";
-import { KV_KEYS } from "../lib/config.js";
+import { KV_KEYS, NATIONAL_TEAM_COMPETITION_CODES } from "../lib/config.js";
 import * as apiFootball from "../sources/apiFootball.js";
 import { loadSubscriptions, filterInterested, sendToSubscriber } from "../lib/subscriptions.js";
 
@@ -30,12 +30,15 @@ export async function notifyLineups(env) {
   // 상태/시간대만 보고 후보를 걸러내면 아무도 구독 안 한 해외 하부리그 경기까지 매 틱 라인업을
   // 조회하게 된다(detectCardsAndNotify.js의 watchedLive와 같은 이유로 API-Football 레이트리밋을
   // 갉아먹는 주범 중 하나였음, 2026-08-22). 구독자가 실제로 관심 있는 경기만 조회한다.
+  // 국가대표 대회(NATIONAL_TEAM_COMPETITION_CODES)는 예외 - 경기 수 자체가 국제 A매치 주간에만
+  // 소수라 부담이 작고, 아무도 그 나라를 즐겨찾기 안 해도 "라인업 발표됨" 표시는 항상 나와야 한다
+  // (2026-09-26 사용자 요청).
   const candidates = all.filter((m) => {
     if (m.lineupsAnnounced) return false; // 이미 확인 끝난 경기는 다시 안 봄
     if (!["SCHEDULED", "TIMED", "IN_PLAY"].includes(m.status)) return false;
     const untilKickoff = new Date(m.utcDate).getTime() - now;
     if (untilKickoff <= -POST_KICKOFF_GRACE_MS || untilKickoff > WINDOW_MAX_MS) return false;
-    return filterInterested(subscriptions, m).length > 0;
+    return NATIONAL_TEAM_COMPETITION_CODES.has(m.competition.code) || filterInterested(subscriptions, m).length > 0;
   });
 
   if (!candidates.length) return;
