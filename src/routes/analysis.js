@@ -1,15 +1,16 @@
 import { json } from "../lib/http.js";
 import { getJSON, putJSON } from "../lib/kv.js";
-import { KV_KEYS, COMPETITIONS, findCompetition } from "../lib/config.js";
+import { KV_KEYS, COMPETITIONS, findCompetition, YOUTH_OR_WOMEN_TEAM_NAME_PATTERN } from "../lib/config.js";
 import * as apiFootball from "../sources/apiFootball.js";
 import { normalizeFixture, normalizeInjuries } from "../adapters/apiFootballAdapter.js";
 import { buildMatchAnalysis } from "../lib/analysis.js";
 import { getAdidasPointsByCode, findTeamAdidasPoint } from "../lib/kleagueAdidasPoints.js";
 import { fetchTeamRank, KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID } from "../scheduled/refreshKLeagueResults.js";
 
-// v13: featured 대회 목록이 바뀌면(2026-09-25, 국가대표 친선경기/네이션스리그 추가) 예전 필터로
-// 만들어둔 캐시가 TTL(3시간) 동안 그대로 남아있으니, 버전을 올려서 즉시 새로 만들어지게 한다.
-const ANALYSIS_CACHE_KEY = "analysis:v13";
+// v14: featured 대회 목록/필터가 바뀌면(2026-09-25, 국가대표 친선경기/네이션스리그 추가 + 유소년/
+// 여자대표팀 친선경기 제외) 예전 필터로 만들어둔 캐시가 TTL(3시간) 동안 그대로 남아있으니, 버전을
+// 올려서 즉시 새로 만들어지게 한다.
+const ANALYSIS_CACHE_KEY = "analysis:v14";
 // 사전 갱신 크론 주기(scheduled/index.js)의 2배로 넉넉하게 잡아서, 쿼터가 빡빡해 사전 갱신 틱이
 // 한 번 건너뛰어져도(isQuotaTight) 다음 틱 전에 캐시가 만료되지 않게 한다(사용자 제보: "AI 분석
 // 열 때 딜레이가 있다" - 콜드캐시로 직접 계산을 떠맡는 순간이 그 지연이다).
@@ -168,8 +169,16 @@ export async function buildAnalysis(env) {
     .filter((m) => ["SCHEDULED", "TIMED"].includes(m.status))
     .filter((m) => new Date(m.utcDate) <= horizon);
 
+  // INTFRIENDLY(API-Football league=10 "Friendlies")는 성인 남자 대표팀뿐 아니라 유소년/여자대표팀
+  // 경기까지 다 섞여 온다 - 그대로 두면 카드 슬롯(20개)이 "Poland U17 vs Czechia U17" 같은 경기로
+  // 채워지고 정작 성인 국가대표 친선경기가 밀려난다(국가대표 친선경기를 AI 분석에 추가하면서 발견,
+  // 2026-09-25). UNL/CNL은 애초에 API-Football 리그 ID 자체가 성인 남자부만 가리켜서 이 필터가 필요 없다.
+  const isYouthOrWomenFriendly = (m) =>
+    m.competition.code === "INTFRIENDLY" &&
+    (YOUTH_OR_WOMEN_TEAM_NAME_PATTERN.test(m.homeTeam.name || "") || YOUTH_OR_WOMEN_TEAM_NAME_PATTERN.test(m.awayTeam.name || ""));
+
   const upcoming = withinHorizon
-    .filter((m) => FEATURED_CODES.has(m.competition.code))
+    .filter((m) => FEATURED_CODES.has(m.competition.code) && !isYouthOrWomenFriendly(m))
     .sort((a, b) => {
       const rankDiff = analysisTierRank(a.competition.code) - analysisTierRank(b.competition.code);
       return rankDiff !== 0 ? rankDiff : new Date(a.utcDate) - new Date(b.utcDate);

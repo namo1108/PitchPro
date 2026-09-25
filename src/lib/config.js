@@ -301,6 +301,11 @@ export const LEADERBOARD_SIZE = 100;
 // 여기 적은 아이디(소문자)는 포인트와 상관없이 레벨 99 "나 개발자(Goat)"로 고정 표시된다(운영자 이스터에그).
 export const GOAT_USERNAMES = ["bongmars"];
 
+// 국가대표 친선경기(INTFRIENDLY, API-Football league=10)는 성인 남자 대표팀뿐 아니라 유소년(U15~U23)/
+// 여자대표팀( ...W") 경기까지 다 섞어서 준다 - 팀 검색(refreshNationalTeams.js)과 AI 분석(routes/
+// analysis.js, 2026-09-25 국가대표 친선경기 추가하면서 발견) 둘 다 이 필터가 필요해 공유한다.
+export const YOUTH_OR_WOMEN_TEAM_NAME_PATTERN = /U1[5-9]|U2[0-3]| W$/;
+
 function monthDayNumber(date) {
   return (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
 }
