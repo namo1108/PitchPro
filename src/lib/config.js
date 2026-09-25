@@ -61,9 +61,9 @@ export const COMPETITIONS = [
   // 리그별로 League A/B/C 조 편성 후 조별리그(순위표) -> 파이널포(대진표) 순서로 진행되는 대회라
   // hasBracket로 등록해두면 leagues.js의 loadBracketOrStandings가 알아서 조별리그 기간엔 순위표를,
   // 파이널포에 들어가면 대진표를 보여준다(챔피언스리그 리그페이즈와 동일한 패턴, 2026-09-25).
-  { code: "UNL", name: "UEFA 네이션스리그", emblem: "https://media.api-sports.io/football/leagues/5.png", apiFootballLeagueId: 5, apiFootballSeason: 2026, hasBracket: true },
+  { code: "UNL", name: "UEFA 네이션스리그", emblem: "https://media.api-sports.io/football/leagues/5.png", apiFootballLeagueId: 5, apiFootballSeason: 2026, hasBracket: true, featured: true },
   // CONCACAF는 API-Football이 대회 시즌을 "2025"로 표기(확인 2026-09-25, 유럽과 시즌 표기 연도가 다름).
-  { code: "CNL", name: "CONCACAF 네이션스리그", emblem: "https://media.api-sports.io/football/leagues/536.png", apiFootballLeagueId: 536, apiFootballSeason: 2025, hasBracket: true },
+  { code: "CNL", name: "CONCACAF 네이션스리그", emblem: "https://media.api-sports.io/football/leagues/536.png", apiFootballLeagueId: 536, apiFootballSeason: 2025, hasBracket: true, featured: true },
   { code: "KL1", name: "K리그1", emblem: "https://media.api-sports.io/football/leagues/292.png", apiFootballLeagueId: 292, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }], featured: true },
   // promotionSpots: K리그2는 1~2위 자동 승격 + 3~6위 승격 플레이오프라 1~6위 전체가 "승격권"이다
   // (사용자 확인, 2026-07). 지정 안 한 다른 리그는 순위표 렌더링 쪽의 기존 근사 규칙(상위 4/하위 3)을 쓴다.
@@ -91,7 +91,9 @@ export const COMPETITIONS = [
   // 국가대표 친선경기(A매치): 클럽 친선경기(667)와 별개로 API-Football은 국가대표 친선경기를 리그
   // id 10 "Friendlies"로 묶어서 제공한다(유소년/여자 대표팀 경기도 섞여 있지만 팀 검색과 마찬가지로
   // 여기선 성인 남자 대표팀 경기 위주로 노출). 친선경기라 순위표/득점왕 개념이 없어 리그 탭엔 안 보여준다.
-  { code: "INTFRIENDLY", name: "국가대표 친선경기", emblem: "https://media.api-sports.io/football/leagues/10.png", apiFootballLeagueId: 10, apiFootballSeason: 2026, hideFromLeagueTab: true },
+  // AI 분석 대상에 추가(2026-09-25 사용자 요청) - featured: true를 줘야 리그 탭엔 안 보이면서도
+  // (hideFromLeagueTab 유지) AI 분석 카드 후보에는 들어간다(routes/analysis.js의 FEATURED_CODES).
+  { code: "INTFRIENDLY", name: "국가대표 친선경기", emblem: "https://media.api-sports.io/football/leagues/10.png", apiFootballLeagueId: 10, apiFootballSeason: 2026, hideFromLeagueTab: true, featured: true },
   // 월드컵 아시아 지역예선: 친선경기(INTFRIENDLY)만 등록해뒀더니 예선전은 캐시에 없어서 "다음 경기"엔
   // 뜨는데(팀 상세는 API-Football 실시간 조회라 대회 등록 여부와 무관) 정작 집관인증은 "경기를 찾을 수
   // 없습니다"로 실패하는 문제가 있었다(2026-08-11 제보) - 친선경기와 마찬가지로 등록해서 캐시에 포함시킨다.

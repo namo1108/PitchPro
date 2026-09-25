@@ -7,9 +7,9 @@ import { buildMatchAnalysis } from "../lib/analysis.js";
 import { getAdidasPointsByCode, findTeamAdidasPoint } from "../lib/kleagueAdidasPoints.js";
 import { fetchTeamRank, KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID } from "../scheduled/refreshKLeagueResults.js";
 
-// v12: featured 대회 목록이 바뀌면(2026-08-29, K3/K4 제외 + 5대리그/FA컵 등 추가) 예전 필터로
+// v13: featured 대회 목록이 바뀌면(2026-09-25, 국가대표 친선경기/네이션스리그 추가) 예전 필터로
 // 만들어둔 캐시가 TTL(3시간) 동안 그대로 남아있으니, 버전을 올려서 즉시 새로 만들어지게 한다.
-const ANALYSIS_CACHE_KEY = "analysis:v12";
+const ANALYSIS_CACHE_KEY = "analysis:v13";
 // 사전 갱신 크론 주기(scheduled/index.js)의 2배로 넉넉하게 잡아서, 쿼터가 빡빡해 사전 갱신 틱이
 // 한 번 건너뛰어져도(isQuotaTight) 다음 틱 전에 캐시가 만료되지 않게 한다(사용자 제보: "AI 분석
 // 열 때 딜레이가 있다" - 콜드캐시로 직접 계산을 떠맡는 순간이 그 지연이다).
@@ -33,10 +33,13 @@ const CONCURRENCY = 6;
 // 노출 슬롯이 몇 개뿐이라, 시간순으로만 뽑으면 그날 하필 빨리 킥오프하는 대회가 슬롯을 차지하고
 // 정작 K리그가 밀려날 수 있어 "중요도 티어" 순으로 먼저 정렬한 뒤 같은 티어 안에서만 시간순으로 줄을 세운다.
 // 0티어: K리그. 1티어: 챔피언스리그/AFC챔스 엘리트/5대리그. 2티어: 유로파(컨퍼런스)리그/코리아컵/FA컵/카라바오컵.
+// 3티어: 국가대표 친선경기/네이션스리그(2026-09-25 사용자 요청으로 AI 분석 대상에 추가) - 슬롯이
+// 부족할 때 클럽 대회보다 뒤로 밀리게 가장 낮은 티어로 둔다.
 const AI_ANALYSIS_TIERS = [
   ["KL1", "KL2"],
   ["CL", "ACL", "PL", "PD", "BL1", "SA", "FL1"],
   ["EL", "ECL", "ACL2", "KFA", "FA", "EFL"],
+  ["INTFRIENDLY", "UNL", "CNL"],
 ];
 const FEATURED_CODES = new Set(COMPETITIONS.filter((c) => c.featured).map((c) => c.code));
 
