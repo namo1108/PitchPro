@@ -62,6 +62,16 @@ const FIFA_RANKING_BY_NAME = {
   "czech republic": 48,
   chile: 49,
   peru: 50,
+  // 51위 밖은 기사 하나로 한 번에 안 나와서 개별 검색으로 확인된 것만 추가한다(2026-09-26 - 중국/
+  // 뉴질랜드 랭킹이 안 나온다는 제보로 발견). 다른 나라도 안 나온다는 제보가 오면 그때그때 추가.
+  uzbekistan: 54,
+  qatar: 57,
+  "saudi arabia": 59,
+  iraq: 60,
+  "new zealand": 86,
+  china: 91,
+  "china pr": 91,
+  bahrain: 92,
 };
 
 export function findFifaRanking(teamName) {
