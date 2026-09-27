@@ -258,15 +258,28 @@ export function buildTacticalNote(lineups, homeTeamId, homeTeamName, awayTeamNam
   return parts.join(" ");
 }
 
+// 2026-09-27 사용자 요청("우리도 통계에 이런 분석 내용들을 좀 더 넣으면 좋겠어", 다른 앱의 상세
+// 통계 화면 스크린샷 참고) - API-Football이 실제로 주는데 그동안 안 쓰고 버리던 필드들을 추가로
+// 매핑했다. 태클/가로채기/크로스/터치/공격구역%/큰기회 같은 항목은 API-Football 자체에 없는
+// 데이터라(직접 확인함, /fixtures/statistics 원본 응답에 없음) 추가 못 한다 - 별도 유료 데이터
+// 제공사가 필요한 영역이라 지금 소스로는 재현 불가.
 const STAT_KEY_MAP = {
   "Shots on Goal": "shotsOnGoal",
+  "Shots off Goal": "shotsOffGoal",
   "Total Shots": "shotsTotal",
+  "Blocked Shots": "blockedShots",
+  "Shots insidebox": "shotsInsideBox",
+  "Shots outsidebox": "shotsOutsideBox",
   "Ball Possession": "possession",
   "Corner Kicks": "corners",
   Fouls: "fouls",
+  Offsides: "offsides",
+  "Free Kicks": "freeKicks",
   "Yellow Cards": "yellowCards",
   "Red Cards": "redCards",
   "Goalkeeper Saves": "saves",
+  "Total passes": "totalPasses",
+  "Passes accurate": "passesAccurate",
   "Passes %": "passAccuracy",
   expected_goals: "xg",
 };
