@@ -24,6 +24,7 @@ import { resolveCheckinOutcomes } from "./resolveCheckinOutcomes.js";
 import { scrapeKLeagueAdidasPoints } from "./scrapeKLeagueAdidasPoints.js";
 import { shouldRun, getJSON } from "../lib/kv.js";
 import { KV_KEYS, REFRESH_INTERVALS_MS } from "../lib/config.js";
+import { MATCH_DURATION_BUFFER_MS } from "../lib/matchWindow.js";
 import { alertAdminOfFailure } from "../lib/adminAlert.js";
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -41,8 +42,19 @@ export async function runScheduledTasks(env) {
   // 건너뛴다 - 대회 10~14개를 순차 조회하는 무거운 작업이 라이브 폴링과 동시에 같은 분당 한도를
   // 나눠 먹는 걸 막기 위함. 라이브 폴링 쪽이 이미 그 순간의 실시간 스코어/상태는 갱신해주고 있어서,
   // 건너뛰어도 골/알림 자체가 끊기진 않는다(스코어 아닌 다른 대회 메타데이터 갱신만 한 틱 늦어짐).
-  const livePollActive = await getJSON(env, KV_KEYS.livePollActive);
-  if (livePollActive) {
+  //
+  // 예외: 킥오프 후 150분이 지나도록 여전히 IN_PLAY/PAUSED로 남은("지연" 표시) 경기가 있으면
+  // 건너뛰지 않는다 - 그런 경기는 이미 실제로는 끝났는데 live=all엔 다시 안 잡히니(pollLiveMatches.js
+  // 참고) 이 스윕(날짜 범위 재조회)만이 바로잡을 수 있는 유일한 수단이다. MLS/UNL/CNL처럼 저녁 시간대
+  // 내내 어딘가는 계속 라이브인 대회가 늘면서, 매 틱 무조건 건너뛰면 "조용한 순간"이 올 때까지(길게는
+  // 1시간 이상) 지연 표시가 안 풀리는 문제가 반복 확인됨(2026-09-20 리그1, 2026-09-27 MLS). 이제
+  // 계정 자체 한도는 릴레이 서버 덕분에 여유가 커서(project_pitchpro_ratelimit_tradeoffs 메모 참고)
+  // 동시에 돌아도 안전하다.
+  const [livePollActive, matchesForStaleCheck] = await Promise.all([getJSON(env, KV_KEYS.livePollActive), getJSON(env, KV_KEYS.matches)]);
+  const hasStaleMatch = (matchesForStaleCheck?.matches || []).some(
+    (m) => (m.status === "IN_PLAY" || m.status === "PAUSED") && Date.now() - new Date(m.utcDate).getTime() > MATCH_DURATION_BUFFER_MS
+  );
+  if (livePollActive && !hasStaleMatch) {
     console.log("live poll still active from previous tick - skipping refreshApiFootballMatches this tick");
   } else {
     tasks.push(["matches", () => refreshApiFootballMatches(env)]);
