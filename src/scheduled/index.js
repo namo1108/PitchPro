@@ -6,6 +6,7 @@ import { refreshKfaCupResults } from "./refreshKfaCupResults.js";
 import { refreshNews } from "./refreshNews.js";
 import { detectGoalsAndNotify } from "./detectGoalsAndNotify.js";
 import { refreshNationalTeams } from "./refreshNationalTeams.js";
+import { refreshFifaRanking } from "./refreshFifaRanking.js";
 import { refreshAnalysis } from "./refreshAnalysis.js";
 import { notifyLineups } from "./notifyLineups.js";
 import { notifyMatchEvents } from "./notifyMatchEvents.js";
@@ -103,6 +104,11 @@ export async function runScheduledTasks(env) {
   // 국가대표팀 명단(팀 검색용)은 거의 안 바뀌는 데이터라 하루 한 번이면 충분하다.
   if (await shouldRun(env, `${KV_KEYS.lastRunPrefix}nationalteams`, 24 * 60 * 60 * 1000)) {
     tasks.push(["국가대표팀 명단 갱신", () => refreshNationalTeams(env)]);
+  }
+
+  // FIFA 랭킹은 한 달에 한 번(대개 목요일)만 갱신되는 데이터라 하루 한 번이면 그날 안에는 확실히 잡는다.
+  if (await shouldRun(env, `${KV_KEYS.lastRunPrefix}fifaranking`, 24 * 60 * 60 * 1000)) {
+    tasks.push(["FIFA 랭킹 갱신", () => refreshFifaRanking(env)]);
   }
 
   // AI 분석 캐시가 만료되기 전에 미리 다시 채워서, 실사용자가 이 무거운 계산을 직접 기다리는 일

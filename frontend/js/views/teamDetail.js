@@ -174,7 +174,21 @@ function openDirections(venue) {
 
 function renderTeamInfoStrip(team) {
   const items = [];
-  if (team.fifaRanking) items.push({ label: "FIFA 랭킹", value: `${team.fifaRanking}위` });
+  if (team.fifaRanking) {
+    // change: 지난 발표(전월) 대비 순위 변동 - 양수면 순위가 오른 것(숫자가 작아짐)이라 좋은 쪽(초록),
+    // 음수면 떨어진 것(빨강). fifaRanking.js/refreshFifaRanking.js가 이미 "prevRank - rank"로
+    // 계산해서 이 부호 그대로 쓰면 된다.
+    const change = team.fifaRankingChange;
+    const deltaHtml =
+      change > 0
+        ? `<span class="fifa-rank-delta good">▲${change}</span>`
+        : change < 0
+        ? `<span class="fifa-rank-delta bad">▼${Math.abs(change)}</span>`
+        : change === 0
+        ? `<span class="fifa-rank-delta">-</span>`
+        : "";
+    items.push({ label: "FIFA 랭킹", value: `${team.fifaRanking}위 ${deltaHtml}` });
+  }
   if (team.founded) items.push({ label: "창단", value: `${team.founded}년` });
   if (team.venueCity) items.push({ label: "연고지", value: team.venueCity });
   if (team.venueCapacity) items.push({ label: "수용인원", value: `${team.venueCapacity.toLocaleString()}명` });

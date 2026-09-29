@@ -208,6 +208,8 @@ export const KV_KEYS = {
   notifiedCards: "cards:notified:v1",
   // 리그 검색에서 국가대표팀도 찾을 수 있도록 캐시해두는 국가대표팀 목록(성인 남자만).
   nationalTeams: "teams:national:v1",
+  // FIFA 랭킹(211개국 전체 + 전월 대비 변동) - scheduled/refreshFifaRanking.js가 채운다.
+  fifaRanking: "fifa:ranking:v1",
   // 팬 커뮤니티 게시판. index는 최신순 요약 목록(글 본문/댓글은 안 담음 - 목록 조회가 무거워지지 않게),
   // 글 본문+댓글 전체는 postPrefix로 글 하나씩 따로 저장한다.
   communityPostIndex: "community:posts:index",

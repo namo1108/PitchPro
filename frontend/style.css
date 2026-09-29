@@ -5386,6 +5386,20 @@ table.standings-table {
   color: var(--danger, #e5484d);
 }
 
+.fifa-rank-delta {
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.fifa-rank-delta.good {
+  color: var(--accent);
+}
+
+.fifa-rank-delta.bad {
+  color: var(--danger, #e5484d);
+}
+
 .points-history-date {
   font-size: 11px;
   color: var(--text-muted);
