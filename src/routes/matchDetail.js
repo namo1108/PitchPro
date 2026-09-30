@@ -1,6 +1,7 @@
 import { json } from "../lib/http.js";
 import { getJSON, putJSON } from "../lib/kv.js";
-import { KV_KEYS, DETAIL_CACHE_TTL_SECONDS, LIVE_DETAIL_CACHE_TTL_SECONDS, findBroadcastLink } from "../lib/config.js";
+import { KV_KEYS, DETAIL_CACHE_TTL_SECONDS, LIVE_DETAIL_CACHE_TTL_SECONDS, findBroadcastLink, NATIONAL_TEAM_COMPETITION_CODES } from "../lib/config.js";
+import { findFifaRanking } from "../lib/fifaRanking.js";
 import { findKLeagueVenue } from "../lib/kleagueVenues.js";
 import * as apiFootball from "../sources/apiFootball.js";
 import {
@@ -392,6 +393,17 @@ export async function buildMatchDetail(env, id) {
   if (broadcast) {
     match.broadcastUrl = broadcast.url;
     match.broadcastProvider = broadcast.provider;
+  }
+
+  // 국가대표 경기(친선경기/네이션스리그/유로/월드컵/아시안컵/아시안게임)는 경기 상세 화면에도
+  // 양 팀 FIFA 랭킹을 붙여준다(2026-09-30 사용자 요청 - 팀 정보 화면에만 나오던 걸 경기 상세에도).
+  if (NATIONAL_TEAM_COMPETITION_CODES.has(match.competition.code)) {
+    const [homeRanking, awayRanking] = await Promise.all([
+      findFifaRanking(env, match.homeTeam.name),
+      findFifaRanking(env, match.awayTeam.name),
+    ]);
+    if (homeRanking) match.homeTeam.fifaRanking = homeRanking.rank;
+    if (awayRanking) match.awayTeam.fifaRanking = awayRanking.rank;
   }
 
   const cacheKey = `${KV_KEYS.detailPrefix}${id}`;

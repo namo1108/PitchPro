@@ -1739,11 +1739,13 @@ function renderMatchDetail(m) {
         <div class="scoreboard-team" data-team-id="${m.homeTeam.id}">
           ${crestImg(m.homeTeam, "scoreboard-crest")}
           <div class="scoreboard-team-name">${m.homeTeam.name}</div>
+          ${m.homeTeam.fifaRanking ? `<div class="scoreboard-fifa-rank">FIFA ${m.homeTeam.fifaRanking}위</div>` : ""}
         </div>
         <div class="scoreboard-score">${hasScore ? `${home} : ${away}` : "vs"}</div>
         <div class="scoreboard-team" data-team-id="${m.awayTeam.id}">
           ${crestImg(m.awayTeam, "scoreboard-crest")}
           <div class="scoreboard-team-name">${m.awayTeam.name}</div>
+          ${m.awayTeam.fifaRanking ? `<div class="scoreboard-fifa-rank">FIFA ${m.awayTeam.fifaRanking}위</div>` : ""}
         </div>
       </div>
       <div class="scoreboard-status ${statusClass}">${statusText}</div>
