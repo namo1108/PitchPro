@@ -10,48 +10,55 @@
 // 고쳤는데, 바로 다음 반려: "미니앱 접속 직후 바텀시트가 바로 노출돼요." - 안내창 자체가 앱 켜자마자
 // (광고 로드가 끝나는 대로) 자동으로 뜨는 게 문제였다. 그래서 안내창은 광고가 준비돼 있어도 사용자가
 // 화면을 한 번이라도 탭하기 전까진 절대 띄우지 않는다 - "접속 직후"라는 시점 자체를 없앤다.
+//
+// 2026-09-30 3차 반려(같은 사유 "유저가 예상하기 어려운 시점에 광고가 노출돼요") - 이전 수정의
+// 진짜 문제를 다시 짚어보니, "화면 아무 데나 탭"을 광고 트리거로 쓴 것 자체가 원인이었다. 유저가
+// 경기 카드나 탭 버튼을 눌렀을 뿐인데(다른 화면으로 이동하려던 것) 뜬금없이 광고 안내가 끼어드니,
+// 안내 문구가 있어도 "예상 못 한 시점"인 건 마찬가지였던 것. 이번엔 트리거 자체를 바꾼다 - 화면
+// 아무 곳이나 누르면 반응하는 대신, 명확한 문구가 적힌 전용 배너 버튼(#toss-ad-banner, 하단
+// 플로팅 탭바 바로 위)을 만들어서 그 버튼을 직접 눌러야만(다른 어떤 조작도 광고를 트리거하지 않음)
+// 광고가 뜨도록 한다 - 버튼 문구 자체가 이미 "이걸 누르면 광고가 나온다"는 안내라 별도 확인창도 필요 없다.
 import { loadFullScreenAd, showFullScreenAd } from "@apps-in-toss/web-framework";
 
 // 콘솔에서 발급받은 실제(운영) 전면광고 그룹 ID(사용자 제공, 2026-09-09 배너 -> 전면 교체).
 const AD_GROUP_ID = "ait.v2.live.082ac21e3f3d4e7b";
 
-function showAdNotice(onConfirm) {
-  const overlay = document.createElement("div");
-  overlay.style.cssText =
-    "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);";
-  overlay.innerHTML = `
-    <div style="background:#181c24;color:#fff;padding:28px 24px;border-radius:20px;text-align:center;max-width:260px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-      <div style="font-size:34px;margin-bottom:10px;">📢</div>
-      <div style="font-size:16px;font-weight:700;margin-bottom:6px;">잠시 후 광고가 표시돼요</div>
-      <div style="font-size:13px;color:#9aa0ac;margin-bottom:18px;">확인을 누르면 광고가 시작돼요</div>
-      <button id="pitchpro-ad-confirm" style="width:100%;padding:12px 0;border:none;border-radius:12px;background:#3182f6;color:#fff;font-size:15px;font-weight:700;">확인</button>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  overlay.querySelector("#pitchpro-ad-confirm").addEventListener("click", () => {
-    overlay.remove();
-    onConfirm();
-  });
+function renderBanner(state, onClick) {
+  const el = document.getElementById("toss-ad-banner");
+  if (!el) return;
+  const LABEL = {
+    loading: "📢 광고 준비 중...",
+    ready: "📢 광고 보고 PITCH PRO 응원하기",
+    showing: "📢 광고를 불러오는 중...",
+  };
+  el.textContent = LABEL[state] || "";
+  el.style.display = "block";
+  el.style.cursor = state === "ready" ? "pointer" : "default";
+  el.style.opacity = state === "ready" ? "1" : "0.6";
+  el.onclick = state === "ready" ? onClick : null;
 }
 
 function initInterstitialAd() {
   if (!loadFullScreenAd?.isSupported?.() || !showFullScreenAd?.isSupported?.()) return;
 
-  let adReady = false;
-  let userInteracted = false;
-  let noticeShown = false;
+  renderBanner("loading");
 
-  const maybeShow = () => {
-    if (noticeShown || !adReady || !userInteracted) return;
-    noticeShown = true;
-    showAdNotice(() => {
-      showFullScreenAd({
-        options: { adGroupId: AD_GROUP_ID },
-        onEvent: (showEvent) => {
-          if (showEvent.type === "failedToShow") console.error("토스 전면광고 노출 실패");
-        },
-        onError: (err) => console.error("토스 전면광고 노출 요청 실패:", err?.message),
-      });
+  const showAd = () => {
+    renderBanner("showing");
+    showFullScreenAd({
+      options: { adGroupId: AD_GROUP_ID },
+      onEvent: (showEvent) => {
+        if (showEvent.type === "failedToShow") console.error("토스 전면광고 노출 실패");
+        // 성공/실패와 무관하게 이번 세션에 불러온 광고 1개는 소모됐으니 배너를 치운다(다시 눌러도
+        // 보여줄 게 없음 - 재로딩은 다음 세션에서).
+        const el = document.getElementById("toss-ad-banner");
+        if (el) el.style.display = "none";
+      },
+      onError: (err) => {
+        console.error("토스 전면광고 노출 요청 실패:", err?.message);
+        const el = document.getElementById("toss-ad-banner");
+        if (el) el.style.display = "none";
+      },
     });
   };
 
@@ -59,26 +66,16 @@ function initInterstitialAd() {
     options: { adGroupId: AD_GROUP_ID },
     onEvent: (event) => {
       if (event.type !== "loaded") return;
-      adReady = true;
-      maybeShow();
+      renderBanner("ready", showAd);
     },
     onError: (err) => {
-      // 채울 광고가 없거나(no-fill) SDK 미지원인 경우도 여기로 온다 - 조용히 넘어간다(안내 자체를
-      // 안 띄웠으니 화면에 빈 흔적이 남을 걱정도 없음).
+      // 채울 광고가 없거나(no-fill) SDK 미지원인 경우도 여기로 온다 - 배너 자체를 숨겨서
+      // "눌러도 아무 일도 안 일어나는 죽은 버튼"이 안 남게 한다.
       console.warn("토스 전면광고 불러오기 실패(no-fill 포함 가능):", err?.message);
+      const el = document.getElementById("toss-ad-banner");
+      if (el) el.style.display = "none";
     },
   });
-
-  // "미니앱 접속 직후"를 없애기 위해, 사용자가 화면을 한 번이라도 탭하기 전까진 안내창 자체를
-  // 절대 띄우지 않는다 - 광고 로딩은(화면에 아무것도 안 그리니) 미리 해둬도 상관없다.
-  document.addEventListener(
-    "click",
-    () => {
-      userInteracted = true;
-      maybeShow();
-    },
-    { once: true }
-  );
 }
 
 initInterstitialAd();

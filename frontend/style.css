@@ -629,17 +629,37 @@ html[data-toss-app] #update-notes-modal {
   display: none !important;
 }
 
-/* 토스 광고 - 2026-09-09 하단 플로팅 배너에서 전면(풀스크린) 광고로 교체(사용자 요청, toss-ads.js
-   참고) - 전면광고는 네이티브가 화면 전체에 별도로 띄워주는 거라 이 컨테이너 자체가 더는 필요
-   없다. 엘리먼트는 index.html에 남겨뒀지만(제거할 이유 없음) 항상 숨김 처리한다. */
+/* 토스 광고 - 2026-09-09 하단 플로팅 배너에서 전면(풀스크린) 광고로 교체했다가, 2026-09-30
+   심사 반려("유저가 예상하기 어려운 시점에 광고가 노출돼요")로 다시 이 배너를 전용 CTA 버튼으로
+   부활시켰다(toss-ads.js 참고) - 화면 아무 곳이나 눌러서 광고가 뜨는 대신, 이 버튼을 직접 눌러야만
+   광고가 뜬다. 기본값은 숨김(display:none) - toss-ads.js가 광고를 준비하는 동안에만 JS로 보여준다
+   (일반 웹/PWA/안드로이드 빌드는 이 스크립트 자체가 안 실행되니 항상 숨김 상태 그대로 유지됨). */
 .toss-ad-banner {
   display: none;
 }
 
+html[data-toss-app] .toss-ad-banner {
+  position: fixed;
+  left: 28px;
+  right: 28px;
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  max-width: calc(900px - 56px);
+  margin: 0 auto;
+  z-index: 40;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  padding: 12px 18px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
 html[data-toss-app] .content {
-  /* 배너가 없어졌으니 플로팅 탭바 하나만 가릴 걱정하면 된다(탭바 자체가 바닥에서 22px 띄워져 있어
-     일반 웹의 78px보다 살짝 더 필요). */
-  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  /* 2026-09-30 광고 CTA 배너가 부활하면서(탭바 위 88px 지점) 다시 그만큼 여유가 더 필요하다. */
+  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
 }
 
 .section-title {
