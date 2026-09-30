@@ -207,6 +207,43 @@ export function resultClass(result) {
 // (예: 승승승무패) - 과거->최근 순으로 이미 뒤집어 놓은 배열이라 왼쪽이 오래된 경기, 오른쪽이 최근이다.
 const FORM_RESULT_LABEL = { W: "승", D: "무", L: "패" };
 
+// 연승/연패/무패 스트릭 계산(2026-09-30 사용자 요청) - matches는 formBadgesHtml과 마찬가지로
+// 최신 경기가 배열 맨 앞에 오는 순서를 기대한다. 3경기 미만은 우연일 수 있어 배지로 안 보여준다.
+// 무패(W/D 연속)와 순수 연승을 둘 다 계산해서, 그 무패 구간이 전부 승리면 더 눈에 띄는 "연승"으로,
+// 무승부가 섞여 있으면 "무패"로 표시한다.
+export function computeStreak(matches, perspectiveTeamId, minLength = 3) {
+  const results = (matches || []).map((m) => matchResultForTeam(m, perspectiveTeamId)).filter(Boolean);
+  if (!results.length) return null;
+
+  if (results[0] === "L") {
+    let count = 0;
+    while (results[count] === "L") count++;
+    return count >= minLength ? { type: "loss", count } : null;
+  }
+
+  let unbeatenCount = 0;
+  while (results[unbeatenCount] === "W" || results[unbeatenCount] === "D") unbeatenCount++;
+  let winCount = 0;
+  while (results[winCount] === "W") winCount++;
+
+  if (winCount === unbeatenCount && winCount >= minLength) return { type: "win", count: winCount };
+  if (unbeatenCount >= minLength) return { type: "unbeaten", count: unbeatenCount };
+  return null;
+}
+
+const STREAK_LABEL = {
+  win: (n) => `🔥 ${n}연승`,
+  loss: (n) => `🥶 ${n}연패`,
+  unbeaten: (n) => `🛡️ ${n}경기 무패`,
+};
+const STREAK_CLASS = { win: "win", loss: "loss", unbeaten: "draw" };
+
+export function streakBadgeHtml(matches, perspectiveTeamId, minLength = 3) {
+  const streak = computeStreak(matches, perspectiveTeamId, minLength);
+  if (!streak) return "";
+  return `<span class="streak-badge ${STREAK_CLASS[streak.type]}">${STREAK_LABEL[streak.type](streak.count)}</span>`;
+}
+
 export function formBadgesHtml(matches, perspectiveTeamId, count = 5) {
   const badges = (matches || [])
     .map((m) => matchResultForTeam(m, perspectiveTeamId))

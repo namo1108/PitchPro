@@ -12,6 +12,7 @@ import {
   applySquadRemovals,
   applySquadAdditions,
   koreanizeTeam,
+  normalizeInjuries,
 } from "../adapters/apiFootballAdapter.js";
 import {
   getKLeaguePlayerPhotoMap,
@@ -55,7 +56,7 @@ async function buildTeam(env, teamId) {
   // kleague 사진 캐시 두 개는 API-Football 결과와 무관한 독립적인 KV 조회라, 아래 Promise.all과
   // 같이 시작해서 기다리는 시간을 겹치게 한다(예전엔 API-Football 5개를 다 기다린 "다음에" 순서대로
   // 조회해서, 그 왕복 시간만큼 응답이 더 늦어졌다 - "팀 정보 불러오는 속도가 느리다" 제보, 2026-09-02).
-  const [teamRaw, recentRaw, upcomingRaw, squadRaw, coachRaw, kleaguePhotos, kleagueCoachPhotos] = await Promise.all([
+  const [teamRaw, recentRaw, upcomingRaw, squadRaw, coachRaw, kleaguePhotos, kleagueCoachPhotos, injuriesRaw] = await Promise.all([
     apiFootball.getTeam(env, teamId),
     // 시즌 전체 경기 결과를 보고 싶다는 요청(2026-09-13) - K리그1 정규 38라운드 등 웬만한 리그의
     // 한 시즌 전체 경기 수를 넉넉히 커버하도록 60으로 늘렸다. API-Football의 last= 파라미터는 호출
@@ -86,6 +87,13 @@ async function buildTeam(env, teamId) {
     }),
     getKLeaguePlayerPhotoMap(env),
     getKLeagueCoachPhotoMap(env),
+    // 부상자 명단(2026-09-30 사용자 요청 - AI 분석에만 쓰던 걸 팀 정보 화면에도 노출). 부가 정보라
+    // 실패해도 hadFetchError는 안 세운다 - 이거 하나 때문에 팀 상세 전체가 stale 캐시로 대체될
+    // 필요는 없다(빈 배열로 대체하면 그만).
+    apiFootball.getTeamInjuries(env, teamId, new Date().getUTCFullYear()).catch((err) => {
+      console.error("team injuries fetch failed:", err);
+      return null;
+    }),
   ]);
 
   const teamInfo = teamRaw.response?.[0];
@@ -118,6 +126,7 @@ async function buildTeam(env, teamId) {
     upcomingMatches: (upcomingRaw.response || []).map(normalizeFixture),
     squad,
     coach,
+    injuries: injuriesRaw ? normalizeInjuries(injuriesRaw.response) : [],
     hadFetchError,
   };
 }

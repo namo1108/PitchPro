@@ -12,6 +12,7 @@ import {
   matchResultForTeam,
   resultClass,
   formBadgesHtml,
+  streakBadgeHtml,
   escapeHtml,
   playerHintFromElement,
 } from "../format.js";
@@ -201,8 +202,22 @@ function renderTeamInfoStrip(team) {
   `;
 }
 
+// AI 분석 카드에서만 쓰던 부상 정보를 팀 정보 화면에도 그대로 노출한다(2026-09-30 사용자 요청).
+// 최근 30일 이내(src/adapters/apiFootballAdapter.js normalizeInjuries) 기록만 최대 3명.
+function renderInjuries(injuries) {
+  if (!injuries?.length) return "";
+  return `
+    <div class="team-injuries-card">
+      <div class="team-injuries-title">🩹 부상자 명단</div>
+      <div class="team-injuries-list">
+        ${injuries.map((p) => `<div class="team-injuries-row"><span class="team-injuries-name">${p.name}</span>${p.reason ? `<span class="team-injuries-reason">${p.reason}</span>` : ""}</div>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function renderTeamDetail(teamId, data) {
-  const { team, recentMatches, upcomingMatches, squad, coach } = data;
+  const { team, recentMatches, upcomingMatches, squad, coach, injuries } = data;
   const favorite = isFavorite(teamId);
 
   el.content.innerHTML = `
@@ -219,8 +234,11 @@ function renderTeamDetail(teamId, data) {
         ${favorite ? "★ 즐겨찾기됨" : "☆ 즐겨찾기"}
       </button>
       ${renderTeamInfoStrip(team)}
+      ${streakBadgeHtml(recentMatches, teamId)}
       ${renderVenueActions(data.venue)}
     </div>
+
+    ${renderInjuries(injuries)}
 
     <div class="team-tabs">
       <button class="team-tab-btn active" data-tab="schedule">일정</button>

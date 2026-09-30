@@ -271,7 +271,12 @@ function openLeague(code) {
   // 빠져있어 순위표 개념이 없다 - 경기 탭 헤더 클릭이 goToLeagueStandings로 아무 코드나 넘길 수
   // 있으니, 못 찾으면 그냥 조용히 무시한다(TypeError로 화면을 깨뜨리지 않음).
   if (!comp) return;
-  el.detailHeader.innerHTML = `${emblemImg(comp, "league-detail-emblem")}<span>${comp.name}</span>`;
+  // 득점왕/도움왕이 순위표 밑에 있어서(전체 20팀 표라면 한참 스크롤해야 보임) 눈에 잘 안 띈다는
+  // 이유로, 헤더에 바로 그 위치로 스크롤해주는 바로가기를 추가한다(2026-09-30 사용자 요청).
+  el.detailHeader.innerHTML = `${emblemImg(comp, "league-detail-emblem")}<span>${comp.name}</span><button class="top-players-jump-btn" id="top-players-jump-btn">🏆 득점왕</button>`;
+  document.getElementById("top-players-jump-btn")?.addEventListener("click", () => {
+    el.topPlayersWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   el.list.style.display = "none";
   el.searchInput.style.display = "none";
   el.detailWrap.style.display = "block";

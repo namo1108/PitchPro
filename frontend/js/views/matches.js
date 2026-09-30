@@ -1407,13 +1407,13 @@ function pitchPlayerDot(p, x, y, ringColor, teamId, goalEvents) {
     <div class="pitch-player-abs" style="left:${x}%; top:${y}%;">
       <div class="pitch-photo-wrap">
         ${subOffHtml}
-        <div class="pitch-photo-ring" style="border-color:${ringColor};" data-player-id="${p.id}">
+        <div class="pitch-photo-ring ${p.motm ? "motm" : ""}" style="border-color:${p.motm ? "" : ringColor};" data-player-id="${p.id}">
           ${playerAvatarImg(p, teamId, "pitch-photo")}
         </div>
         ${ratingHtml}
         ${eventBadgeHtml}
       </div>
-      <div class="pitch-player-name">${lastName}</div>
+      <div class="pitch-player-name">${p.motm ? `<span class="motm-crown" title="이 경기 베스트 평점">👑</span>` : ""}${lastName}</div>
     </div>
   `;
 }
@@ -1515,7 +1515,7 @@ function renderSimpleLineupList(lineup, team, goalEvents) {
           <div class="lineup-simple-row" data-player-id="${p.id}">
             <span class="lineup-simple-num">${p.number ?? ""}</span>
             ${playerAvatarImg(p, team?.id, "lineup-simple-photo")}
-            <span class="lineup-simple-name">${p.name}</span>
+            <span class="lineup-simple-name">${p.motm ? `<span class="motm-crown" title="이 경기 베스트 평점">👑</span>` : ""}${p.name}</span>
             ${playerEventBadgesHtml(p.name, goalEvents)}
             <span class="lineup-simple-pos">${p.position ?? ""}</span>
           </div>
@@ -1525,7 +1525,9 @@ function renderSimpleLineupList(lineup, team, goalEvents) {
       </div>
       ${
         subs.length
-          ? `<div class="lineup-simple-subs">${subs.map((p) => `<span data-player-id="${p.id}">${p.number ?? ""} ${p.name}${playerEventBadgesHtml(p.name, goalEvents)}</span>`).join("")}</div>`
+          ? `<div class="lineup-simple-subs">${subs
+              .map((p) => `<span data-player-id="${p.id}">${p.motm ? "👑 " : ""}${p.number ?? ""} ${p.name}${playerEventBadgesHtml(p.name, goalEvents)}</span>`)
+              .join("")}</div>`
           : ""
       }
       ${lineup.coach ? `<div class="lineup-simple-coach">감독: ${lineup.coach}</div>` : ""}

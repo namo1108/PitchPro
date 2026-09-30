@@ -395,6 +395,16 @@ export async function buildMatchDetail(env, id) {
     match.broadcastProvider = broadcast.provider;
   }
 
+  // 베스트 평점(MOTM) 배지 - 양 팀 라인업(선발+교체 전원) 중 평점이 가장 높은 선수 한 명에게 표시한다
+  // (2026-09-30 사용자 요청). 평점 자체가 이미 있는 데이터라 별도 조회 없이 바로 계산 가능. 평점이
+  // 하나도 없으면(즉 아직 아무도 안 뛰었거나 이 소스가 평점을 안 주는 대회) 조용히 생략한다.
+  const allLineupPlayers = match.lineups.flatMap((l) => [...l.startXI, ...l.substitutes]);
+  const rated = allLineupPlayers.filter((p) => typeof p.rating === "number");
+  if (rated.length) {
+    const best = rated.reduce((a, b) => (b.rating > a.rating ? b : a));
+    best.motm = true;
+  }
+
   // 국가대표 경기(친선경기/네이션스리그/유로/월드컵/아시안컵/아시안게임)는 경기 상세 화면에도
   // 양 팀 FIFA 랭킹을 붙여준다(2026-09-30 사용자 요청 - 팀 정보 화면에만 나오던 걸 경기 상세에도).
   if (NATIONAL_TEAM_COMPETITION_CODES.has(match.competition.code)) {

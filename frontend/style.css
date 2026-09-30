@@ -1690,6 +1690,19 @@ html[data-toss-app] .content {
   font-weight: 800;
 }
 
+.top-players-jump-btn {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .top-players-wrap {
   margin-top: 22px;
 }
@@ -2610,6 +2623,16 @@ table.standings-table {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
+.pitch-photo-ring.motm {
+  border-color: #ffc93c;
+  box-shadow: 0 0 8px rgba(255, 201, 60, 0.85), 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.motm-crown {
+  font-size: 11px;
+  margin-right: 2px;
+}
+
 .pitch-photo {
   width: 100%;
   height: 100%;
@@ -3389,6 +3412,31 @@ table.standings-table {
 
 .form-badge.l {
   color: var(--live-red);
+}
+
+.streak-badge {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--card-bg-2, rgba(255, 255, 255, 0.06));
+}
+
+.streak-badge.win {
+  color: var(--accent);
+  border: 1px solid rgba(36, 229, 131, 0.4);
+}
+
+.streak-badge.loss {
+  color: var(--live-red);
+  border: 1px solid rgba(229, 72, 77, 0.4);
+}
+
+.streak-badge.draw {
+  color: var(--text-muted);
+  border: 1px solid var(--border);
 }
 
 .myteam-remove {
@@ -4605,6 +4653,36 @@ table.standings-table {
 
 .squad-meta {
   font-size: 11px;
+  color: var(--text-muted);
+}
+
+.team-injuries-card {
+  background: rgba(229, 72, 77, 0.08);
+  border: 1px solid rgba(229, 72, 77, 0.25);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+
+.team-injuries-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.team-injuries-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.team-injuries-name {
+  font-weight: 600;
+}
+
+.team-injuries-reason {
   color: var(--text-muted);
 }
 
