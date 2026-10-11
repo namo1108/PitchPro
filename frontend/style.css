@@ -2242,6 +2242,15 @@ table.standings-table {
   text-shadow: 0 0 6px rgba(36, 229, 131, 0.85), 0 0 14px rgba(36, 229, 131, 0.5);
 }
 
+.scoreboard-rank-change {
+  margin-left: 2px;
+}
+
+.scoreboard-rank-change.down {
+  color: var(--live-red);
+  text-shadow: none;
+}
+
 .scoreboard-score {
   font-size: 40px;
   font-weight: 800;

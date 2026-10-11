@@ -57,9 +57,26 @@ export async function refreshApiFootballStandings(env) {
 
   for (const comp of batch) {
     try {
+      // 순위 등락(▲▼) 표시(2026-10-11 사용자 요청 - 경기 상세에도 팀 리그 순위를 FIFA 랭킹처럼
+      // 보여달라는 요청) - API-Football 응답의 row.status는 실제로는 거의 항상 "same"만 와서
+      // (직접 확인함, EPL 전체 20팀이 전부 "same") 못 쓴다. 대신 이 대회가 마지막으로 성공 갱신됐을
+      // 때의 순위를 팀별로 기억해뒀다가, 이번에 새로 받은 순위와 직접 비교해서 우리가 계산한다 -
+      // 순위표는 매치데이 단위로만 바뀌므로 "마지막 갱신 대비"가 곧 "지난 매치데이 대비"와 같다.
+      const prevPositionByTeamId = new Map();
+      for (const group of existing.byCode[comp.code]?.standings || []) {
+        for (const row of group.table || []) prevPositionByTeamId.set(row.team.id, row.position);
+      }
+
       const raw = await apiFootball.getStandings(env, comp.apiFootballLeagueId, comp.apiFootballSeason, { retries: 1 });
       // 응답이 비어도(친선경기 등 원래 순위표가 없는 대회) "시도는 했다"로 기록해야 매 tick 재시도하지 않는다.
-      existing.byCode[comp.code] = raw.response?.[0] ? normalizeStandings(raw.response[0]) : { standings: [] };
+      const normalized = raw.response?.[0] ? normalizeStandings(raw.response[0]) : { standings: [] };
+      for (const group of normalized.standings) {
+        for (const row of group.table) {
+          const prevPosition = prevPositionByTeamId.get(row.team.id);
+          row.positionChange = prevPosition != null ? prevPosition - row.position : null;
+        }
+      }
+      existing.byCode[comp.code] = normalized;
     } catch (err) {
       console.error(`standings fetch failed for ${comp.code}:`, err);
     }

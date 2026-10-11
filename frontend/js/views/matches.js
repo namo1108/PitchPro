@@ -1641,6 +1641,23 @@ function safeRender(fn, fallback) {
   }
 }
 
+// 국가대표 경기는 FIFA 랭킹, 클럽 경기는 소속 리그 순위를 스코어보드 팀 이름 아래 같은 자리에
+// 보여준다(2026-10-11 사용자 요청). 둘 다 없으면(순수 토너먼트 등) 아무것도 안 보여준다. 리그
+// 순위는 지난 갱신 대비 등락(positionChange, src/scheduled/refreshApiFootballStandings.js가 계산)이
+// 있으면 ▲▼로 같이 표시한다.
+function scoreboardRankBadgeHtml(team) {
+  if (team.fifaRanking) return `<div class="scoreboard-fifa-rank">FIFA ${team.fifaRanking}위</div>`;
+  if (!team.leaguePosition) return "";
+  const change = team.leaguePositionChange;
+  const changeHtml =
+    change > 0
+      ? `<span class="scoreboard-rank-change up">▲${change}</span>`
+      : change < 0
+      ? `<span class="scoreboard-rank-change down">▼${Math.abs(change)}</span>`
+      : "";
+  return `<div class="scoreboard-fifa-rank">리그 ${team.leaguePosition}위 ${changeHtml}</div>`;
+}
+
 function renderMatchDetail(m) {
   // 목록 캐시로 먼저 그린 뒤(라인업/스탯 없음) 전체 조회가 끝나 다시 그릴 때, 그 사이 사용자가
   // "라인업"/"통계" 등으로 탭을 옮겨놨으면 그대로 유지한다 - 예전엔 매번 무조건 "정보" 탭으로
@@ -1741,13 +1758,13 @@ function renderMatchDetail(m) {
         <div class="scoreboard-team" data-team-id="${m.homeTeam.id}">
           ${crestImg(m.homeTeam, "scoreboard-crest")}
           <div class="scoreboard-team-name">${m.homeTeam.name}</div>
-          ${m.homeTeam.fifaRanking ? `<div class="scoreboard-fifa-rank">FIFA ${m.homeTeam.fifaRanking}위</div>` : ""}
+          ${scoreboardRankBadgeHtml(m.homeTeam)}
         </div>
         <div class="scoreboard-score">${hasScore ? `${home} : ${away}` : "vs"}</div>
         <div class="scoreboard-team" data-team-id="${m.awayTeam.id}">
           ${crestImg(m.awayTeam, "scoreboard-crest")}
           <div class="scoreboard-team-name">${m.awayTeam.name}</div>
-          ${m.awayTeam.fifaRanking ? `<div class="scoreboard-fifa-rank">FIFA ${m.awayTeam.fifaRanking}위</div>` : ""}
+          ${scoreboardRankBadgeHtml(m.awayTeam)}
         </div>
       </div>
       <div class="scoreboard-status ${statusClass}">${statusText}</div>

@@ -414,6 +414,24 @@ export async function buildMatchDetail(env, id) {
     ]);
     if (homeRanking) match.homeTeam.fifaRanking = homeRanking.rank;
     if (awayRanking) match.awayTeam.fifaRanking = awayRanking.rank;
+  } else {
+    // 클럽 경기(국가대표 경기가 아닌 나머지)는 FIFA 랭킹 대신 소속 리그 순위를 같은 자리에 보여준다
+    // (2026-10-11 사용자 요청 - "경기 정보 들어가면 각 리그에 맞게 피파랭킹처럼 리그 순위 표시해줘").
+    // 순수 토너먼트(FA컵 등)는 순위표 자체가 없어 조용히 생략된다. 등락(positionChange)은
+    // refreshApiFootballStandings.js가 매 갱신마다 직접 계산해서 같이 저장해둔 값을 그대로 쓴다.
+    const standingsBlob = await getJSON(env, KV_KEYS.standings);
+    const groups = standingsBlob?.byCode?.[match.competition.code]?.standings || [];
+    const findRow = (teamId) => groups.flatMap((g) => g.table || []).find((row) => row.team.id === teamId);
+    const homeRow = findRow(match.homeTeam.id);
+    const awayRow = findRow(match.awayTeam.id);
+    if (homeRow) {
+      match.homeTeam.leaguePosition = homeRow.position;
+      match.homeTeam.leaguePositionChange = homeRow.positionChange ?? null;
+    }
+    if (awayRow) {
+      match.awayTeam.leaguePosition = awayRow.position;
+      match.awayTeam.leaguePositionChange = awayRow.positionChange ?? null;
+    }
   }
 
   const cacheKey = `${KV_KEYS.detailPrefix}${id}`;
