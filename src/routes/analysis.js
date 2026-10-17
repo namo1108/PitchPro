@@ -7,9 +7,10 @@ import { buildMatchAnalysis } from "../lib/analysis.js";
 import { getAdidasPointsByCode, findTeamAdidasPoint } from "../lib/kleagueAdidasPoints.js";
 import { fetchTeamRank, KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID } from "../scheduled/refreshKLeagueResults.js";
 
-// v15: featured 대회 목록/필터/정렬 기준이 바뀌면(2026-10-17, MLS 추가 + 한국 날짜 기준 정렬) 예전
-// 필터로 만들어둔 캐시가 TTL(3시간) 동안 그대로 남아있으니, 버전을 올려서 즉시 새로 만들어지게 한다.
-const ANALYSIS_CACHE_KEY = "analysis:v15";
+// v16: featured 대회 목록/필터/정렬 기준이 바뀌면(2026-10-17, MLS 추가 + 한국 날짜 기준 정렬 +
+// FA컵 하위리그 구단 제외) 예전 필터로 만들어둔 캐시가 TTL(3시간) 동안 그대로 남아있으니, 버전을
+// 올려서 즉시 새로 만들어지게 한다.
+const ANALYSIS_CACHE_KEY = "analysis:v16";
 // 사전 갱신 크론 주기(scheduled/index.js)의 2배로 넉넉하게 잡아서, 쿼터가 빡빡해 사전 갱신 틱이
 // 한 번 건너뛰어져도(isQuotaTight) 다음 틱 전에 캐시가 만료되지 않게 한다(사용자 제보: "AI 분석
 // 열 때 딜레이가 있다" - 콜드캐시로 직접 계산을 떠맡는 순간이 그 지연이다).
@@ -191,8 +192,17 @@ export async function buildAnalysis(env) {
     m.competition.code === "INTFRIENDLY" &&
     (YOUTH_OR_WOMEN_TEAM_NAME_PATTERN.test(m.homeTeam.name || "") || YOUTH_OR_WOMEN_TEAM_NAME_PATTERN.test(m.awayTeam.name || ""));
 
+  // FA컵(FA)은 하위리그(League One/Two, 내셔널리그 등) 아마추어~세미프로 구단까지 다 참가해서,
+  // 초반 라운드엔 한 매치데이에 수십 경기가 몰린다 - 그대로 두면 카드 슬롯을 FA컵이 독점해서 정작
+  // 다른 리그 경기가 밀려난다(2026-10-17 사용자 제보 - "FA컵 때문에 다른 리그 경기가 안 나와").
+  // 두 팀 중 하나라도 지금 프리미어리그 소속(PL 순위표에 있음)일 때만 "주요 경기"로 쳐준다.
+  const plTeamIds = new Set(
+    (standingsBlob?.byCode?.PL?.standings || []).flatMap((g) => g.table || []).map((row) => row.team.id)
+  );
+  const isMinorFaCupMatch = (m) => m.competition.code === "FA" && !plTeamIds.has(m.homeTeam.id) && !plTeamIds.has(m.awayTeam.id);
+
   const upcoming = withinHorizon
-    .filter((m) => FEATURED_CODES.has(m.competition.code) && !isYouthOrWomenFriendly(m))
+    .filter((m) => FEATURED_CODES.has(m.competition.code) && !isYouthOrWomenFriendly(m) && !isMinorFaCupMatch(m))
     .sort((a, b) => {
       const dateDiff = toKstDateString(a.utcDate).localeCompare(toKstDateString(b.utcDate));
       if (dateDiff !== 0) return dateDiff;
