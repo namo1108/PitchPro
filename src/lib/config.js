@@ -77,7 +77,9 @@ export const COMPETITIONS = [
   { code: "J1", name: "J1리그", emblem: "https://media.api-sports.io/football/leagues/98.png", apiFootballLeagueId: 98, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }] },
   { code: "J2", name: "J2리그", emblem: "https://media.api-sports.io/football/leagues/99.png", apiFootballLeagueId: 99, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }], realtime: false },
   { code: "J3", name: "J3리그", emblem: "https://media.api-sports.io/football/leagues/100.png", apiFootballLeagueId: 100, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }], realtime: false },
-  { code: "MLS", name: "MLS", emblem: "https://media.api-sports.io/football/leagues/253.png", apiFootballLeagueId: 253, apiFootballSeason: 2026, transferWindows: [{ start: "01-20", end: "04-02" }, { start: "07-06", end: "09-09" }] },
+  // featured: true - AI 분석 대상에 추가(2026-10-17 사용자 요청 - 5대리그/챔스/K리그/AFC챔스와
+  // 같은 급의 "주요 리그"로 취급해달라는 요청).
+  { code: "MLS", name: "MLS", emblem: "https://media.api-sports.io/football/leagues/253.png", apiFootballLeagueId: 253, apiFootballSeason: 2026, transferWindows: [{ start: "01-20", end: "04-02" }, { start: "07-06", end: "09-09" }], featured: true },
   { code: "NOR", name: "노르웨이 1부", emblem: "https://media.api-sports.io/football/leagues/103.png", apiFootballLeagueId: 103, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-15" }, { start: "07-01", end: "08-10" }], realtime: false },
   { code: "DEN", name: "덴마크 1부", emblem: "https://media.api-sports.io/football/leagues/119.png", apiFootballLeagueId: 119, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, realtime: false },
   { code: "SCO", name: "스코틀랜드 1부", emblem: "https://media.api-sports.io/football/leagues/179.png", apiFootballLeagueId: 179, apiFootballSeason: 2026, transferWindows: EU_WINDOWS, realtime: false },

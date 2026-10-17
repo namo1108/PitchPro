@@ -7,10 +7,9 @@ import { buildMatchAnalysis } from "../lib/analysis.js";
 import { getAdidasPointsByCode, findTeamAdidasPoint } from "../lib/kleagueAdidasPoints.js";
 import { fetchTeamRank, KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID } from "../scheduled/refreshKLeagueResults.js";
 
-// v14: featured 대회 목록/필터가 바뀌면(2026-09-25, 국가대표 친선경기/네이션스리그 추가 + 유소년/
-// 여자대표팀 친선경기 제외) 예전 필터로 만들어둔 캐시가 TTL(3시간) 동안 그대로 남아있으니, 버전을
-// 올려서 즉시 새로 만들어지게 한다.
-const ANALYSIS_CACHE_KEY = "analysis:v14";
+// v15: featured 대회 목록/필터/정렬 기준이 바뀌면(2026-10-17, MLS 추가 + 한국 날짜 기준 정렬) 예전
+// 필터로 만들어둔 캐시가 TTL(3시간) 동안 그대로 남아있으니, 버전을 올려서 즉시 새로 만들어지게 한다.
+const ANALYSIS_CACHE_KEY = "analysis:v15";
 // 사전 갱신 크론 주기(scheduled/index.js)의 2배로 넉넉하게 잡아서, 쿼터가 빡빡해 사전 갱신 틱이
 // 한 번 건너뛰어져도(isQuotaTight) 다음 틱 전에 캐시가 만료되지 않게 한다(사용자 제보: "AI 분석
 // 열 때 딜레이가 있다" - 콜드캐시로 직접 계산을 떠맡는 순간이 그 지연이다).
@@ -18,10 +17,11 @@ const ANALYSIS_CACHE_KEY = "analysis:v14";
 // 비용도 그만큼 커져서 - 사전 갱신 주기를 1시간 -> 90분으로 늘려 하루 총 호출량을 상쇄했다
 // (기존 60분 주기/120분 TTL과 같은 "TTL = 주기 x 2" 비율 유지).
 const ANALYSIS_CACHE_TTL_SECONDS = 10800; // 180분
-// 2026-08-11 사용자 요청으로 6 -> 20 (카드당 최대 6콜 x 20장 = 120콜/갱신 + 링크 전용 최대 12콜
-// ≈ 132콜/갱신, 90분 주기면 하루 최대 약 2,100콜 - Pro 플랜 일일 한도 7,500의 30% 미만으로 억제).
-// 프론트(aiAnalysis.js)는 카드가 많아진 만큼 기본은 접어두고 눌러서 펼치는 방식으로 바꿨다.
-const MAX_CARDS = 20;
+// 2026-10-17 사용자 요청으로 20 -> 40 (5대리그+챔스+MLS+K리그+AFC챔스1·2를 매치데이에 다 보여달라는
+// 요청 - 20장으론 MLS 하루치만으로도 슬롯이 꽉 찼었음). 카드당 최대 6콜 x 40장 = 240콜/갱신 + 링크
+// 전용 최대 12콜 ≈ 252콜/갱신, 90분 주기면 하루 최대 약 4,000콜 - 지금은 Ultra 플랜(일일 75,000)이라
+// 여유 충분(기존 Pro 플랜 기준 계산은 더 이상 유효하지 않음, project_pitchpro_ratelimit_tradeoffs 참고).
+const MAX_CARDS = 40;
 const MAX_LINK_ONLY = 12;
 const CONCURRENCY = 6;
 
@@ -33,16 +33,24 @@ const CONCURRENCY = 6;
 // featured에서 뺐다(config.js 참고) - 몇 년에 한 번뿐인 국가대표 대회거나 토토 대상이 아님.
 // 노출 슬롯이 몇 개뿐이라, 시간순으로만 뽑으면 그날 하필 빨리 킥오프하는 대회가 슬롯을 차지하고
 // 정작 K리그가 밀려날 수 있어 "중요도 티어" 순으로 먼저 정렬한 뒤 같은 티어 안에서만 시간순으로 줄을 세운다.
-// 0티어: K리그. 1티어: 챔피언스리그/AFC챔스 엘리트/5대리그. 2티어: 유로파(컨퍼런스)리그/코리아컵/FA컵/카라바오컵.
-// 3티어: 국가대표 친선경기/네이션스리그(2026-09-25 사용자 요청으로 AI 분석 대상에 추가) - 슬롯이
-// 부족할 때 클럽 대회보다 뒤로 밀리게 가장 낮은 티어로 둔다.
+// 0티어: K리그. 1티어: 챔피언스리그/AFC챔스 엘리트/5대리그/MLS. 2티어: 유로파(컨퍼런스)리그/
+// AFC챔스투/코리아컵/FA컵/카라바오컵. 3티어: 국가대표 친선경기/네이션스리그(2026-09-25 사용자
+// 요청으로 AI 분석 대상에 추가) - 슬롯이 부족할 때 클럽 대회보다 뒤로 밀리게 가장 낮은 티어로 둔다.
+// MLS는 2026-10-17 사용자 요청으로 1티어에 추가(5대리그/챔스/AFC챔스와 같은 급의 "주요 리그").
 const AI_ANALYSIS_TIERS = [
   ["KL1", "KL2"],
-  ["CL", "ACL", "PL", "PD", "BL1", "SA", "FL1"],
+  ["CL", "ACL", "PL", "PD", "BL1", "SA", "FL1", "MLS"],
   ["EL", "ECL", "ACL2", "KFA", "FA", "EFL"],
   ["INTFRIENDLY", "UNL", "CNL"],
 ];
 const FEATURED_CODES = new Set(COMPETITIONS.filter((c) => c.featured).map((c) => c.code));
+
+// routes/matches.js의 같은 이름 헬퍼와 동일 - 날짜 "경계"를 한국 시간 기준으로 맞추기 위함
+// (UTC 자정 기준으로 자르면 한국 기준 오전 경기가 전날로 새는 문제가 생김).
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+function toKstDateString(utcIso) {
+  return new Date(new Date(utcIso).getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);
+}
 
 function analysisTierRank(code) {
   const idx = AI_ANALYSIS_TIERS.findIndex((tier) => tier.includes(code));
@@ -163,16 +171,22 @@ export async function buildAnalysis(env) {
   ]);
   const all = matchesBlob?.matches || [];
   const now = new Date();
-  const horizon = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+  // 2026-10-17 사용자 요청("한국 날짜로 정리해줘") - 예전엔 "지금부터 48시간"으로 끊어서, 보는
+  // 시점에 따라 하루 반~이틀 반씩 들쭉날쭉하게 걸치고 정렬도 시각 순이라 같은 날 경기끼리도 뒤섞여
+  // 보였다. 한국 달력 기준 "오늘 + 내일" 2일치로 명확히 하고, 정렬도 날짜 -> 중요도 -> 시각 순으로
+  // 바꿔서 날짜별로 묶여 보이게 한다(프론트 aiAnalysis.js가 이 순서 그대로 날짜 헤더를 붙인다).
+  const todayKst = toKstDateString(now.toISOString());
+  const tomorrowKst = toKstDateString(new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString());
+  const horizonDates = new Set([todayKst, tomorrowKst]);
 
   const withinHorizon = all
     .filter((m) => ["SCHEDULED", "TIMED"].includes(m.status))
-    .filter((m) => new Date(m.utcDate) <= horizon);
+    .filter((m) => horizonDates.has(toKstDateString(m.utcDate)));
 
   // INTFRIENDLY(API-Football league=10 "Friendlies")는 성인 남자 대표팀뿐 아니라 유소년/여자대표팀
-  // 경기까지 다 섞여 온다 - 그대로 두면 카드 슬롯(20개)이 "Poland U17 vs Czechia U17" 같은 경기로
-  // 채워지고 정작 성인 국가대표 친선경기가 밀려난다(국가대표 친선경기를 AI 분석에 추가하면서 발견,
-  // 2026-09-25). UNL/CNL은 애초에 API-Football 리그 ID 자체가 성인 남자부만 가리켜서 이 필터가 필요 없다.
+  // 경기까지 다 섞여 온다 - 그대로 두면 카드 슬롯이 "Poland U17 vs Czechia U17" 같은 경기로 채워지고
+  // 정작 성인 국가대표 친선경기가 밀려난다(국가대표 친선경기를 AI 분석에 추가하면서 발견, 2026-09-25).
+  // UNL/CNL은 애초에 API-Football 리그 ID 자체가 성인 남자부만 가리켜서 이 필터가 필요 없다.
   const isYouthOrWomenFriendly = (m) =>
     m.competition.code === "INTFRIENDLY" &&
     (YOUTH_OR_WOMEN_TEAM_NAME_PATTERN.test(m.homeTeam.name || "") || YOUTH_OR_WOMEN_TEAM_NAME_PATTERN.test(m.awayTeam.name || ""));
@@ -180,6 +194,8 @@ export async function buildAnalysis(env) {
   const upcoming = withinHorizon
     .filter((m) => FEATURED_CODES.has(m.competition.code) && !isYouthOrWomenFriendly(m))
     .sort((a, b) => {
+      const dateDiff = toKstDateString(a.utcDate).localeCompare(toKstDateString(b.utcDate));
+      if (dateDiff !== 0) return dateDiff;
       const rankDiff = analysisTierRank(a.competition.code) - analysisTierRank(b.competition.code);
       return rankDiff !== 0 ? rankDiff : new Date(a.utcDate) - new Date(b.utcDate);
     })

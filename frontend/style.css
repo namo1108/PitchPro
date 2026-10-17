@@ -3171,6 +3171,19 @@ table.standings-table {
   margin-top: 8px;
 }
 
+.ai-date-header {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 20px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-date-header:first-child {
+  margin-top: 4px;
+}
+
 .ai-link-only-title {
   font-size: 13px;
   font-weight: 800;

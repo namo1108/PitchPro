@@ -14,6 +14,22 @@ function formatKickoff(utcDate) {
   return d.toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", timeZone: KST_TIME_ZONE });
 }
 
+// 한국 달력 기준 날짜 문자열(YYYY-MM-DD) - 백엔드(routes/analysis.js)가 이미 이 기준으로
+// 정렬/필터링해서 보내주므로, 프론트는 같은 기준으로 "오늘/내일" 헤더만 끼워 넣으면 된다
+// (2026-10-17 사용자 요청 - "한국 날짜로 정리해줘").
+function kstDateKey(utcDate) {
+  return new Date(utcDate).toLocaleDateString("en-CA", { timeZone: KST_TIME_ZONE }); // en-CA 로케일이 YYYY-MM-DD를 줌
+}
+
+function kstDateHeaderLabel(utcDate) {
+  const target = kstDateKey(utcDate);
+  const today = kstDateKey(new Date().toISOString());
+  const tomorrow = kstDateKey(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+  if (target === today) return "오늘";
+  if (target === tomorrow) return "내일";
+  return new Date(utcDate).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short", timeZone: KST_TIME_ZONE });
+}
+
 // 이번 세션에 한 번 그려본 뒤로는 탭을 다시 눌러도 스켈레톤으로 비우지 않고 화면에 남겨둔 채
 // 조용히 새로 받아와서 갈아끼운다 - 매번 탭 전환마다 깜빡이며 로딩되는 느낌을 없앤다.
 let loadedOnce = false;
@@ -99,9 +115,15 @@ function renderAnalysis(cards, animate) {
     return;
   }
 
+  let lastDateKey = null;
   el.list.innerHTML = cards
-    .map(
-      (c) => `
+    .map((c) => {
+      const dateKey = kstDateKey(c.utcDate);
+      const headerHtml = dateKey !== lastDateKey ? `<div class="ai-date-header">${kstDateHeaderLabel(c.utcDate)}</div>` : "";
+      lastDateKey = dateKey;
+      return (
+        headerHtml +
+        `
     <div class="ai-card">
       <div class="ai-card-header">
         <span class="ai-card-competition">${c.competition.name}</span>
@@ -127,7 +149,8 @@ function renderAnalysis(cards, animate) {
       </div>
     </div>
   `
-    )
+      );
+    })
     .join("");
 
   if (animate) fadeIn(el.list);
