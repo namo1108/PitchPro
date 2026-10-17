@@ -7,10 +7,10 @@ import { buildMatchAnalysis } from "../lib/analysis.js";
 import { getAdidasPointsByCode, findTeamAdidasPoint } from "../lib/kleagueAdidasPoints.js";
 import { fetchTeamRank, KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID } from "../scheduled/refreshKLeagueResults.js";
 
-// v16: featured 대회 목록/필터/정렬 기준이 바뀌면(2026-10-17, MLS 추가 + 한국 날짜 기준 정렬 +
-// FA컵 하위리그 구단 제외) 예전 필터로 만들어둔 캐시가 TTL(3시간) 동안 그대로 남아있으니, 버전을
-// 올려서 즉시 새로 만들어지게 한다.
-const ANALYSIS_CACHE_KEY = "analysis:v16";
+// v17: featured 대회 목록/필터/정렬 기준이 바뀌면(2026-10-17, MLS 추가 + 한국 날짜 기준 정렬 +
+// FA컵 하위리그 구단 제외 + 최종 표시 순서를 시간순으로 재정렬) 예전 필터로 만들어둔 캐시가
+// TTL(3시간) 동안 그대로 남아있으니, 버전을 올려서 즉시 새로 만들어지게 한다.
+const ANALYSIS_CACHE_KEY = "analysis:v17";
 // 사전 갱신 크론 주기(scheduled/index.js)의 2배로 넉넉하게 잡아서, 쿼터가 빡빡해 사전 갱신 틱이
 // 한 번 건너뛰어져도(isQuotaTight) 다음 틱 전에 캐시가 만료되지 않게 한다(사용자 제보: "AI 분석
 // 열 때 딜레이가 있다" - 콜드캐시로 직접 계산을 떠맡는 순간이 그 지연이다).
@@ -201,7 +201,11 @@ export async function buildAnalysis(env) {
   );
   const isMinorFaCupMatch = (m) => m.competition.code === "FA" && !plTeamIds.has(m.homeTeam.id) && !plTeamIds.has(m.awayTeam.id);
 
-  const upcoming = withinHorizon
+  // 2026-10-17 사용자 요청("오전 경기가 앞으로 오고 시간 순서대로") - 중요도 티어는 "슬롯이 40개뿐인데
+  // 후보가 더 많을 때 누굴 먼저 끼워줄지" 고르는 데만 쓰고, 실제로 화면에 보여주는 순서는 날짜 -> 시각
+  // 순수 시간순으로 다시 정렬한다. 즉 "어떤 경기가 뽑히는지"는 여전히 중요도가 좌우하지만(K리그가
+  // FA컵 하위리그 경기에 밀려나지 않게), "뽑힌 경기들을 어떤 순서로 보여줄지"는 시간순이다.
+  const bySelectionPriority = withinHorizon
     .filter((m) => FEATURED_CODES.has(m.competition.code) && !isYouthOrWomenFriendly(m) && !isMinorFaCupMatch(m))
     .sort((a, b) => {
       const dateDiff = toKstDateString(a.utcDate).localeCompare(toKstDateString(b.utcDate));
@@ -210,6 +214,7 @@ export async function buildAnalysis(env) {
       return rankDiff !== 0 ? rankDiff : new Date(a.utcDate) - new Date(b.utcDate);
     })
     .slice(0, MAX_CARDS);
+  const upcoming = bySelectionPriority.slice().sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
 
   // 주요 대회가 아닌 리그/컵대회/친선경기는 분석 문구 없이, 경기 상세로 넘어가는 링크 목록으로만 보여준다.
   const linkOnly = withinHorizon
