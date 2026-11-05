@@ -74,7 +74,12 @@ export const COMPETITIONS = [
   // 스포츠토토 대상 대회 위주로만, K3/K4는 그 대상이 아님(리그 탭/경기 목록엔 그대로 나온다).
   { code: "K3", name: "K3리그", emblem: "/img/emblems/k3리그.png", apiFootballLeagueId: 295, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }] },
   { code: "K4", name: "K4리그", emblem: "/img/emblems/k4리그.png", apiFootballLeagueId: 1234, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "04-01" }, { start: "07-05", end: "08-25" }] },
-  { code: "J1", name: "J1리그", emblem: "https://media.api-sports.io/football/leagues/98.png", apiFootballLeagueId: 98, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }] },
+  // J1만 2026시즌부터 춘추제(3월~12월)에서 추춘제(8월~이듬해 6월)로 먼저 개편되면서, API-Football의
+  // "현재 시즌" 라벨이 2026이 아니라 2027로 바뀌었다(2026-08-07~2027-06-06 시즌을 "2027"로 부름,
+  // 2026-11-06 확인 - "J1리그가 노출이 안 된다" 제보 원인. season=2026으로 조회하면 이미 끝난 예전
+  // 시즌만 나와서 오늘 이후 경기가 하나도 안 걸렸다). J2/J3는 아직 개편 전이라(API-Football 기준
+  // 현재 시즌 여전히 2026) season을 그대로 둔다 - 둘 다 바뀌었을 거라 지레짐작하지 말 것, 직접 확인함.
+  { code: "J1", name: "J1리그", emblem: "https://media.api-sports.io/football/leagues/98.png", apiFootballLeagueId: 98, apiFootballSeason: 2027, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }] },
   { code: "J2", name: "J2리그", emblem: "https://media.api-sports.io/football/leagues/99.png", apiFootballLeagueId: 99, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }], realtime: false },
   { code: "J3", name: "J3리그", emblem: "https://media.api-sports.io/football/leagues/100.png", apiFootballLeagueId: 100, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-01" }, { start: "07-01", end: "08-10" }], realtime: false },
   // featured: true - AI 분석 대상에 추가(2026-10-17 사용자 요청 - 5대리그/챔스/K리그/AFC챔스와
