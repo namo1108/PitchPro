@@ -3428,6 +3428,11 @@ table.standings-table {
   color: var(--text-secondary);
 }
 
+.myteam-next.myteam-live {
+  color: #ff4d4f;
+  font-weight: 600;
+}
+
 .myteam-form,
 .form-strip {
   margin-top: 6px;

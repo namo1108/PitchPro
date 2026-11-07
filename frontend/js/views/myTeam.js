@@ -1,6 +1,6 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange } from "../router.js";
-import { crestImg, formatMatchDateTime, formBadgesHtml, teamHintFromElement } from "../format.js";
+import { crestImg, formatMatchDateTime, formBadgesHtml, teamHintFromElement, LIVE_STATUSES, liveMinuteLabel } from "../format.js";
 import { listFavorites, toggleFavorite } from "../favorites.js";
 import { goToTeam } from "./teamDetail.js";
 import { openSoccerSchool } from "./soccerSchool.js";
@@ -686,14 +686,27 @@ export async function loadMyTeam() {
 }
 
 function renderCard(fav, data) {
+  // 경기가 시작되면 API-Football의 next=(예정)에서 last=(완료) 쪽으로 넘어가면서 recentMatches에
+  // 잠깐 LIVE 상태로 끼어 있다가 FINISHED가 된다 - upcomingMatches만 보던 예전 코드는 이 틈에서
+  // "다음 경기"가 사라지고(=집관인증 버튼도 같이 사라짐) 경기 시작 후엔 인증을 못 하는 문제가 있었다
+  // (2026-11-07 사용자 제보). 그래서 recentMatches에서 진행 중인 경기를 먼저 찾아 우선한다.
   const next = data?.upcomingMatches?.[0];
-  const nextHtml = next
-    ? `<div class="myteam-next">다음 경기: ${next.homeTeam.shortName || next.homeTeam.name} vs ${next.awayTeam.shortName || next.awayTeam.name} · ${formatMatchDateTime(next.utcDate)}</div>`
-    : '<div class="myteam-next">예정된 경기 정보 없음</div>';
+  const liveMatch = (data?.recentMatches || []).find((m) => LIVE_STATUSES.has(m.status));
+  const checkinMatch = liveMatch || next;
+
+  const nextHtml = liveMatch
+    ? `<div class="myteam-next myteam-live">🔴 ${liveMatch.homeTeam.shortName || liveMatch.homeTeam.name} ${liveMatch.score?.fullTime?.home ?? 0} - ${
+        liveMatch.score?.fullTime?.away ?? 0
+      } ${liveMatch.awayTeam.shortName || liveMatch.awayTeam.name} · ${liveMinuteLabel(liveMatch.status, liveMatch.elapsed, liveMatch.extraElapsed)}</div>`
+    : next
+      ? `<div class="myteam-next">다음 경기: ${next.homeTeam.shortName || next.homeTeam.name} vs ${next.awayTeam.shortName || next.awayTeam.name} · ${formatMatchDateTime(next.utcDate)}</div>`
+      : '<div class="myteam-next">예정된 경기 정보 없음</div>';
 
   const form = formBadgesHtml(data?.recentMatches, fav.id, 5);
   const checkinHtml =
-    next && isLoggedIn() ? `<div class="checkin-slot" data-checkin-match-id="${next.id}" data-checkin-team-id="${fav.id}"><div class="loading">·</div></div>` : "";
+    checkinMatch && isLoggedIn()
+      ? `<div class="checkin-slot" data-checkin-match-id="${checkinMatch.id}" data-checkin-team-id="${fav.id}"><div class="loading">·</div></div>`
+      : "";
 
   return `
     <div class="myteam-card" data-team-id="${fav.id}">
