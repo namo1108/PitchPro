@@ -56,6 +56,16 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // 이미 있는 detectGoalsAndNotify/notifyMatchEvents를 그대로 재사용해 변화가 있으면 바로 알림을 보낸다
 // (두 함수 다 "이전 값과 비교해서 달라졌을 때만" 동작하므로 매번 호출해도 중복 알림은 안 나간다).
 export async function pollLiveMatches(env) {
+  // 2026-11-08 추가 - 계정이 Pro 플랜(분당 300회)으로 확인돼(project_pitchpro_ratelimit_tradeoffs
+  // 메모 참고) 이 루프 혼자 분당 ~24콜을 쓰는데, 겹치는 틱에서 두 개가 동시에 돌면 그게 그대로
+  // 두 배(~48콜/분)가 돼버린다 - 바로 아래서 이전 틱이 아직 돌고 있는지 확인해서 겹치면 이번 틱은
+  // 통째로 건너뛴다(이미 돌고 있는 쪽이 골/카드 감지를 계속 담당하므로 알림이 끊기진 않음).
+  const alreadyRunning = await env.CACHE.get(KV_KEYS.livePollRunning);
+  if (alreadyRunning) {
+    console.log("pollLiveMatches already running from an overlapping tick - skipping this invocation");
+    return;
+  }
+
   const deadline = Date.now() + POLL_DURATION_MS;
   let lastCardCheck = 0;
   let consecutiveRateLimits = 0;
@@ -67,7 +77,10 @@ export async function pollLiveMatches(env) {
   // 15~20초+ 걸림)가 이 표시를 보고 겹치는 틱엔 자기 차례를 건너뛰어서, 가장 비싼 두 작업이 동시에
   // 레이트리밋 한도를 나눠 먹는 걸 막는다.
   let markedActive = false;
+  // livePollActive와 달리 루프가 끝나는 즉시 지울 것(위 livePollRunning 오버랩 가드 전용) - finally에서 해제.
+  let markedRunning = false;
 
+  try {
   while (Date.now() < deadline) {
     const matchesBlob = await getJSON(env, KV_KEYS.matches);
     const cached = matchesBlob?.matches || [];
@@ -88,9 +101,13 @@ export async function pollLiveMatches(env) {
 
     if (!markedActive) {
       markedActive = true;
+      markedRunning = true;
       // TTL(70초)로 자동 만료 - 이 틱이 끝나기 전에 죽어도(Cloudflare가 강제 종료 등) 다음 틱이
       // 영원히 막히지 않는다.
-      await putJSON(env, KV_KEYS.livePollActive, { startedAt: Date.now() }, { expirationTtl: 70 });
+      await Promise.all([
+        putJSON(env, KV_KEYS.livePollActive, { startedAt: Date.now() }, { expirationTtl: 70 }),
+        putJSON(env, KV_KEYS.livePollRunning, { startedAt: Date.now() }, { expirationTtl: 70 }),
+      ]);
     }
 
     let liveRaw;
@@ -132,5 +149,11 @@ export async function pollLiveMatches(env) {
     }
 
     await sleep(POLL_INTERVAL_MS);
+  }
+  } finally {
+    // 루프가 끝나자마자(정상 종료든 return이든) 바로 지워서, 다음 틱이 TTL(70초) 다 만료되길
+    // 기다리지 않고도 "지금은 안 도는 중"임을 바로 알 수 있게 한다 - livePollActive는 반대로 일부러
+    // 안 지우고 TTL로만 만료시킨다(용도가 다름, 위 주석 참고).
+    if (markedRunning) await env.CACHE.delete(KV_KEYS.livePollRunning).catch(() => {});
   }
 }

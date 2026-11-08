@@ -181,6 +181,14 @@ export const KV_KEYS = {
   // 자동 만료되니 별도 해제(delete) 없이 "쓰고 방치"만 해도 된다. refreshApiFootballMatches처럼
   // 무거운 작업이 겹치는 크론 틱에서 또 도는 걸 막을 때 쓴다(2026-09-09, pollLiveMatches.js 참고).
   livePollActive: "livepoll:active:v1",
+  // livePollActive와 별개 용도(2026-11-08, Pro 플랜 분당 300회 한도에서 레이트리밋이 너무 잦다는
+  // 제보 조사 중 추가) - livePollActive는 "최근에 돌았음" 신호로 일부러 루프 종료 후에도 TTL(70초)
+  // 만큼 남겨두는데(그래야 refreshApiFootballMatches가 그동안 계속 스킵됨, 의도된 동작), 이 키는
+  // 반대로 "지금 이 순간 실제로 루프를 돌고 있는지"만 엄격하게 본다 - 크론이 1분마다 도는데 이
+  // 루프가 50초까지 걸릴 수 있어서 다음 틱이 겹쳐 들어오면 pollLiveMatches 자신이 두 번 동시에
+  // live=all을 2.5초 간격으로 때려서 분당 호출량이 두 배가 되는 걸 막는다. 루프 진입 시 쓰고
+  // 루프가 끝나는 즉시(finally) 지운다 - 죽어도 TTL로 자동 해제.
+  livePollRunning: "livepoll:running:v1",
   lastRunPrefix: "lastrun:",
   detailPrefix: "detail:",
   // 로그인/집관인증/레벨/친구/명예의 전당(선택 기능) 관련 저장소.
