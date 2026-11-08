@@ -82,6 +82,7 @@ import { resolveCheckinOutcomes } from "./scheduled/resolveCheckinOutcomes.js";
 import { detectCardsAndNotify } from "./scheduled/detectCardsAndNotify.js";
 import { refreshNationalTeams } from "./scheduled/refreshNationalTeams.js";
 import { refreshAnalysis } from "./scheduled/refreshAnalysis.js";
+import * as apiFootball from "./sources/apiFootball.js";
 import { KV_KEYS, GOAT_USERNAMES } from "./lib/config.js";
 import { getJSON, putJSON } from "./lib/kv.js";
 import { userKey, nicknameIndexKey, hashPassword, getAuthedUser } from "./lib/auth.js";
@@ -305,6 +306,12 @@ export async function routeApiRequest(request, env, ctx) {
   if (segments[1] === "admin" && segments[2] === "refresh-standings" && request.method === "POST") {
     await refreshApiFootballStandings(env);
     return json({ ok: true });
+  }
+  // 실제 API-Football 플랜(분당/일일 한도)이 코드 주석과 맞는지 확인용(2026-11-08, "알림이 늦게
+  // 온다" 제보 - admin alert log에 livepoll-ratelimit이 너무 자주 쌓이는 것을 보고 추가).
+  if (segments[1] === "admin" && segments[2] === "api-usage" && request.method === "GET") {
+    const diagnostics = await apiFootball.getApiDiagnostics(env);
+    return json(diagnostics);
   }
   // 새로 넓힌 경기 일정 범위(연말까지)나 새 대회(국가대표 친선경기) 반영을 크론 게이트 기다리지 않고
   // 바로 확인하고 싶을 때 수동 호출. force=1이면 최소 간격 게이트까지 건너뛰고 즉시 조회한다

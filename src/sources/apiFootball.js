@@ -75,6 +75,28 @@ export async function getApiUsage(env) {
   return { current: requests.current, limit: requests.limit_day };
 }
 
+// 관리자 진단용(2026-11-08, "알림이 늦게 온다" 제보 조사) - /status 호출 1번으로 플랜명/일일 한도와
+// 그 응답에 실린 분당 한도 헤더(x-ratelimit-limit/remaining)를 같이 돌려준다. getApiUsage는 바디만
+// 반환해서(request()가 헤더를 버림) 실제 계정에 적용된 분당 한도가 코드 주석(메가플랜 900회)과
+// 맞는지 직접 확인할 방법이 없었다.
+export async function getApiDiagnostics(env) {
+  const url = new URL(`${API_FOOTBALL_BASE}/status`);
+  const res = await fetch(url, { headers: { "x-proxy-secret": env.PROXY_SECRET || "" } });
+  const minuteRemaining = res.headers.get("x-ratelimit-remaining");
+  const minuteLimit = res.headers.get("x-ratelimit-limit");
+  const data = await res.json();
+  return {
+    ok: res.ok,
+    httpStatus: res.status,
+    plan: data.response?.subscription?.plan ?? null,
+    subscriptionActive: data.response?.subscription?.active ?? null,
+    dailyCurrent: data.response?.requests?.current ?? null,
+    dailyLimit: data.response?.requests?.limit_day ?? null,
+    minuteRemaining,
+    minuteLimit,
+  };
+}
+
 export function getFixturesByLeague(env, leagueId, season, from, to, opts) {
   return request(env, "/fixtures", { league: leagueId, season, from, to, timezone: "UTC" }, opts);
 }
