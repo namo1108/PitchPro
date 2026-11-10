@@ -91,10 +91,10 @@ export const COMPETITIONS = [
   // 친선경기는 순위표/득점왕 개념이 없어 리그 탭에는 노출하지 않는다(경기 목록에는 그대로 나온다).
   { code: "FRIENDLY", name: "클럽 친선경기", emblem: "https://media.api-sports.io/football/leagues/667.png", apiFootballLeagueId: 667, apiFootballSeason: 2026, hideFromLeagueTab: true },
   // 호주는 남반구라 시즌(10월~5월)에 맞춰 시즌 개막 전(8~11월)/중반(1월) 두 창구를 쓴다.
-  { code: "AUS", name: "호주 1부(A-League)", emblem: "https://media.api-sports.io/football/leagues/188.png", apiFootballLeagueId: 188, apiFootballSeason: 2025, transferWindows: [{ start: "01-01", end: "01-31" }, { start: "08-01", end: "11-15" }], realtime: false },
+  { code: "AUS", name: "호주 1부(A-League)", emblem: "https://media.api-sports.io/football/leagues/188.png", apiFootballLeagueId: 188, apiFootballSeason: 2025, transferWindows: [{ start: "01-01", end: "01-31" }, { start: "08-01", end: "11-15" }] },
   // 사우디는 최근 몇 시즌 유럽보다 살짝 더 늦게까지 등록을 받아줘서 마감을 여유 있게 잡는다.
   { code: "KSA", name: "사우디 1부", emblem: "https://media.api-sports.io/football/leagues/307.png", apiFootballLeagueId: 307, apiFootballSeason: 2025, transferWindows: [{ start: "01-01", end: "02-10" }, { start: "06-01", end: "09-15" }], realtime: false },
-  { code: "CHN", name: "중국 슈퍼리그", emblem: "https://media.api-sports.io/football/leagues/169.png", apiFootballLeagueId: 169, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-05" }, { start: "06-20", end: "08-10" }], realtime: false },
+  { code: "CHN", name: "중국 슈퍼리그", emblem: "https://media.api-sports.io/football/leagues/169.png", apiFootballLeagueId: 169, apiFootballSeason: 2026, transferWindows: [{ start: "01-01", end: "03-05" }, { start: "06-20", end: "08-10" }] },
   // 국가대표 친선경기(A매치): 클럽 친선경기(667)와 별개로 API-Football은 국가대표 친선경기를 리그
   // id 10 "Friendlies"로 묶어서 제공한다(유소년/여자 대표팀 경기도 섞여 있지만 팀 검색과 마찬가지로
   // 여기선 성인 남자 대표팀 경기 위주로 노출). 친선경기라 순위표/득점왕 개념이 없어 리그 탭엔 안 보여준다.
