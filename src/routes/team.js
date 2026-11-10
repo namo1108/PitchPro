@@ -131,6 +131,21 @@ async function buildTeam(env, teamId) {
   };
 }
 
+// 팀 상세 캐시(10분 TTL)가 "킥오프 직전"에 떠진 스냅샷이면, 그 경기가 시작된 뒤에도 최대 10분간
+// upcomingMatches 쪽에 그대로 남아있고 recentMatches엔 아직 안 들어와 있는 것처럼 보일 수 있다 -
+// 마이팀 화면의 집관인증 버튼은 recentMatches에서 라이브 경기를 찾는 방식이라(myTeam.js 참고,
+// 2026-11-07), 이 캐시 지연 구간에 들어오면 경기가 이미 시작됐는데도 버튼이 "다음 경기"로 안 바뀐
+// 채 몇 분간 멈춰 있다가, 운 나쁘게 그 사이에만 들어온 사용자는 집관인증 자체를 놓친다(2026-11-10
+// 제보 - bongsoon님이 첼시 vs 선덜랜드 경기에서 참여 포인트를 못 받음). 캐시된 스냅샷에 지금
+// 시각(±10분) 근처에 킥오프가 있는 경기가 하나라도 있으면, 그 경계를 넘나드는 애매한 캐시이니
+// 캐시를 못 믿고 새로 받아온다.
+const KICKOFF_TRANSITION_BUFFER_MS = 10 * 60 * 1000;
+function hasMatchNearKickoffTransition(cached) {
+  const now = Date.now();
+  const all = [...(cached.recentMatches || []), ...(cached.upcomingMatches || [])];
+  return all.some((m) => Math.abs(new Date(m.utcDate).getTime() - now) <= KICKOFF_TRANSITION_BUFFER_MS);
+}
+
 export async function handleTeamDetail(request, env, id) {
   const cacheKey = `team:${id}`;
   const staleKey = `${TEAM_STALE_KEY_PREFIX}${id}`;
@@ -139,7 +154,7 @@ export async function handleTeamDetail(request, env, id) {
   const venue = findKLeagueVenue(id);
 
   const cached = await getJSON(env, cacheKey);
-  if (cached) return json({ ...(await reKoreanize(env, cached)), venue });
+  if (cached && !hasMatchNearKickoffTransition(cached)) return json({ ...(await reKoreanize(env, cached)), venue });
 
   try {
     const { hadFetchError, ...result } = await buildTeam(env, id);
