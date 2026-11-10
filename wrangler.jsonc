@@ -10,6 +10,17 @@
   "kv_namespaces": [
     { "binding": "CACHE", "id": "4a82ab329c014cf781586986df945dbc" }
   ],
+  // 2026-11-10 - 애드센스가 *.workers.dev(공용 서브도메인이라 Public Suffix List에 올라있어,
+  // 실제로는 아무것도 안 떠 있는 계정 전체 도메인 skagh662.workers.dev를 검증 대상으로 잡으려 함)를
+  // 검증할 수 없어서, 정식으로 구매한 커스텀 도메인을 이 워커에 연결한다. workers.dev 주소는 그대로
+  // 살아있고, 이 도메인이 같은 워커를 가리키는 또 하나의 진입점으로 추가되는 것뿐이다.
+  "routes": [
+    { "pattern": "originpitchpro.com", "custom_domain": true }
+  ],
+  // routes를 추가하면 wrangler가 기본값을 "workers.dev 끄기"로 바꿔버려서(2026-11-10 실제로
+  // soccer-live.skagh662.workers.dev가 404로 끊기는 사고 발생) 명시적으로 계속 켜둔다 - TWA
+  // 앱/토스 미니앱/assetlinks.json이 전부 이 workers.dev 주소를 그대로 쓰고 있어서 반드시 살아있어야 함.
+  "workers_dev": true,
   // 앱인토스(토스 미니앱) 스마트발송 API는 일반 API 키가 아니라 mTLS(상호 인증서) 인증만 지원해서,
   // fetch()에 일반 헤더로는 인증할 수 없다 - Cloudflare의 mTLS 인증서 바인딩을 통해서만 호출 가능하다.
   "mtls_certificates": [
