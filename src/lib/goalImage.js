@@ -66,11 +66,11 @@ const CARD_STYLE_BASE = {
   fontFamily: "Pretendard",
 };
 
-async function renderCard(env, element) {
+async function renderCard(env, element, width = CARD_WIDTH, height = CARD_HEIGHT) {
   await ensureWasm();
   const fonts = await loadFonts(env);
-  const svg = await satori(element, { width: CARD_WIDTH, height: CARD_HEIGHT, fonts });
-  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: CARD_WIDTH } });
+  const svg = await satori(element, { width, height, fonts });
+  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: width } });
   return resvg.render().asPng();
 }
 
@@ -225,6 +225,101 @@ export async function renderMatchStatusImage(
   };
 
   return renderCard(env, element);
+}
+
+// "공유용 결과 카드"(2026-11-10 추가) - 골 알림 카드와 같은 satori+resvg 파이프라인을 재사용하되,
+// 더 큰 캔버스에 득점자 목록 + 내 승부예측까지 한 장에 담는다. 알림 이미지들과 달리 쿼리스트링이
+// 아니라 matchId로 서버에서 데이터를 직접 조회해 만든다(routes/shareImage.js).
+const SHARE_CARD_WIDTH = 1000;
+const SHARE_CARD_HEIGHT = 560;
+
+function scorerLine(g, align) {
+  return {
+    type: "div",
+    props: {
+      style: { display: "flex", fontSize: 20, color: "#c8cfcb", justifyContent: align === "right" ? "flex-end" : "flex-start", gap: 6 },
+      children: `⚽ ${g.scorer}${g.ownGoal ? "(자책)" : ""} ${g.minute}'`,
+    },
+  };
+}
+
+export async function renderShareCardImage(
+  env,
+  { competitionName, homeTeam, homeCrestUrl, awayTeam, awayCrestUrl, homeScore, awayScore, statusLabel, homeScorers = [], awayScorers = [], predictionLabel }
+) {
+  const [homeCrestDataUri, awayCrestDataUri] = await Promise.all([toDataUri(env, homeCrestUrl), toDataUri(env, awayCrestUrl)]);
+
+  const element = {
+    type: "div",
+    props: {
+      style: { ...CARD_STYLE_BASE, height: SHARE_CARD_HEIGHT, flexDirection: "column", gap: 20, border: `6px solid ${ACCENT}` },
+      children: [
+        {
+          type: "div",
+          props: {
+            style: { display: "flex", justifyContent: "center", fontSize: 22, fontWeight: 700, color: "#9fb0a8", letterSpacing: 1 },
+            children: competitionName || "PITCH PRO",
+          },
+        },
+        {
+          type: "div",
+          props: {
+            style: { display: "flex", alignItems: "center", justifyContent: "space-between" },
+            children: [
+              teamColumn(homeCrestDataUri, homeTeam),
+              {
+                type: "div",
+                props: {
+                  style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 },
+                  children: [
+                    {
+                      type: "div",
+                      props: {
+                        style: { display: "flex", fontSize: 26, fontWeight: 700, color: ACCENT, letterSpacing: 2 },
+                        children: statusLabel || "FT",
+                      },
+                    },
+                    { type: "div", props: { style: { display: "flex", fontSize: 72, fontWeight: 700, color: "#ffffff" }, children: `${homeScore} - ${awayScore}` } },
+                  ],
+                },
+              },
+              teamColumn(awayCrestDataUri, awayTeam),
+            ],
+          },
+        },
+        {
+          type: "div",
+          props: {
+            style: { display: "flex", justifyContent: "space-between", padding: "0 20px", gap: 20 },
+            children: [
+              { type: "div", props: { style: { flex: 1, display: "flex", flexDirection: "column", gap: 8 }, children: homeScorers.map((g) => scorerLine(g, "left")) } },
+              { type: "div", props: { style: { flex: 1, display: "flex", flexDirection: "column", gap: 8 }, children: awayScorers.map((g) => scorerLine(g, "right")) } },
+            ],
+          },
+        },
+        ...(predictionLabel
+          ? [
+              {
+                type: "div",
+                props: {
+                  style: { display: "flex", justifyContent: "center", marginTop: "auto" },
+                  children: pill(predictionLabel, ACCENT),
+                },
+              },
+            ]
+          : []),
+        {
+          type: "div",
+          props: {
+            style: { display: "flex", justifyContent: "center", fontSize: 18, color: "#6b7a72", marginTop: predictionLabel ? 0 : "auto" },
+            children: "PITCH PRO",
+          },
+        },
+      ],
+    },
+  };
+
+  return renderCard(env, element, SHARE_CARD_WIDTH, SHARE_CARD_HEIGHT);
 }
 
 // 이적 소식용 - 선수명 + 이전팀 -> 이적팀(화살표) 구도.

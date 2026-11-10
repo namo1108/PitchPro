@@ -43,6 +43,9 @@ import {
 } from "./routes/auth.js";
 import { handlePointsHistory } from "./routes/points.js";
 import { handleCheckin, handleCheckinStatus } from "./routes/checkin.js";
+import { handleSubmitPrediction, handlePredictionStatus } from "./routes/prediction.js";
+import { handleMyRecords } from "./routes/myRecords.js";
+import { handleMatchShareImage } from "./routes/shareImage.js";
 import {
   handleSendFriendRequest,
   handleRemoveFriend,
@@ -221,6 +224,18 @@ export async function routeApiRequest(request, env, ctx) {
   }
   if (segments[1] === "checkin" && segments.length === 2 && request.method === "POST") {
     return handleCheckin(request, env);
+  }
+  if (segments[1] === "predict" && segments.length === 3 && request.method === "GET") {
+    return handlePredictionStatus(request, env, segments[2]);
+  }
+  if (segments[1] === "predict" && segments.length === 2 && request.method === "POST") {
+    return handleSubmitPrediction(request, env);
+  }
+  if (segments[1] === "me" && segments[2] === "records" && request.method === "GET") {
+    return handleMyRecords(request, env);
+  }
+  if (segments[1] === "share" && segments[2] === "match" && segments.length === 4 && request.method === "GET") {
+    return handleMatchShareImage(request, env, segments[3].replace(/\.png$/, ""));
   }
   if (segments[1] === "friends" && segments.length === 2 && request.method === "GET") {
     return handleListFriends(request, env);

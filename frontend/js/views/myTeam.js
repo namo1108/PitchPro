@@ -341,6 +341,7 @@ function renderProfile() {
         <div id="friends-add-error" class="auth-error"></div>
         <div id="friends-list-wrap" class="friends-list-wrap"></div>
       </div>
+      <button id="my-records-open-btn" class="my-records-link">📊 내 기록 보기</button>
       <button id="delete-account-open-btn" class="account-delete-link">회원 탈퇴</button>
     </div>
   `;
@@ -349,6 +350,7 @@ function renderProfile() {
     await logout();
   });
 
+  document.getElementById("my-records-open-btn").addEventListener("click", openMyRecordsModal);
   document.getElementById("delete-account-open-btn").addEventListener("click", openDeleteAccountModal);
 
   document.getElementById("points-info-btn").addEventListener("click", showPointsInfoModal);
@@ -397,6 +399,80 @@ function hideDeleteAccountModal() {
 
 document.getElementById("delete-account-close")?.addEventListener("click", hideDeleteAccountModal);
 document.querySelector("#delete-account-modal .points-info-backdrop")?.addEventListener("click", hideDeleteAccountModal);
+
+// ---------- 내 기록(직관 기록장) 팝업 ----------
+// 새로 데이터를 모으는 게 아니라, 이미 쌓이고 있던 집관인증/승부예측 기록(src/routes/myRecords.js가
+// 집계)을 통계로 보여주기만 한다 - 열 때마다 다시 받아온다(점수/경기 결과가 수시로 바뀌는 데이터라
+// 포인트 내역처럼 한 번 불러오고 캐시해두면 오래 열어둘수록 내용이 낡아 보일 수 있음).
+const myRecordsModal = document.getElementById("my-records-modal");
+
+function myRecordsHistoryRowHtml(entry) {
+  const m = entry.match;
+  const dateLabel = m ? formatMatchDateTime(m.utcDate) : "";
+  const matchLabel = m ? `${m.homeTeam.shortName || m.homeTeam.name} vs ${m.awayTeam.shortName || m.awayTeam.name}` : `경기 #${entry.matchId}`;
+  let resultLabel;
+  if (entry.type === "checkin") {
+    resultLabel = !entry.resolved ? "정산 대기" : `${entry.cheeredTeamName || ""} ${entry.finalPoints >= 0 ? "+" : ""}${entry.finalPoints}P`;
+  } else {
+    resultLabel = !entry.resolved ? `예측 ${entry.homeGuess}-${entry.awayGuess}` : `예측 ${entry.homeGuess}-${entry.awayGuess} · ${entry.finalPoints > 0 ? `+${entry.finalPoints}P` : "빗나감"}`;
+  }
+  return `
+    <div class="points-history-row">
+      <div class="points-history-reason">${entry.type === "checkin" ? "🏟" : "🔮"} ${matchLabel}</div>
+      <div class="points-history-meta">
+        <span class="points-history-delta ${entry.resolved && entry.finalPoints > 0 ? "good" : entry.resolved && entry.finalPoints < 0 ? "bad" : ""}">${resultLabel}</span>
+        <span class="points-history-date">${dateLabel}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderMyRecords(data) {
+  const content = document.getElementById("my-records-content");
+  const c = data.checkin;
+  const p = data.prediction;
+  const history = [...c.history, ...p.history]
+    .sort((a, b) => new Date(b.checkedInAt || b.submittedAt) - new Date(a.checkedInAt || a.submittedAt))
+    .slice(0, 30);
+
+  content.innerHTML = `
+    <div class="my-records-stats-grid">
+      <div class="my-records-stat-card">
+        <div class="my-records-stat-title">🏟 집관인증</div>
+        <div class="my-records-stat-main">${c.total}회</div>
+        <div class="my-records-stat-sub">${c.win}승 ${c.draw}무 ${c.loss}패${c.winRate != null ? ` · 승률 ${c.winRate}%` : ""}</div>
+        ${c.topTeamName ? `<div class="my-records-stat-sub">최애팀: ${c.topTeamName} (${c.topTeamCount}회)</div>` : ""}
+      </div>
+      <div class="my-records-stat-card">
+        <div class="my-records-stat-title">🔮 승부예측</div>
+        <div class="my-records-stat-main">${p.total}회</div>
+        <div class="my-records-stat-sub">🎯 정확 ${p.exact} · ✅ 결과적중 ${p.correctResult} · ❌ 빗나감 ${p.wrong}</div>
+        ${p.accuracy != null ? `<div class="my-records-stat-sub">적중률 ${p.accuracy}%</div>` : ""}
+      </div>
+    </div>
+    <div class="my-records-history-title">최근 기록</div>
+    ${history.length ? history.map(myRecordsHistoryRowHtml).join("") : '<div class="empty-state">아직 기록이 없어요. 집관인증이나 승부예측에 참여해보세요!</div>'}
+  `;
+}
+
+async function openMyRecordsModal() {
+  myRecordsModal.style.display = "flex";
+  const content = document.getElementById("my-records-content");
+  content.innerHTML = '<div class="loading">불러오는 중...</div>';
+  try {
+    const data = await authFetch("/me/records");
+    renderMyRecords(data);
+  } catch (err) {
+    content.innerHTML = `<div class="error-state">${err.message}</div>`;
+  }
+}
+
+function hideMyRecordsModal() {
+  myRecordsModal.style.display = "none";
+}
+
+document.getElementById("my-records-close")?.addEventListener("click", hideMyRecordsModal);
+document.querySelector("#my-records-modal .points-info-backdrop")?.addEventListener("click", hideMyRecordsModal);
 
 deleteAccountConfirmBtn?.addEventListener("click", async () => {
   const password = deleteAccountPassword.value;

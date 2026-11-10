@@ -37,7 +37,22 @@ const THEME_BY_CODE = new Map(LEAGUE_GROUPS.filter((g) => g.theme).flatMap((g) =
 // 첫 방문엔 국내(K리그) 그룹만 펼쳐두고 나머지는 접어서 시작한다.
 // themeEmblems: 테마별 워터마크에 쓸 실제 API-Football 엠블럼 URL - competitions를 받아오면
 // renderList에서 채운다(그 전엔 비어있어 워터마크 없이 색/텍스처만 켜진다).
-const state = { competitions: [], openCode: null, pollTimer: null, query: "", openGroups: new Set(["국내(K리그)"]), loaded: false, themeEmblems: new Map() };
+const state = {
+  competitions: [],
+  openCode: null,
+  pollTimer: null,
+  query: "",
+  openGroups: new Set(["국내(K리그)"]),
+  loaded: false,
+  themeEmblems: new Map(),
+  // 순위 시나리오 시뮬레이터(2026-11-10) 상태 - 남은 일정에 사용자가 입력해본 가상 스코어는 그 리그를
+  // 다시 열 때까지만 기억한다(새로고침하면 초기화돼도 무방한 가벼운 "미리보기" 기능이라 서버 저장 안 함).
+  simMode: false,
+  simGuesses: new Map(),
+  remainingFixtures: [],
+  lastTables: [],
+  lastComp: null,
+};
 
 const el = {
   view: document.getElementById("view-leagues"),
@@ -271,6 +286,9 @@ function openLeague(code) {
   // 빠져있어 순위표 개념이 없다 - 경기 탭 헤더 클릭이 goToLeagueStandings로 아무 코드나 넘길 수
   // 있으니, 못 찾으면 그냥 조용히 무시한다(TypeError로 화면을 깨뜨리지 않음).
   if (!comp) return;
+  // 다른 리그로 넘어가면 이전 리그에서 찍어본 가상 스코어는 의미가 없으니 꺼둔다.
+  state.simMode = false;
+  state.simGuesses = new Map();
   // 득점왕/도움왕이 순위표 밑에 있어서(전체 20팀 표라면 한참 스크롤해야 보임) 눈에 잘 안 띈다는
   // 이유로, 헤더에 바로 그 위치로 스크롤해주는 바로가기를 추가한다(2026-09-30 사용자 요청).
   el.detailHeader.innerHTML = `${emblemImg(comp, "league-detail-emblem")}<span>${comp.name}</span><button class="top-players-jump-btn" id="top-players-jump-btn">🏆 득점왕</button>`;
@@ -405,6 +423,7 @@ async function loadStandings(code, opts = {}) {
   try {
     const data = await fetchJSON(`/standings/${code}`);
     const comp = state.competitions.find((c) => c.code === code);
+    state.remainingFixtures = data.remainingFixtures || [];
     renderTables(data.standings || [], opts.silent, comp);
   } catch (err) {
     if (!opts.silent) el.standingsWrap.innerHTML = `<div class="error-state">순위 정보를 불러오지 못했습니다.<br>${err.message}</div>`;
@@ -422,6 +441,9 @@ const PROMOTION_RULE_NOTE = {
 // 표 자체(그룹 나누기, 행 렌더링)는 format.js의 standingsTablesHtml 공용 함수가 만들어준다(경기 상세의
 // "순위" 탭과 공유, 2026-09-14) - 여기서는 이 화면 전용인 승강 규정 안내와 DOM 반영/이벤트만 처리한다.
 function renderTables(tables, silent, comp) {
+  state.lastTables = tables;
+  state.lastComp = comp;
+
   const tablesHtml = standingsTablesHtml(tables, comp);
   if (!tablesHtml) {
     el.standingsWrap.innerHTML = '<div class="empty-state">순위 정보가 없습니다.</div>';
@@ -429,12 +451,148 @@ function renderTables(tables, silent, comp) {
   }
 
   const ruleNote = PROMOTION_RULE_NOTE[comp?.code];
-  el.standingsWrap.innerHTML = (ruleNote ? `<div class="promotion-rule-note">${ruleNote}</div>` : "") + tablesHtml;
+  const simToggleHtml = state.remainingFixtures.length
+    ? `<button type="button" class="sim-toggle-btn" id="sim-toggle-btn">🎮 ${state.simMode ? "시뮬레이터 끄기" : "순위 시뮬레이터"}</button>`
+    : "";
+
+  el.standingsWrap.innerHTML =
+    simToggleHtml +
+    (ruleNote ? `<div class="promotion-rule-note">${ruleNote}</div>` : "") +
+    (state.simMode ? renderSimulatorPanel(state.remainingFixtures) + `<div id="sim-tables-output"></div>` : tablesHtml);
 
   if (!silent) fadeIn(el.standingsWrap);
-  el.standingsWrap.querySelectorAll("[data-team-id]").forEach((cell) => {
+
+  document.getElementById("sim-toggle-btn")?.addEventListener("click", () => {
+    state.simMode = !state.simMode;
+    renderTables(state.lastTables, true, state.lastComp);
+  });
+
+  if (state.simMode) {
+    wireSimulatorPanel();
+    recomputeSimulatedTables();
+  } else {
+    wireStandingsTeamClicks(el.standingsWrap);
+  }
+}
+
+function wireStandingsTeamClicks(root) {
+  root.querySelectorAll("[data-team-id]").forEach((cell) => {
     cell.addEventListener("click", () => goToTeam(cell.dataset.teamId, teamHintFromElement(cell)));
   });
+}
+
+// ---------- 순위 시나리오 시뮬레이터 (2026-11-10) ----------
+// 남은 경기에 사용자가 가상 스코어를 입력하면, 서버 왕복 없이 브라우저 안에서만 순위표를 재계산해
+// 보여준다. API 호출이 늘지 않는 "공짜" 기능이라 부담 없이 자주 써볼 수 있다.
+
+function simFixtureRowHtml(fx) {
+  const guess = state.simGuesses.get(fx.id) || {};
+  return `
+    <div class="sim-fixture-row" data-fixture-id="${fx.id}">
+      <div class="sim-fixture-team">${crestImg(fx.homeTeam, "team-crest")}<span>${fx.homeTeam.shortName || fx.homeTeam.name}</span></div>
+      <input type="number" min="0" max="20" inputmode="numeric" class="sim-score-input" data-side="home" value="${guess.home ?? ""}" placeholder="-" />
+      <span class="sim-score-sep">:</span>
+      <input type="number" min="0" max="20" inputmode="numeric" class="sim-score-input" data-side="away" value="${guess.away ?? ""}" placeholder="-" />
+      <div class="sim-fixture-team away">${crestImg(fx.awayTeam, "team-crest")}<span>${fx.awayTeam.shortName || fx.awayTeam.name}</span></div>
+    </div>
+  `;
+}
+
+function renderSimulatorPanel(fixtures) {
+  if (!fixtures.length) return '<div class="empty-state">남은 일정이 없습니다.</div>';
+  const byMatchday = new Map();
+  for (const fx of fixtures) {
+    const key = fx.matchday || "일정";
+    if (!byMatchday.has(key)) byMatchday.set(key, []);
+    byMatchday.get(key).push(fx);
+  }
+  return `
+    <div class="sim-panel" id="sim-panel">
+      <div class="sim-panel-header">
+        <span>남은 경기 결과를 입력해서 최종 순위를 미리 확인해보세요.</span>
+        <button type="button" class="sim-reset-btn" id="sim-reset-btn">초기화</button>
+      </div>
+      ${[...byMatchday.entries()].map(([md, fxs]) => `<div class="sim-matchday-title">${md}</div>${fxs.map(simFixtureRowHtml).join("")}`).join("")}
+    </div>
+  `;
+}
+
+function wireSimulatorPanel() {
+  const panel = document.getElementById("sim-panel");
+  if (!panel) return;
+  panel.addEventListener("input", (e) => {
+    const input = e.target;
+    if (!input.matches(".sim-score-input")) return;
+    const row = input.closest("[data-fixture-id]");
+    const fixtureId = row.dataset.fixtureId;
+    const guess = state.simGuesses.get(fixtureId) || {};
+    guess[input.dataset.side] = input.value;
+    if (guess.home === "" && guess.away === "") state.simGuesses.delete(fixtureId);
+    else state.simGuesses.set(fixtureId, guess);
+    recomputeSimulatedTables();
+  });
+  document.getElementById("sim-reset-btn")?.addEventListener("click", () => {
+    state.simGuesses = new Map();
+    renderTables(state.lastTables, true, state.lastComp);
+  });
+}
+
+// 실제 순위표(state.lastTables)를 복제해서 그 위에 가상 스코어만큼의 승/무/패/득실/승점을 더한 뒤
+// 다시 정렬한다 - 동률 처리는 승점->득실->득점순(공식 세부 타이브레이커, 예: 상대전적까지는 반영 안
+// 되는 근사치)으로, 이미 리그 탭 다른 곳에서도 쓰는 수준의 근사라 추가 설명 없이도 자연스럽다.
+function simulateStandings(baseTables, fixtures, guesses) {
+  const groups = (baseTables || []).map((g) => ({ ...g, table: (g.table || []).map((row) => ({ ...row, team: { ...row.team } })) }));
+  const rowByTeamId = new Map();
+  for (const g of groups) for (const row of g.table) rowByTeamId.set(String(row.team.id), row);
+
+  for (const fx of fixtures) {
+    const guess = guesses.get(fx.id);
+    if (!guess) continue;
+    const h = Number(guess.home);
+    const a = Number(guess.away);
+    if (!Number.isFinite(h) || !Number.isFinite(a) || h < 0 || a < 0) continue;
+    const homeRow = rowByTeamId.get(String(fx.homeTeam.id));
+    const awayRow = rowByTeamId.get(String(fx.awayTeam.id));
+    if (!homeRow || !awayRow) continue;
+    homeRow.playedGames++;
+    awayRow.playedGames++;
+    homeRow.goalsFor += h;
+    homeRow.goalsAgainst += a;
+    awayRow.goalsFor += a;
+    awayRow.goalsAgainst += h;
+    if (h > a) {
+      homeRow.won++;
+      homeRow.points += 3;
+      awayRow.lost++;
+    } else if (a > h) {
+      awayRow.won++;
+      awayRow.points += 3;
+      homeRow.lost++;
+    } else {
+      homeRow.draw++;
+      awayRow.draw++;
+      homeRow.points++;
+      awayRow.points++;
+    }
+    homeRow.goalDifference = homeRow.goalsFor - homeRow.goalsAgainst;
+    awayRow.goalDifference = awayRow.goalsFor - awayRow.goalsAgainst;
+    homeRow.live = false;
+    awayRow.live = false;
+  }
+
+  for (const g of groups) {
+    g.table.sort((x, y) => y.points - x.points || y.goalDifference - x.goalDifference || y.goalsFor - x.goalsFor);
+    g.table.forEach((row, i) => (row.position = i + 1));
+  }
+  return groups;
+}
+
+function recomputeSimulatedTables() {
+  const output = document.getElementById("sim-tables-output");
+  if (!output) return;
+  const simulated = simulateStandings(state.lastTables, state.remainingFixtures, state.simGuesses);
+  output.innerHTML = standingsTablesHtml(simulated, state.lastComp) || '<div class="empty-state">순위 정보가 없습니다.</div>';
+  wireStandingsTeamClicks(output);
 }
 
 async function loadTopPlayers(code) {

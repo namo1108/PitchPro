@@ -196,6 +196,8 @@ export const KV_KEYS = {
   nicknameIndexPrefix: "nickname:",
   sessionPrefix: "session:",
   checkinPrefix: "checkin:",
+  // 승부예측 게임(선택 기능, 2026-11-10) - 집관인증과 똑같은 "참여 기록 -> 경기 끝나면 크론이 정산" 패턴.
+  predictionPrefix: "predict:",
   leaderboardCache: "leaderboard:v1",
   kleagueAdidasPoints: "kleague:adidaspoint:v1",
   // 우리 내부 경기 id -> kleague.com 자체 식별자(year/leagueId/gameId/meetSeq) 매핑.
@@ -311,6 +313,10 @@ export const POINTS_CHECKIN_LOSS = -5;
 // 일단 그대로 둔다(다르게 하고 싶으면 알려달라고 사용자에게 안내).
 export const POINTS_CHECKIN_SHOOTOUT_WIN = 3;
 export const POINTS_CHECKIN_SHOOTOUT_LOSS = 2;
+// 승부예측: 스코어까지 정확히 맞히면 EXACT, 승/무/패 결과만 맞히면 RESULT, 틀리면 0점(기록은 남지만
+// 포인트 변동은 없음 - 집관인증과 달리 참여만으로 주는 기본점수는 없다, 예측이 쉬워서 남발 방지).
+export const POINTS_PREDICTION_EXACT = 15;
+export const POINTS_PREDICTION_RESULT = 5;
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const LEADERBOARD_CACHE_TTL_SECONDS = 300;
 export const LEADERBOARD_SIZE = 100;

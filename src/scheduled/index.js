@@ -22,6 +22,7 @@ import { scrapeKLeagueCoachPhotos } from "./scrapeKLeagueCoachPhotos.js";
 import { detectTransfersAndNotify } from "./detectTransfersAndNotify.js";
 import { refreshTransferMarket } from "./refreshTransferMarket.js";
 import { resolveCheckinOutcomes } from "./resolveCheckinOutcomes.js";
+import { resolvePredictionOutcomes } from "./resolvePredictionOutcomes.js";
 import { scrapeKLeagueAdidasPoints } from "./scrapeKLeagueAdidasPoints.js";
 import { shouldRun, getJSON } from "../lib/kv.js";
 import { KV_KEYS, REFRESH_INTERVALS_MS } from "../lib/config.js";
@@ -134,6 +135,8 @@ export async function runScheduledTasks(env) {
   tasks.push(["kickoff 5분 전 알림", () => notifyUpcomingKickoff(env)]);
   // 집관인증 승/패 정산도 매번 갱신된 스코어 기준으로 판단해야 하니 goal notifications 이후에 돈다.
   tasks.push(["checkin outcome resolution", () => resolveCheckinOutcomes(env)]);
+  // 승부예측 채점도 같은 이유로 goal notifications 이후에 돈다.
+  tasks.push(["prediction outcome resolution", () => resolvePredictionOutcomes(env)]);
 
   // K3/K4, K리그2 득점/도움 순위·사진은 API-Football이 부실해서 매주 일요일 밤 10시(KST)에 공식 사이트를 스크랩한다.
   // 사진 스크랩을 먼저 해야 득점/도움 순위 스크랩이 이번에 갱신된 사진으로 매칭할 수 있다.

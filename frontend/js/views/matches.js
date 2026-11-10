@@ -1,4 +1,4 @@
-import { fetchJSON } from "../api.js";
+import { fetchJSON, API } from "../api.js";
 import { pushDetail, onTabChange, openLeagueStandings } from "../router.js";
 import {
   STATUS_KO,
@@ -25,6 +25,8 @@ import { setMatchWatch } from "../push.js";
 import { isFavorite } from "../favorites.js";
 import { saveViewState } from "../viewState.js";
 import { getTheme } from "../theme.js";
+import { isLoggedIn, authFetch, getToken } from "../auth.js";
+import { trackEvent } from "../analytics.js";
 
 const state = {
   dayOffset: 0,
@@ -944,6 +946,13 @@ export async function loadMatchDetail(matchId, knownMatch, targetTab) {
     fetchJSON(`/standings/${m.competition.code}`)
       .then((standings) => renderMatchStandings(standings, m))
       .catch(() => {});
+
+    // 승부예측(2026-11-10)은 로그인한 사용자 전용(집관인증과 같은 패턴) - 비로그인 상태면 아예 호출하지 않는다.
+    if (isLoggedIn()) {
+      authFetch(`/predict/${m.id}`)
+        .then((status) => renderPrediction(status, m))
+        .catch(() => {});
+    }
   } catch (err) {
     if (!knownMatch) {
       el.detailContent.innerHTML = `<div class="error-state">경기 상세 정보를 불러오지 못했습니다.<br>${err.message}</div>`;
@@ -1628,6 +1637,107 @@ function renderMatchStandings(data, m) {
   document.getElementById("match-full-standings-btn")?.addEventListener("click", () => openLeagueStandings(m.competition.code));
 }
 
+// ---------- 승부예측 (2026-11-10) ----------
+// 킥오프 전까지만 제출/수정 가능 - 경기가 시작되면 서버가 거부하니(prediction.js) 프론트에서도
+// 같은 기준(m.utcDate 지남 여부)으로 미리 입력창을 잠가서 헛된 제출 시도를 막는다.
+function predictionInputsHtml(existing) {
+  return `
+    <div class="prediction-form">
+      <input type="number" min="0" max="20" inputmode="numeric" class="prediction-input" id="prediction-home" value="${existing?.homeGuess ?? ""}" placeholder="-" />
+      <span class="prediction-sep">:</span>
+      <input type="number" min="0" max="20" inputmode="numeric" class="prediction-input" id="prediction-away" value="${existing?.awayGuess ?? ""}" placeholder="-" />
+      <button type="button" class="prediction-submit-btn" id="prediction-submit-btn">${existing ? "수정하기" : "예측하기"}</button>
+    </div>
+  `;
+}
+
+function wirePredictionSubmit(matchId) {
+  document.getElementById("prediction-submit-btn")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const homeGuess = Number(document.getElementById("prediction-home").value);
+    const awayGuess = Number(document.getElementById("prediction-away").value);
+    if (!Number.isInteger(homeGuess) || !Number.isInteger(awayGuess) || homeGuess < 0 || awayGuess < 0) {
+      alert("0 이상의 스코어를 입력해주세요.");
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "제출 중...";
+    try {
+      await authFetch("/predict", { method: "POST", body: { matchId, homeGuess, awayGuess } });
+      trackEvent("prediction");
+      const wrap = document.getElementById("prediction-widget");
+      if (wrap) {
+        wrap.innerHTML = `<h3 class="team-section-title">🔮 승부예측</h3><div class="prediction-done">✅ 예측 완료: ${homeGuess} - ${awayGuess}</div>${predictionInputsHtml({ homeGuess, awayGuess })}`;
+        wirePredictionSubmit(matchId);
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "예측하기";
+      alert(err.message);
+    }
+  });
+}
+
+function renderPrediction(status, m) {
+  const wrap = document.getElementById("prediction-widget");
+  if (!wrap) return;
+
+  if (status.resolved) {
+    const points = status.finalPoints ?? 0;
+    const outcome = points >= 15 ? "🎯 정확히 적중!" : points > 0 ? "✅ 결과 적중" : "❌ 빗나감";
+    wrap.innerHTML = `
+      <h3 class="team-section-title">🔮 승부예측</h3>
+      <div class="prediction-done">내 예측 ${status.prediction.homeGuess} - ${status.prediction.awayGuess} · ${outcome}${points > 0 ? ` (+${points}P)` : ""}</div>
+    `;
+    return;
+  }
+
+  if (status.state === "closed") {
+    wrap.innerHTML = `
+      <h3 class="team-section-title">🔮 승부예측</h3>
+      <div class="prediction-done">${status.prediction ? `내 예측 ${status.prediction.homeGuess} - ${status.prediction.awayGuess} · 결과 기다리는 중` : "⏱ 예측 시간이 지났어요"}</div>
+    `;
+    return;
+  }
+
+  wrap.innerHTML = `<h3 class="team-section-title">🔮 승부예측</h3>${predictionInputsHtml(status.prediction)}`;
+  wirePredictionSubmit(m.id);
+}
+
+// ---------- 공유용 결과 카드 (2026-11-10) ----------
+// 서버(routes/shareImage.js)가 satori로 그려주는 PNG를 받아서, 가능하면 OS 공유 시트(navigator.share)로
+// 바로 블로그/SNS에 보낼 수 있게 하고, 지원 안 하는 환경(대부분의 데스크톱 브라우저)에서는 새 탭에
+// 열어서 길게 눌러 저장/공유하게 한다. 로그인했으면 토큰을 같이 보내 내 예측 결과도 카드에 얹는다
+// (<img> 태그로는 Authorization 헤더를 못 보내서 fetch로 받아와 blob으로 바꾼 뒤 보여준다).
+async function shareMatchCard(matchId, btn) {
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "카드 만드는 중...";
+  try {
+    const token = getToken();
+    const res = await fetch(`${API}/share/match/${matchId}.png`, {
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("아직 결과 카드를 만들 수 없는 경기예요.");
+    const blob = await res.blob();
+    trackEvent("share_match_card");
+
+    const file = new File([blob], `pitchpro-${matchId}.png`, { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: "PITCH PRO" });
+    } else {
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+  } catch (err) {
+    if (err?.name !== "AbortError") alert(err.message || "결과 카드를 만들지 못했어요.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
 // "45+2"처럼 추가시간 표기가 섞여 있어도 실제 시간 순으로 정렬되도록, 추가시간은 소수점으로 얹는다
 // (본 시간 45분 골보다 45+2분 골이 항상 뒤로 오게).
 function parseMinuteValue(minute) {
@@ -1778,12 +1888,15 @@ function renderMatchDetail(m) {
       ${htHtml}
     </div>
 
+    <div class="team-section prediction-widget" id="prediction-widget"></div>
+
     ${
-      m.broadcastUrl || m.ticketUrl
+      m.broadcastUrl || m.ticketUrl || hasScore
         ? `
       <div class="detail-actions">
         ${m.broadcastUrl ? `<a class="detail-action-btn" href="${m.broadcastUrl}" target="_blank" rel="noopener">📺 ${m.broadcastProvider}에서 중계 보기</a>` : ""}
         ${m.ticketUrl ? `<a class="detail-action-btn" href="${m.ticketUrl}" target="_blank" rel="noopener"><img class="detail-action-icon" src="/img/ticket-icon.png" alt="" />티켓 예매하기</a>` : ""}
+        ${hasScore ? `<button type="button" class="detail-action-btn" id="match-share-btn">📤 결과 카드 공유하기</button>` : ""}
       </div>
     `
         : ""
@@ -1818,6 +1931,8 @@ function renderMatchDetail(m) {
     teamEl.style.cursor = "pointer";
     teamEl.addEventListener("click", () => goToTeam(teamEl.dataset.teamId, teamHintFromElement(teamEl)));
   });
+
+  document.getElementById("match-share-btn")?.addEventListener("click", (e) => shareMatchCard(m.id, e.currentTarget));
 
   el.detailContent.querySelectorAll(".pitch-photo-ring[data-player-id], .pitch-bench-player[data-player-id]").forEach((dotEl) => {
     dotEl.addEventListener("click", () => goToPlayer(dotEl.dataset.playerId, playerHintFromElement(dotEl)));
