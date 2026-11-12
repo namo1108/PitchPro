@@ -76,7 +76,6 @@
           <div class="date-label" id="current-date-label">오늘</div>
           <button id="next-day" class="date-arrow" aria-label="다음 날짜">›</button>
           <button id="date-picker-btn" class="date-arrow" aria-label="날짜 선택" title="날짜 선택">📅</button>
-          <input type="date" id="date-picker-input" class="date-picker-input" aria-hidden="true" tabindex="-1" />
           <!-- 리그 구분 없이 오늘 경기를 킥오프 시각순으로만 쭉 보고 싶을 때(2026-08-29 사용자 요청). -->
           <button id="time-sort-btn" class="date-arrow" aria-label="시간순 보기" title="리그 구분 없이 시간순으로 보기">🕐</button>
           <button id="refresh-btn" class="refresh-btn" title="새로고침">⟳</button>
@@ -89,6 +88,14 @@
       <!-- 최신뉴스 -->
       <section id="view-news" class="view">
         <h2 class="section-title">최신뉴스</h2>
+        <!-- 해외(BBC)/국내(동아) 필터 - 2026-11-12 사용자 피드백("최신뉴스가 리그별 혹은 해외/국내
+             정도로 분리되었으면 좋겠어요"). 뉴스 소스가 둘뿐이라 리그별 분류는 데이터가 없어 불가능,
+             해외/국내는 이미 있는 source 필드로 바로 가능해서 이것부터 한다. -->
+        <div class="news-filter-tabs" id="news-filter-tabs">
+          <button type="button" class="news-filter-tab active" data-news-filter="all">전체</button>
+          <button type="button" class="news-filter-tab" data-news-filter="donga">국내</button>
+          <button type="button" class="news-filter-tab" data-news-filter="bbc">해외</button>
+        </div>
         <div id="news-list" class="news-list">
           <div class="loading">뉴스를 불러오는 중...</div>
         </div>
@@ -615,6 +622,24 @@
         </div>
         <div id="update-notes-date" class="update-notes-date"></div>
         <ul id="update-notes-list" class="update-notes-list"></ul>
+      </div>
+    </div>
+
+    <!-- 날짜 선택 캘린더(2026-11-12 사용자 피드백 - "캘린더에 어떤 경기들이 있는지 보이면 좋겠다").
+         네이티브 <input type="date">는 날짜별 경기 유무 표시를 커스터마이징할 수 없어서 직접 만든다. -->
+    <div id="calendar-modal" class="points-info-modal" style="display: none;">
+      <div class="points-info-backdrop"></div>
+      <div class="points-info-card calendar-card">
+        <div class="points-info-header">
+          <button type="button" id="calendar-prev-month" class="calendar-month-nav" aria-label="이전 달">‹</button>
+          <h3 id="calendar-month-label"></h3>
+          <button type="button" id="calendar-next-month" class="calendar-month-nav" aria-label="다음 달">›</button>
+          <button id="calendar-close" class="points-info-close" aria-label="닫기">✕</button>
+        </div>
+        <div class="calendar-weekday-row">
+          <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+        </div>
+        <div id="calendar-grid" class="calendar-grid"></div>
       </div>
     </div>
 

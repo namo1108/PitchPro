@@ -1,7 +1,7 @@
 import { json } from "./lib/http.js";
 import { handleHealth } from "./routes/health.js";
 import { handleCompetitions } from "./routes/competitions.js";
-import { handleMatches } from "./routes/matches.js";
+import { handleMatches, handleMatchesCalendar } from "./routes/matches.js";
 import { handleMatchDetail } from "./routes/matchDetail.js";
 import { handleStandings } from "./routes/standings.js";
 import { handleLeagueTopPlayers } from "./routes/leagueTopPlayers.js";
@@ -114,6 +114,10 @@ export async function routeApiRequest(request, env, ctx) {
   }
   if (segments[1] === "matches" && segments.length === 2) {
     return handleMatches(request, env, url);
+  }
+  // segments.length===3의 handleMatchDetail(아래)보다 먼저 와야 "calendar"가 matchId로 오인되지 않는다.
+  if (segments[1] === "matches" && segments[2] === "calendar" && segments.length === 3) {
+    return handleMatchesCalendar(request, env, url);
   }
   if (segments[1] === "notif-image" && segments[2] === "goal" && request.method === "GET") {
     return handleGoalNotificationImage(request, env, url);

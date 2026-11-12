@@ -2,7 +2,11 @@ import { fetchJSON } from "../api.js";
 import { onTabChange } from "../router.js";
 import { KST_TIME_ZONE, fadeIn, skeletonList } from "../format.js";
 
-const el = { list: document.getElementById("news-list") };
+const el = { list: document.getElementById("news-list"), filterTabs: document.getElementById("news-filter-tabs") };
+
+// 전체 받아온 뉴스를 들고 있다가 필터 탭 클릭 시 다시 서버에 안 물어보고 바로 걸러서 다시 그린다.
+let allItems = [];
+let activeFilter = "all";
 
 function formatPubDate(pubDate) {
   if (!pubDate) return "";
@@ -18,18 +22,31 @@ async function loadNews() {
   if (!loadedOnce) el.list.innerHTML = skeletonList(5);
   try {
     const data = await fetchJSON("/news");
-    renderNews(data.items || [], !loadedOnce);
+    allItems = data.items || [];
+    renderNews(filteredItems(), !loadedOnce);
     loadedOnce = true;
   } catch (err) {
     if (!loadedOnce) el.list.innerHTML = `<div class="error-state">뉴스를 불러오지 못했습니다.<br>${err.message}</div>`;
   }
 }
 
+function filteredItems() {
+  return activeFilter === "all" ? allItems : allItems.filter((n) => n.source === activeFilter);
+}
+
+el.filterTabs?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-news-filter]");
+  if (!btn) return;
+  activeFilter = btn.dataset.newsFilter;
+  el.filterTabs.querySelectorAll(".news-filter-tab").forEach((t) => t.classList.toggle("active", t === btn));
+  renderNews(filteredItems(), false);
+});
+
 const SOURCE_LABEL = { bbc: "해외", donga: "국내" };
 
 function renderNews(items, animate) {
   if (!items.length) {
-    el.list.innerHTML = '<div class="empty-state">아직 뉴스가 없습니다.</div>';
+    el.list.innerHTML = '<div class="empty-state">해당하는 뉴스가 없습니다.</div>';
     return;
   }
 

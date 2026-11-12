@@ -120,8 +120,8 @@ export function getFixture(env, fixtureId) {
   return request(env, "/fixtures", { id: fixtureId, timezone: "UTC" });
 }
 
-export function getFixtureEvents(env, fixtureId) {
-  return request(env, "/fixtures/events", { fixture: fixtureId });
+export function getFixtureEvents(env, fixtureId, opts) {
+  return request(env, "/fixtures/events", { fixture: fixtureId }, opts);
 }
 
 export function getFixtureLineups(env, fixtureId) {

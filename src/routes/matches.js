@@ -47,3 +47,18 @@ export async function handleMatches(request, env, url) {
 
   return json({ matches });
 }
+
+// 날짜 선택 캘린더(2026-11-12 사용자 피드백 - "캘린더에 어떤 경기들이 있는지 보이면 좋겠다")용 -
+// 이미 KV에 캐싱된 matches 하나만 읽어서 달별로 묶어 세어주면 되니 API-Football 호출이 전혀
+// 추가되지 않는다(handleMatches와 같은 소스 재사용).
+export async function handleMatchesCalendar(request, env, url) {
+  const month = url.searchParams.get("month") || toKstDateString(new Date().toISOString()).slice(0, 7);
+  const blob = await getJSON(env, KV_KEYS.matches);
+  const counts = {};
+  for (const m of blob?.matches || []) {
+    const date = toKstDateString(m.utcDate);
+    if (!date.startsWith(month)) continue;
+    counts[date] = (counts[date] || 0) + 1;
+  }
+  return json({ month, counts });
+}

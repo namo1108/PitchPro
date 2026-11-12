@@ -23,6 +23,7 @@ import { detectTransfersAndNotify } from "./detectTransfersAndNotify.js";
 import { refreshTransferMarket } from "./refreshTransferMarket.js";
 import { resolveCheckinOutcomes } from "./resolveCheckinOutcomes.js";
 import { resolvePredictionOutcomes } from "./resolvePredictionOutcomes.js";
+import { enrichGoalScorers } from "./enrichGoalScorers.js";
 import { scrapeKLeagueAdidasPoints } from "./scrapeKLeagueAdidasPoints.js";
 import { shouldRun, getJSON } from "../lib/kv.js";
 import { KV_KEYS, REFRESH_INTERVALS_MS } from "../lib/config.js";
@@ -126,6 +127,8 @@ export async function runScheduledTasks(env) {
   tasks.push(["bracket refresh", () => refreshBrackets(env)]);
   // 항상 마지막에 실행 -> 이번 tick에 갱신된(혹은 최소한 최신) 스코어를 기준으로 골 발생 여부를 비교
   tasks.push(["goal notifications", () => detectGoalsAndNotify(env)]);
+  // 경기 목록(메인 화면)에 득점자를 보여주기 위한 주요 대회 한정 보강(2026-11-12 사용자 피드백).
+  tasks.push(["goal scorer enrichment", () => enrichGoalScorers(env)]);
   // 카드(경고/퇴장) 알림은 2026-08-09부터 여기서 안 돌고 pollLiveMatches 안에서 15초 간격으로 돈다 -
   // events 조회가 경기당 비용이라 매번(3초)은 부담되지만, 예전처럼 1분에 한 번만 확인하면 최대 60초
   // 지연이 나서(사용자 피드백) 그 중간값을 찾은 것. 그쪽에서 이미 하므로 여기서 또 부르면 중복 비용만 든다.

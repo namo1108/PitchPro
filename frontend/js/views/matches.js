@@ -57,7 +57,6 @@ const el = {
   nextDay: document.getElementById("next-day"),
   refreshBtn: document.getElementById("refresh-btn"),
   datePickerBtn: document.getElementById("date-picker-btn"),
-  dateInput: document.getElementById("date-picker-input"),
   timeSortBtn: document.getElementById("time-sort-btn"),
   detailContent: document.getElementById("match-detail-content"),
   detailView: document.getElementById("view-detail"),
@@ -832,6 +831,7 @@ function renderHeroCard(m) {
         ${redCardBadgeHtml(m, m.awayTeam.id)}
       </div>
     </div>
+    ${goalSummaryHtml(m)}
   `;
 
   // 팀 엠블럼/이름을 눌러도 팀 정보가 아니라 이 경기 상세로 가야 한다(2026-08-25 피드백 - 카드
@@ -847,6 +847,29 @@ function renderHeroCard(m) {
 // 추가로 들지 않는다. 대신 아무도 구독 안 한 라이브 경기는 값 자체가 안 채워질 수 있음(의도된 제한).
 function redCardBadgeHtml(m, teamId) {
   return m.redCardTeamIds?.includes(String(teamId)) ? '<span class="red-card-badge" title="퇴장 있음">🟥</span>' : "";
+}
+
+// 경기 목록(메인 화면)에서 바로 득점자를 보여준다(2026-11-12 사용자 피드백 - "경기를 다 챙겨보진
+// 않아서 결과+득점자 정도만 목록에서 바로 보고 싶다"). 서버가 K리그·5대리그·UEFA 클럽대항전 한정으로
+// 채워주는 m.goalEvents가 있을 때만 나온다(scheduled/enrichGoalScorers.js) - 그 외 대회는 비용
+// 문제로 비어있어서 조용히 생략된다.
+function goalSummaryHtml(m) {
+  const goals = m.goalEvents;
+  if (!goals?.length) return "";
+  const names = (teamId) =>
+    goals
+      .filter((g) => g.teamId === String(teamId))
+      .map((g) => `${g.scorer}${g.ownGoal ? "(OG)" : ""} ${g.minute}'`)
+      .join(" · ");
+  const homeNames = names(m.homeTeam.id);
+  const awayNames = names(m.awayTeam.id);
+  if (!homeNames && !awayNames) return "";
+  return `
+    <div class="match-row-goals">
+      <div class="match-row-goals-side home">${homeNames ? `⚽ ${homeNames}` : ""}</div>
+      <div class="match-row-goals-side away">${awayNames ? `⚽ ${awayNames}` : ""}</div>
+    </div>
+  `;
 }
 
 function renderMatchRow(m, opts = {}) {
@@ -903,6 +926,7 @@ function renderMatchRow(m, opts = {}) {
     <div class="match-row-actions">
       ${watchBellHtml(m.id)}
     </div>
+    ${goalSummaryHtml(m)}
   `;
 
   attachWatchBells(row);
@@ -2029,19 +2053,89 @@ el.timeSortBtn?.addEventListener("click", () => {
   if (state.lastMatches) renderMatches(state.lastMatches);
 });
 
-el.datePickerBtn.addEventListener("click", () => {
-  el.dateInput.value = toISODate(dateWithOffset(state.dayOffset));
-  if (el.dateInput.showPicker) el.dateInput.showPicker();
-  else el.dateInput.click();
-});
+// ---------- 날짜 선택 캘린더 (2026-11-12 사용자 피드백) ----------
+// 네이티브 <input type="date">는 날짜별 경기 유무 표시를 커스터마이징할 수 없어서, 월 단위로
+// /matches/calendar(기존 캐시만 읽는 가벼운 집계 엔드포인트)를 불러와 직접 그린다.
+const calendarState = { year: 0, month: 0 };
 
-el.dateInput.addEventListener("change", () => {
-  if (!el.dateInput.value) return;
-  const picked = new Date(`${el.dateInput.value}T00:00:00Z`);
-  const today = new Date(`${toISODate(dateWithOffset(0))}T00:00:00Z`);
-  state.dayOffset = Math.round((picked - today) / 86400000);
-  loadMatches();
+function openCalendarPopup() {
+  const base = dateWithOffset(state.dayOffset);
+  calendarState.year = base.getFullYear();
+  calendarState.month = base.getMonth();
+  document.getElementById("calendar-modal").style.display = "flex";
+  loadCalendarMonth();
+}
+
+function closeCalendarPopup() {
+  document.getElementById("calendar-modal").style.display = "none";
+}
+
+async function loadCalendarMonth() {
+  const { year, month } = calendarState;
+  document.getElementById("calendar-month-label").textContent = `${year}년 ${month + 1}월`;
+  renderCalendarGrid({});
+  try {
+    const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
+    const data = await fetchJSON(`/matches/calendar?month=${monthStr}`);
+    renderCalendarGrid(data.counts || {});
+  } catch {
+    renderCalendarGrid({});
+  }
+}
+
+function renderCalendarGrid(counts) {
+  const { year, month } = calendarState;
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr = toISODate(dateWithOffset(0));
+  const selectedStr = toISODate(dateWithOffset(state.dayOffset));
+
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push('<div class="calendar-cell empty"></div>');
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const count = counts[dateStr] || 0;
+    cells.push(`
+      <button type="button" class="calendar-cell ${dateStr === todayStr ? "today" : ""} ${dateStr === selectedStr ? "selected" : ""}" data-date="${dateStr}">
+        <span class="calendar-cell-day">${d}</span>
+        ${count ? '<span class="calendar-cell-dot"></span>' : ""}
+      </button>
+    `);
+  }
+
+  const grid = document.getElementById("calendar-grid");
+  grid.innerHTML = cells.join("");
+  grid.querySelectorAll("[data-date]").forEach((cell) => {
+    cell.addEventListener("click", () => {
+      const picked = new Date(`${cell.dataset.date}T00:00:00Z`);
+      const today = new Date(`${toISODate(dateWithOffset(0))}T00:00:00Z`);
+      state.dayOffset = Math.round((picked - today) / 86400000);
+      closeCalendarPopup();
+      loadMatches();
+    });
+  });
+}
+
+document.getElementById("calendar-prev-month")?.addEventListener("click", () => {
+  calendarState.month--;
+  if (calendarState.month < 0) {
+    calendarState.month = 11;
+    calendarState.year--;
+  }
+  loadCalendarMonth();
 });
+document.getElementById("calendar-next-month")?.addEventListener("click", () => {
+  calendarState.month++;
+  if (calendarState.month > 11) {
+    calendarState.month = 0;
+    calendarState.year++;
+  }
+  loadCalendarMonth();
+});
+document.getElementById("calendar-close")?.addEventListener("click", closeCalendarPopup);
+document.querySelector("#calendar-modal .points-info-backdrop")?.addEventListener("click", closeCalendarPopup);
+
+el.datePickerBtn.addEventListener("click", openCalendarPopup);
 
 onTabChange("matches", loadMatches);
 
