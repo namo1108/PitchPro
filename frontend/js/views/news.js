@@ -82,9 +82,14 @@ function renderNews(items, animate) {
 // API는 따로 없어서(저작권상 API-Football도 영상을 안 줌), 유튜브 검색 링크(팀명만 맞으면 거의 항상
 // 뭔가는 나옴)를 기본으로 달고, 이미 중계 링크로 쓰고 있던 쿠팡플레이 허브 URL(config.js의
 // findBroadcastLink, match.broadcastUrl로 이미 내려옴)이 있으면 "다시보기"로 같이 보여준다.
-// K리그1/2·5대리그·UEFA 클럽대항전 한정(골 득점자 표시와 같은 기준) - 범위를 넓히면 하루에도 경기가
-// 너무 많아 의미 없는 하위리그/친선경기까지 다 뜬다.
-const HIGHLIGHT_CODES = new Set(["KL1", "KL2", "PL", "PD", "BL1", "SA", "FL1", "CL", "EL", "ECL"]);
+// K리그1/2·5대리그·UEFA 클럽대항전 + 국가대표 경기(A매치/네이션스리그 등) 한정(골 득점자 표시,
+// 캘린더 우선순위와 같은 기준) - 범위를 넓히면 하루에도 경기가 너무 많아 의미 없는 하위리그/친선경기
+// 까지 다 뜬다. 국가대표를 포함한 건(2026-11-12), 빼놓으면 지금 같은 A매치 기간엔 클럽 경기가 거의
+// 없어서 섹션이 통째로 비어 보였기 때문("하이라이트 영상은?" 제보).
+const HIGHLIGHT_CODES = new Set([
+  "KL1", "KL2", "PL", "PD", "BL1", "SA", "FL1", "CL", "EL", "ECL",
+  "INTFRIENDLY", "UNL", "CNL", "EC", "WC", "ACUP", "AG",
+]);
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 function youtubeHighlightUrl(home, away) {
