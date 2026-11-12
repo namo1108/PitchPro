@@ -1396,37 +1396,9 @@ html[data-toss-app] .content {
 
 /* ---------- 서버사이드 렌더링 초기 콘텐츠(src/lib/ssr.js) ----------
    JS가 로드되는 즉시 matches-list/news-list를 자기 것으로 덮어쓰므로 실사용자에게는 아주 잠깐만
-   보인다 - 그래도 깨져 보이지 않게 최소한의 스타일만 둔다. */
-.ssr-match-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-
-.ssr-match-comp {
-  color: var(--text-muted);
-  flex-shrink: 0;
-  width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ssr-match-teams {
-  flex: 1;
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.ssr-match-status {
-  color: var(--accent);
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
+   보인다. 경기 목록 쪽은 2026-11-13부터 실제 .match-row/.competition-group 클래스를 그대로
+   재사용해서(src/lib/ssr.js), 교체되는 순간 "다른 화면"처럼 안 보이고 자연스럽게 이어진다 -
+   그래서 전용 스타일이 더 필요 없다. 뉴스 쪽은 구조가 단순해 전용 스타일만 최소한으로 둔다. */
 .ssr-news-row {
   display: block;
   padding: 10px 14px;
