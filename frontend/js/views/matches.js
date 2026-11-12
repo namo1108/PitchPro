@@ -2068,11 +2068,14 @@ el.timeSortBtn?.addEventListener("click", () => {
 // 모바일 폭에서 칸이 너무 좁아져 엠블럼/팀명이 깨진다는 피드백으로 주 단위(7x1칸)로 바꿨다 - 칸 수가
 // 줄어든 만큼 칸마다 세로 공간을 훨씬 넉넉하게 쓸 수 있다. 작은 팝업이 아니라 다른 상세 화면과 같은
 // 전체화면 뷰로 연다.
-let calendarWeekStart = null; // 그 주의 일요일(Date, 로컬 자정)
+let calendarWeekStart = null; // 그 주의 일요일 - dateWithOffset()과 같은 방식("Date.now()+9시간"을
+// 그대로 들고 있는 타임스탬프)이라 getUTC*/setUTCDate로만 읽고 써야 한국 시간 기준 날짜가 맞는다
+// (로컬 게터를 쓰면 기기 시간대가 다시 섞여 들어가 날짜가 어긋난다 - 2026-11-12 "날짜는 한국시간
+// 기준이야" 제보로 발견).
 
 function startOfWeek(date) {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  d.setDate(d.getDate() - d.getDay());
+  const d = new Date(date);
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
   return d;
 }
 
@@ -2085,11 +2088,11 @@ function openCalendarView() {
 async function loadCalendarWeek() {
   const from = toISODate(calendarWeekStart);
   const weekEnd = new Date(calendarWeekStart);
-  weekEnd.setDate(weekEnd.getDate() + 6);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
   const to = toISODate(weekEnd);
-  document.getElementById("calendar-week-label").textContent = `${calendarWeekStart.getMonth() + 1}월 ${calendarWeekStart.getDate()}일 - ${
-    weekEnd.getMonth() + 1
-  }월 ${weekEnd.getDate()}일`;
+  document.getElementById("calendar-week-label").textContent = `${calendarWeekStart.getUTCMonth() + 1}월 ${calendarWeekStart.getUTCDate()}일 - ${
+    weekEnd.getUTCMonth() + 1
+  }월 ${weekEnd.getUTCDate()}일`;
 
   // 로딩 중엔 빈 데이터로 그리지 않는다 - 빈 칸(day 없음)은 "경기 없음" 확정 표시로 쓰고 있어서,
   // 로딩 중을 그걸로 그리면 아직 안 받아왔을 뿐인데 "경기 없음"으로 잘못 보인다(2026-11-12 확인).
@@ -2136,12 +2139,12 @@ function renderCalendarGrid(days) {
   const cells = [];
   for (let i = 0; i < 7; i++) {
     const cellDate = new Date(calendarWeekStart);
-    cellDate.setDate(cellDate.getDate() + i);
+    cellDate.setUTCDate(cellDate.getUTCDate() + i);
     const dateStr = toISODate(cellDate);
     const day = days[dateStr];
     cells.push(`
       <button type="button" class="calendar-cell ${dateStr === todayStr ? "today" : ""} ${dateStr === selectedStr ? "selected" : ""}" data-date="${dateStr}">
-        <span class="calendar-cell-day">${WEEKDAY_KO[cellDate.getDay()]} ${cellDate.getDate()}${day ? `<span class="calendar-cell-count">${day.count}</span>` : ""}</span>
+        <span class="calendar-cell-day">${WEEKDAY_KO[cellDate.getUTCDay()]} ${cellDate.getUTCDate()}${day ? `<span class="calendar-cell-count">${day.count}</span>` : ""}</span>
         ${calendarCellPreviewHtml(day)}
       </button>
     `);
@@ -2169,11 +2172,11 @@ function renderCalendarGrid(days) {
 }
 
 document.getElementById("calendar-prev-week")?.addEventListener("click", () => {
-  calendarWeekStart.setDate(calendarWeekStart.getDate() - 7);
+  calendarWeekStart.setUTCDate(calendarWeekStart.getUTCDate() - 7);
   loadCalendarWeek();
 });
 document.getElementById("calendar-next-week")?.addEventListener("click", () => {
-  calendarWeekStart.setDate(calendarWeekStart.getDate() + 7);
+  calendarWeekStart.setUTCDate(calendarWeekStart.getUTCDate() + 7);
   loadCalendarWeek();
 });
 // "오늘" 버튼(2026-11-12 사용자 요청) - 오늘이 속한 주로 돌아가고, 선택 중인 날짜도 오늘로 맞춘다.

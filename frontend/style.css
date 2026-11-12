@@ -4397,14 +4397,17 @@ table.standings-table {
 
 /* 경기 한 줄을 "엠블럼 vs 엠블럼"으로 가로로 보여준다(2026-11-12) - 처음엔 팀명 약어까지 같이
    넣으려 했는데, 7열짜리 좁은 칸에선 줄바꿈이 꼬여서 깨졌다(사용자 제보) - 이름은 빼고 로고만
-   가로로 둬서 폭 부담을 줄였다(로고 alt에 팀명은 남아있어 접근성엔 문제 없음). */
+   가로로 둬서 폭 부담을 줄였다(로고 alt에 팀명은 남아있어 접근성엔 문제 없음). 그래도 칸이 좁은
+   기기에서 엠블럼이 잘려 보인다는 제보(2026-11-12)로, 고정폭(flex-shrink:0) 대신 줄어들 수 있게
+   하고 flex-wrap도 허용해서 - 그래도 안 들어가면 clip 대신 줄바꿈되게 한다(잘리는 것보단 낫다). */
 .calendar-cell-match {
   width: 100%;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 6px 0;
+  gap: 3px;
+  padding: 5px 0;
   border-top: 1px dashed var(--border);
 }
 
@@ -4413,15 +4416,16 @@ table.standings-table {
 }
 
 .calendar-cell-crest {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
+  min-width: 11px;
   object-fit: contain;
-  flex-shrink: 0;
+  flex-shrink: 1;
 }
 
 .calendar-cell-vs {
   flex-shrink: 0;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 700;
   color: var(--text-muted);
 }
@@ -4444,8 +4448,8 @@ table.standings-table {
 
 @media (max-width: 400px) {
   .calendar-cell-crest {
-    width: 17px;
-    height: 17px;
+    width: 13px;
+    height: 13px;
   }
 }
 
