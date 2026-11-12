@@ -2115,7 +2115,7 @@ function calendarCellPreviewHtml(day) {
   const lines = day.preview
     .map(
       (m) => `
-    <div class="calendar-cell-match">
+    <div class="calendar-cell-match" data-match-id="${m.id}">
       ${crestImg({ crest: m.homeCrest, shortName: m.homeTeam }, "calendar-cell-crest")}
       <span class="calendar-cell-vs">vs</span>
       ${crestImg({ crest: m.awayCrest, shortName: m.awayTeam }, "calendar-cell-crest")}
@@ -2156,6 +2156,14 @@ function renderCalendarGrid(days) {
       state.dayOffset = Math.round((picked - today) / 86400000);
       history.back();
       loadMatches();
+    });
+  });
+  // 경기 미리보기 한 줄을 누르면(2026-11-12 사용자 요청) 그 날짜 목록이 아니라 바로 그 경기 상세로
+  // 간다 - 날짜 칸 버튼 안에 중첩돼 있어서 stopPropagation으로 위의 날짜 클릭을 막아야 한다.
+  grid.querySelectorAll("[data-match-id]").forEach((row) => {
+    row.addEventListener("click", (e) => {
+      e.stopPropagation();
+      loadMatchDetail(row.dataset.matchId); // pushDetail("detail")은 loadMatchDetail 내부에서 처리됨
     });
   });
 }

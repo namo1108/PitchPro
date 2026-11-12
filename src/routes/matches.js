@@ -1,6 +1,6 @@
 import { json } from "../lib/http.js";
 import { getJSON } from "../lib/kv.js";
-import { KV_KEYS, findBroadcastLink } from "../lib/config.js";
+import { KV_KEYS, findBroadcastLink, NATIONAL_TEAM_COMPETITION_CODES } from "../lib/config.js";
 import { findKLeagueVenue } from "../lib/kleagueVenues.js";
 import { koreanizeTeam } from "../adapters/apiFootballAdapter.js";
 import { MATCH_DURATION_BUFFER_MS } from "../lib/matchWindow.js";
@@ -56,6 +56,23 @@ export async function handleMatches(request, env, url) {
 // (예: 11/29~12/5) 한 번에 조회할 수 있다.
 const CALENDAR_PREVIEW_CODES = new Set(["KL1", "KL2", "PL", "PD", "BL1", "SA", "FL1", "CL", "EL", "ECL"]);
 const CALENDAR_PREVIEW_MAX = 6;
+// 국가대표 경기 기간(A매치 주간)엔 클럽 리그가 거의 다 쉬어서, 그 주엔 국가대표 경기가 사실상 "메인
+// 이벤트"다(2026-11-12 사용자 요청 - "지금은 국대 기간이니까 국대 우선"). 그래서 우선순위를 국가대표
+// -> 주요 클럽 리그 -> 클럽 친선경기 -> 그 외 순으로 둔다. 클럽 친선경기는 프리시즌(유럽 기준 6~8월)
+// 걸 먼저 보여달라는 요청도 있었는데, API-Football엔 "프리시즌 여부" 플래그가 따로 없어서 월(月)로
+// 근사한다 - 완벽하진 않지만 유럽 빅클럽 프리시즌 투어가 거의 다 이 기간에 몰려있어 꽤 맞는다.
+const FRIENDLY_CODE = "FRIENDLY";
+const PRESEASON_MONTHS = new Set([6, 7, 8]);
+
+function calendarPreviewTier(m) {
+  if (NATIONAL_TEAM_COMPETITION_CODES.has(m.competition.code)) return 0;
+  if (CALENDAR_PREVIEW_CODES.has(m.competition.code)) return 1;
+  if (m.competition.code === FRIENDLY_CODE) {
+    const month = new Date(m.utcDate).getUTCMonth() + 1;
+    return PRESEASON_MONTHS.has(month) ? 2 : 3;
+  }
+  return 4;
+}
 
 export async function handleMatchesCalendar(request, env, url) {
   const todayStr = toKstDateString(new Date().toISOString());
@@ -73,15 +90,14 @@ export async function handleMatchesCalendar(request, env, url) {
 
   const days = {};
   for (const [date, dayMatches] of byDate) {
-    const sorted = dayMatches
-      .slice()
-      .sort((a, b) => (CALENDAR_PREVIEW_CODES.has(b.competition.code) ? 1 : 0) - (CALENDAR_PREVIEW_CODES.has(a.competition.code) ? 1 : 0));
+    const sorted = dayMatches.slice().sort((a, b) => calendarPreviewTier(a) - calendarPreviewTier(b));
     days[date] = {
       count: dayMatches.length,
       preview: sorted.slice(0, CALENDAR_PREVIEW_MAX).map((m) => {
         const home = koreanizeTeam(m.homeTeam);
         const away = koreanizeTeam(m.awayTeam);
         return {
+          id: m.id,
           homeTeam: home.shortName,
           homeCrest: home.crest,
           awayTeam: away.shortName,
