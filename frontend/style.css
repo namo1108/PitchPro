@@ -4247,7 +4247,7 @@ table.standings-table {
   color: var(--text-secondary);
 }
 
-/* ---------- 날짜 선택 캘린더 (전체화면, 2026-11-12) ---------- */
+/* ---------- 날짜 선택 캘린더 (전체화면, 주 단위, 2026-11-12) ---------- */
 .calendar-page-header {
   display: flex;
   align-items: center;
@@ -4255,14 +4255,14 @@ table.standings-table {
   margin: 10px 0 12px;
 }
 
-.calendar-month-label {
+.calendar-week-label {
   flex: 1;
   text-align: center;
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 800;
 }
 
-.calendar-month-nav {
+.calendar-week-nav {
   background: none;
   border: none;
   color: var(--text-secondary);
@@ -4283,41 +4283,26 @@ table.standings-table {
   cursor: pointer;
 }
 
-.calendar-weekday-row {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  text-align: center;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-
+/* 하루에 1칸씩, 7칸 한 줄 - 월 단위(7x6칸)보다 칸 수가 훨씬 줄어서 세로 공간을 넉넉히 쓸 수 있다. */
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 3px;
+  gap: 4px;
 }
 
 .calendar-cell {
-  min-height: 132px;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   color: var(--text-primary);
-  padding: 4px;
+  padding: 6px 3px;
   cursor: pointer;
   overflow: hidden;
-}
-
-.calendar-cell.empty {
-  background: none;
-  border-color: transparent;
-  cursor: default;
 }
 
 .calendar-cell.today {
@@ -4331,10 +4316,12 @@ table.standings-table {
 
 .calendar-cell-day {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  font-size: 12.5px;
+  gap: 2px;
+  font-size: 11.5px;
   font-weight: 700;
+  text-align: center;
 }
 
 .calendar-cell.selected .calendar-cell-day {
@@ -4347,42 +4334,62 @@ table.standings-table {
   color: var(--text-muted);
   background: var(--bg-elevated, #1a1f1c);
   border-radius: 999px;
-  padding: 1px 4px;
+  padding: 1px 5px;
 }
 
 .calendar-cell-match {
   width: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  font-size: 8.5px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--text-secondary);
+  gap: 3px;
+  padding: 4px 0;
+  border-top: 1px dashed var(--border);
 }
 
-.calendar-cell-match span {
+.calendar-cell-match:first-of-type {
+  border-top: none;
+}
+
+.calendar-week-team {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.calendar-week-team span {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 100%;
 }
 
 .calendar-cell-crest {
-  width: 11px;
-  height: 11px;
+  width: 22px;
+  height: 22px;
   object-fit: contain;
   flex-shrink: 0;
 }
 
-.calendar-cell-vs {
-  flex-shrink: 0;
-  color: var(--text-muted);
-}
-
 .calendar-cell-more {
-  font-size: 8.5px;
+  font-size: 9px;
   color: var(--text-muted);
   margin-top: auto;
+}
+
+@media (max-width: 400px) {
+  .calendar-cell-crest {
+    width: 18px;
+    height: 18px;
+  }
+  .calendar-week-team span {
+    font-size: 8.5px;
+  }
 }
 
 .my-records-history-title {

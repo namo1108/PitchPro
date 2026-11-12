@@ -2053,27 +2053,38 @@ el.timeSortBtn?.addEventListener("click", () => {
   if (state.lastMatches) renderMatches(state.lastMatches);
 });
 
-// ---------- 날짜 선택 캘린더 (2026-11-12 사용자 피드백) ----------
-// 네이티브 <input type="date">는 날짜별 경기 유무 표시를 커스터마이징할 수 없어서, 월 단위로
-// /matches/calendar(기존 캐시만 읽는 가벼운 집계 엔드포인트)를 불러와 직접 그린다. 작은 팝업이
-// 아니라 다른 상세 화면과 같은 전체화면 뷰로 열어서(2026-11-12 사용자 요청) 칸을 넉넉하게 쓴다.
-const calendarState = { year: 0, month: 0 };
+// ---------- 날짜 선택 캘린더 (2026-11-12 사용자 피드백, 같은 날 주 단위로 재구성) ----------
+// 네이티브 <input type="date">는 날짜별 경기 유무 표시를 커스터마이징할 수 없어서, /matches/calendar
+// (기존 캐시만 읽는 가벼운 집계 엔드포인트)를 불러와 직접 그린다. 처음엔 월 단위(7x6칸)로 만들었는데
+// 모바일 폭에서 칸이 너무 좁아져 엠블럼/팀명이 깨진다는 피드백으로 주 단위(7x1칸)로 바꿨다 - 칸 수가
+// 줄어든 만큼 칸마다 세로 공간을 훨씬 넉넉하게 쓸 수 있다. 작은 팝업이 아니라 다른 상세 화면과 같은
+// 전체화면 뷰로 연다.
+let calendarWeekStart = null; // 그 주의 일요일(Date, 로컬 자정)
 
-function openCalendarView() {
-  const base = dateWithOffset(state.dayOffset);
-  calendarState.year = base.getFullYear();
-  calendarState.month = base.getMonth();
-  pushDetail("calendar");
-  loadCalendarMonth();
+function startOfWeek(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() - d.getDay());
+  return d;
 }
 
-async function loadCalendarMonth() {
-  const { year, month } = calendarState;
-  document.getElementById("calendar-month-label").textContent = `${year}년 ${month + 1}월`;
+function openCalendarView() {
+  calendarWeekStart = startOfWeek(dateWithOffset(state.dayOffset));
+  pushDetail("calendar");
+  loadCalendarWeek();
+}
+
+async function loadCalendarWeek() {
+  const from = toISODate(calendarWeekStart);
+  const weekEnd = new Date(calendarWeekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  const to = toISODate(weekEnd);
+  document.getElementById("calendar-week-label").textContent = `${calendarWeekStart.getMonth() + 1}월 ${calendarWeekStart.getDate()}일 - ${
+    weekEnd.getMonth() + 1
+  }월 ${weekEnd.getDate()}일`;
+
   renderCalendarGrid({});
   try {
-    const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
-    const data = await fetchJSON(`/matches/calendar?month=${monthStr}`);
+    const data = await fetchJSON(`/matches/calendar?from=${from}&to=${to}`);
     renderCalendarGrid(data.days || {});
   } catch {
     renderCalendarGrid({});
@@ -2081,7 +2092,7 @@ async function loadCalendarMonth() {
 }
 
 // 하루에 많게는 80~90경기까지 몰려서(전세계 경기를 다 세므로) 칸 안에 전부 보여줄 수 없다 - 서버가
-// 이미 주요 대회(K리그1/2·5대리그·UEFA 클럽대항전) 위주로 최대 3개만 추려서 보내주면(routes/matches.js
+// 이미 주요 대회(K리그1/2·5대리그·UEFA 클럽대항전) 위주로 최대 6개만 추려서 보내주면(routes/matches.js
 // 참고), 그걸 엠블럼 + 약어 팀명으로 짧게 적고 나머지는 "+N"으로 뭉뚱그린다. 한글 이름(맨시티, 레알
 // 등)은 이미 충분히 짧으니 그대로 두고, 한글 매핑이 없는 팀만 영문 긴 이름을 첫 단어 3글자로 줄인다
 // (공식 3레터 코드는 아니지만 팀마다 코드를 따로 관리하지 않고도 알아볼 수 있는 선에서 줄인 것).
@@ -2098,11 +2109,12 @@ function calendarCellPreviewHtml(day) {
     .map(
       (m) => `
     <div class="calendar-cell-match">
-      ${crestImg({ crest: m.homeCrest, shortName: m.homeTeam }, "calendar-cell-crest")}
-      <span>${abbreviateTeamName(m.homeTeam)}</span>
-      <span class="calendar-cell-vs">-</span>
-      ${crestImg({ crest: m.awayCrest, shortName: m.awayTeam }, "calendar-cell-crest")}
-      <span>${abbreviateTeamName(m.awayTeam)}</span>
+      <div class="calendar-week-team">${crestImg({ crest: m.homeCrest, shortName: m.homeTeam }, "calendar-cell-crest")}<span>${abbreviateTeamName(
+        m.homeTeam
+      )}</span></div>
+      <div class="calendar-week-team">${crestImg({ crest: m.awayCrest, shortName: m.awayTeam }, "calendar-cell-crest")}<span>${abbreviateTeamName(
+        m.awayTeam
+      )}</span></div>
     </div>
   `
     )
@@ -2111,21 +2123,21 @@ function calendarCellPreviewHtml(day) {
   return `${lines}${extra > 0 ? `<div class="calendar-cell-more">+${extra}경기</div>` : ""}`;
 }
 
+const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
+
 function renderCalendarGrid(days) {
-  const { year, month } = calendarState;
-  const firstWeekday = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayStr = toISODate(dateWithOffset(0));
   const selectedStr = toISODate(dateWithOffset(state.dayOffset));
 
   const cells = [];
-  for (let i = 0; i < firstWeekday; i++) cells.push('<div class="calendar-cell empty"></div>');
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  for (let i = 0; i < 7; i++) {
+    const cellDate = new Date(calendarWeekStart);
+    cellDate.setDate(cellDate.getDate() + i);
+    const dateStr = toISODate(cellDate);
     const day = days[dateStr];
     cells.push(`
       <button type="button" class="calendar-cell ${dateStr === todayStr ? "today" : ""} ${dateStr === selectedStr ? "selected" : ""}" data-date="${dateStr}">
-        <span class="calendar-cell-day">${d}${day ? `<span class="calendar-cell-count">${day.count}</span>` : ""}</span>
+        <span class="calendar-cell-day">${WEEKDAY_KO[cellDate.getDay()]} ${cellDate.getDate()}${day ? `<span class="calendar-cell-count">${day.count}</span>` : ""}</span>
         ${calendarCellPreviewHtml(day)}
       </button>
     `);
@@ -2144,30 +2156,19 @@ function renderCalendarGrid(days) {
   });
 }
 
-document.getElementById("calendar-prev-month")?.addEventListener("click", () => {
-  calendarState.month--;
-  if (calendarState.month < 0) {
-    calendarState.month = 11;
-    calendarState.year--;
-  }
-  loadCalendarMonth();
+document.getElementById("calendar-prev-week")?.addEventListener("click", () => {
+  calendarWeekStart.setDate(calendarWeekStart.getDate() - 7);
+  loadCalendarWeek();
 });
-document.getElementById("calendar-next-month")?.addEventListener("click", () => {
-  calendarState.month++;
-  if (calendarState.month > 11) {
-    calendarState.month = 0;
-    calendarState.year++;
-  }
-  loadCalendarMonth();
+document.getElementById("calendar-next-week")?.addEventListener("click", () => {
+  calendarWeekStart.setDate(calendarWeekStart.getDate() + 7);
+  loadCalendarWeek();
 });
-// "오늘" 버튼(2026-11-12 사용자 요청) - 달만 오늘 달로 되돌리고, 실제 날짜 선택(오늘로 이동)은
-// 아래 날짜 칸 클릭과 똑같이 처리한다(선택 중인 날짜 표시가 같이 갱신되도록).
+// "오늘" 버튼(2026-11-12 사용자 요청) - 오늘이 속한 주로 돌아가고, 선택 중인 날짜도 오늘로 맞춘다.
 document.getElementById("calendar-today-btn")?.addEventListener("click", () => {
-  const today = dateWithOffset(0);
-  calendarState.year = today.getFullYear();
-  calendarState.month = today.getMonth();
+  calendarWeekStart = startOfWeek(dateWithOffset(0));
   state.dayOffset = 0;
-  loadCalendarMonth();
+  loadCalendarWeek();
 });
 
 el.datePickerBtn.addEventListener("click", openCalendarView);

@@ -48,20 +48,25 @@ export async function handleMatches(request, env, url) {
   return json({ matches });
 }
 
-// 날짜 선택 캘린더(2026-11-12 사용자 피드백)용 - 하루에 많게는 80~90경기까지 몰려서(전세계 경기를
-// 다 세므로) 칸 안에 전부 보여줄 수 없다. K리그1/2·5대리그·UEFA 클럽대항전(오늘 득점자 표시와 같은
-// 기준, 2026-11-12) 위주로 몇 개만 미리보기로 뽑고 나머지는 숫자로만("+N") 뭉뚱그린다.
+// 날짜 선택 캘린더(2026-11-12 사용자 피드백, 2026-11-12 주차 단위로 변경)용 - 하루에 많게는
+// 80~90경기까지 몰려서(전세계 경기를 다 세므로) 칸 안에 전부 보여줄 수 없다. K리그1/2·5대리그·UEFA
+// 클럽대항전(오늘 득점자 표시와 같은 기준) 위주로 몇 개만 미리보기로 뽑고 나머지는 숫자로만("+N")
+// 뭉뚱그린다. 월 단위(한 화면에 7x6칸)는 모바일 폭에서 칸이 너무 좁아져 깨진다는 제보로 주 단위
+// (7x1칸, 칸마다 세로 공간을 넉넉히 씀)로 바꿨다 - from/to 날짜 범위를 직접 받아서 월 경계를 걸쳐도
+// (예: 11/29~12/5) 한 번에 조회할 수 있다.
 const CALENDAR_PREVIEW_CODES = new Set(["KL1", "KL2", "PL", "PD", "BL1", "SA", "FL1", "CL", "EL", "ECL"]);
-const CALENDAR_PREVIEW_MAX = 4;
+const CALENDAR_PREVIEW_MAX = 6;
 
 export async function handleMatchesCalendar(request, env, url) {
-  const month = url.searchParams.get("month") || toKstDateString(new Date().toISOString()).slice(0, 7);
+  const todayStr = toKstDateString(new Date().toISOString());
+  const from = url.searchParams.get("from") || todayStr;
+  const to = url.searchParams.get("to") || todayStr;
   const blob = await getJSON(env, KV_KEYS.matches);
 
   const byDate = new Map();
   for (const m of blob?.matches || []) {
     const date = toKstDateString(m.utcDate);
-    if (!date.startsWith(month)) continue;
+    if (date < from || date > to) continue;
     if (!byDate.has(date)) byDate.set(date, []);
     byDate.get(date).push(m);
   }
@@ -87,5 +92,5 @@ export async function handleMatchesCalendar(request, env, url) {
     };
   }
 
-  return json({ month, days });
+  return json({ from, to, days });
 }
