@@ -2109,12 +2109,13 @@ function calendarCellPreviewHtml(day) {
     .map(
       (m) => `
     <div class="calendar-cell-match">
-      <div class="calendar-week-team">${crestImg({ crest: m.homeCrest, shortName: m.homeTeam }, "calendar-cell-crest")}<span>${abbreviateTeamName(
+      <span class="calendar-week-team">${crestImg({ crest: m.homeCrest, shortName: m.homeTeam }, "calendar-cell-crest")}${abbreviateTeamName(
         m.homeTeam
-      )}</span></div>
-      <div class="calendar-week-team">${crestImg({ crest: m.awayCrest, shortName: m.awayTeam }, "calendar-cell-crest")}<span>${abbreviateTeamName(
+      )}</span>
+      <span class="calendar-cell-vs">vs</span>
+      <span class="calendar-week-team">${crestImg({ crest: m.awayCrest, shortName: m.awayTeam }, "calendar-cell-crest")}${abbreviateTeamName(
         m.awayTeam
-      )}</span></div>
+      )}</span>
     </div>
   `
     )

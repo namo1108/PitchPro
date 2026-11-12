@@ -4337,13 +4337,17 @@ table.standings-table {
   padding: 1px 5px;
 }
 
+/* 경기 한 줄을 "A vs B"처럼 가로로 보여준다(2026-11-12 사용자 요청 - 세로로 쌓지 말아달라는 피드백).
+   칸 너비가 좁아서(7열) 세로 공간을 대신 키워뒀으니, 한 줄이 넘치면 줄바꿈으로 자연스럽게 두 줄까지는
+   허용한다(완전히 넘치는 긴 이름만 ellipsis로 자른다). */
 .calendar-cell-match {
   width: 100%;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 3px;
-  padding: 4px 0;
+  padding: 5px 0;
   border-top: 1px dashed var(--border);
 }
 
@@ -4352,26 +4356,23 @@ table.standings-table {
 }
 
 .calendar-week-team {
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
   align-items: center;
-  gap: 2px;
-  width: 100%;
-}
-
-.calendar-week-team span {
+  gap: 3px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 44%;
   font-size: 9.5px;
   font-weight: 700;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100%;
 }
 
 .calendar-cell-crest {
-  width: 22px;
-  height: 22px;
+  width: 16px;
+  height: 16px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -4384,10 +4385,10 @@ table.standings-table {
 
 @media (max-width: 400px) {
   .calendar-cell-crest {
-    width: 18px;
-    height: 18px;
+    width: 14px;
+    height: 14px;
   }
-  .calendar-week-team span {
+  .calendar-week-team {
     font-size: 8.5px;
   }
 }
