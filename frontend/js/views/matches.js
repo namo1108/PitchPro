@@ -2092,30 +2092,19 @@ async function loadCalendarWeek() {
 }
 
 // 하루에 많게는 80~90경기까지 몰려서(전세계 경기를 다 세므로) 칸 안에 전부 보여줄 수 없다 - 서버가
-// 이미 주요 대회(K리그1/2·5대리그·UEFA 클럽대항전) 위주로 최대 6개만 추려서 보내주면(routes/matches.js
-// 참고), 그걸 엠블럼 + 약어 팀명으로 짧게 적고 나머지는 "+N"으로 뭉뚱그린다. 한글 이름(맨시티, 레알
-// 등)은 이미 충분히 짧으니 그대로 두고, 한글 매핑이 없는 팀만 영문 긴 이름을 첫 단어 3글자로 줄인다
-// (공식 3레터 코드는 아니지만 팀마다 코드를 따로 관리하지 않고도 알아볼 수 있는 선에서 줄인 것).
-function abbreviateTeamName(name) {
-  if (!name) return "";
-  if (/[가-힣]/.test(name)) return name;
-  const firstWord = name.split(" ")[0];
-  return firstWord.slice(0, 3).toUpperCase();
-}
-
+// 이미 주요 대회(K리그1/2·5대리그·UEFA 클럽대항전) 위주로 최대 6개만 추려서 보내준다(routes/matches.js
+// 참고). 7칸짜리 좁은 폭에 양팀 엠블럼+약어 이름까지 한 줄에 넣으면 줄바꿈이 꼬여서 깨진다는 피드백
+// (2026-11-12) - 이름은 빼고 엠블럼만 가로로 "vs" 사이에 두는 걸로 바꿨다. 로고만으로도 어느
+// 팀인지 알아보기 쉽고, 폭이 훨씬 덜 빠듯하다(alt 텍스트로 팀명은 여전히 접근성에 남아있음).
 function calendarCellPreviewHtml(day) {
   if (!day) return "";
   const lines = day.preview
     .map(
       (m) => `
     <div class="calendar-cell-match">
-      <span class="calendar-week-team">${crestImg({ crest: m.homeCrest, shortName: m.homeTeam }, "calendar-cell-crest")}${abbreviateTeamName(
-        m.homeTeam
-      )}</span>
+      ${crestImg({ crest: m.homeCrest, shortName: m.homeTeam }, "calendar-cell-crest")}
       <span class="calendar-cell-vs">vs</span>
-      <span class="calendar-week-team">${crestImg({ crest: m.awayCrest, shortName: m.awayTeam }, "calendar-cell-crest")}${abbreviateTeamName(
-        m.awayTeam
-      )}</span>
+      ${crestImg({ crest: m.awayCrest, shortName: m.awayTeam }, "calendar-cell-crest")}
     </div>
   `
     )

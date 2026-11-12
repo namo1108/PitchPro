@@ -4337,17 +4337,16 @@ table.standings-table {
   padding: 1px 5px;
 }
 
-/* 경기 한 줄을 "A vs B"처럼 가로로 보여준다(2026-11-12 사용자 요청 - 세로로 쌓지 말아달라는 피드백).
-   칸 너비가 좁아서(7열) 세로 공간을 대신 키워뒀으니, 한 줄이 넘치면 줄바꿈으로 자연스럽게 두 줄까지는
-   허용한다(완전히 넘치는 긴 이름만 ellipsis로 자른다). */
+/* 경기 한 줄을 "엠블럼 vs 엠블럼"으로 가로로 보여준다(2026-11-12) - 처음엔 팀명 약어까지 같이
+   넣으려 했는데, 7열짜리 좁은 칸에선 줄바꿈이 꼬여서 깨졌다(사용자 제보) - 이름은 빼고 로고만
+   가로로 둬서 폭 부담을 줄였다(로고 alt에 팀명은 남아있어 접근성엔 문제 없음). */
 .calendar-cell-match {
   width: 100%;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  padding: 5px 0;
+  gap: 5px;
+  padding: 6px 0;
   border-top: 1px dashed var(--border);
 }
 
@@ -4355,26 +4354,18 @@ table.standings-table {
   border-top: none;
 }
 
-.calendar-week-team {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 44%;
-  font-size: 9.5px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .calendar-cell-crest {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
   flex-shrink: 0;
+}
+
+.calendar-cell-vs {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
 }
 
 .calendar-cell-more {
@@ -4385,11 +4376,8 @@ table.standings-table {
 
 @media (max-width: 400px) {
   .calendar-cell-crest {
-    width: 14px;
-    height: 14px;
-  }
-  .calendar-week-team {
-    font-size: 8.5px;
+    width: 17px;
+    height: 17px;
   }
 }
 
