@@ -110,7 +110,14 @@ export function setDayOffset(offset) {
   state.dayOffset = offset;
 }
 
+// 새로고침 버튼/자동 새로고침(30초)/날짜 이동이 겹치면 먼저 보낸 요청이 나중에 응답이 와서(네트워크
+// 지연 등으로 순서가 뒤바뀌면) 이미 다른 날짜로 넘어간 화면을 예전 날짜 데이터로 덮어써버리는 "잔상"
+// 문제가 있었다(2026-11-12 제보). 매 호출마다 번호를 매겨서, 응답이 왔을 때 그사이 더 최신 호출이
+// 시작됐으면(번호가 바뀌었으면) 이 응답은 버리고 화면을 안 건드린다.
+let matchesRequestId = 0;
+
 export async function loadMatches(opts = {}) {
+  const requestId = ++matchesRequestId;
   el.dateLabel.textContent = formatDateLabel(state.dayOffset);
   if (!opts.silent) saveViewState({ view: "matches", dayOffset: state.dayOffset });
   // 이 날짜를 이번 세션에 이미 한 번 그려봤으면(탭을 오가거나 재방문), 화면에 남겨둔 채 뒤에서
@@ -123,6 +130,7 @@ export async function loadMatches(opts = {}) {
   try {
     const iso = toISODate(dateWithOffset(state.dayOffset));
     const data = await fetchJSON(`/matches?date=${iso}`);
+    if (requestId !== matchesRequestId) return; // 더 최신 요청이 이미 시작됨 - 이 응답은 버린다
     const matches = data.matches || [];
     state.lastMatches = matches;
     renderMatches(matches);
@@ -130,6 +138,7 @@ export async function loadMatches(opts = {}) {
     if (!opts.silent && !alreadyLoaded) fadeIn(el.matchesList);
     startAutoRefresh();
   } catch (err) {
+    if (requestId !== matchesRequestId) return;
     if (!opts.silent && !alreadyLoaded) el.matchesList.innerHTML = `<div class="error-state">경기 정보를 불러오지 못했습니다.<br>${err.message}</div>`;
   }
 }
