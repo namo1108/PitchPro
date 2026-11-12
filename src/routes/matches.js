@@ -48,17 +48,38 @@ export async function handleMatches(request, env, url) {
   return json({ matches });
 }
 
-// 날짜 선택 캘린더(2026-11-12 사용자 피드백 - "캘린더에 어떤 경기들이 있는지 보이면 좋겠다")용 -
-// 이미 KV에 캐싱된 matches 하나만 읽어서 달별로 묶어 세어주면 되니 API-Football 호출이 전혀
-// 추가되지 않는다(handleMatches와 같은 소스 재사용).
+// 날짜 선택 캘린더(2026-11-12 사용자 피드백)용 - 하루에 많게는 80~90경기까지 몰려서(전세계 경기를
+// 다 세므로) 칸 안에 전부 보여줄 수 없다. K리그1/2·5대리그·UEFA 클럽대항전(오늘 득점자 표시와 같은
+// 기준, 2026-11-12) 위주로 몇 개만 미리보기로 뽑고 나머지는 숫자로만("+N") 뭉뚱그린다.
+const CALENDAR_PREVIEW_CODES = new Set(["KL1", "KL2", "PL", "PD", "BL1", "SA", "FL1", "CL", "EL", "ECL"]);
+const CALENDAR_PREVIEW_MAX = 3;
+
 export async function handleMatchesCalendar(request, env, url) {
   const month = url.searchParams.get("month") || toKstDateString(new Date().toISOString()).slice(0, 7);
   const blob = await getJSON(env, KV_KEYS.matches);
-  const counts = {};
+
+  const byDate = new Map();
   for (const m of blob?.matches || []) {
     const date = toKstDateString(m.utcDate);
     if (!date.startsWith(month)) continue;
-    counts[date] = (counts[date] || 0) + 1;
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date).push(m);
   }
-  return json({ month, counts });
+
+  const days = {};
+  for (const [date, dayMatches] of byDate) {
+    const sorted = dayMatches
+      .slice()
+      .sort((a, b) => (CALENDAR_PREVIEW_CODES.has(b.competition.code) ? 1 : 0) - (CALENDAR_PREVIEW_CODES.has(a.competition.code) ? 1 : 0));
+    days[date] = {
+      count: dayMatches.length,
+      preview: sorted.slice(0, CALENDAR_PREVIEW_MAX).map((m) => ({
+        homeTeam: koreanizeTeam(m.homeTeam).shortName,
+        awayTeam: koreanizeTeam(m.awayTeam).shortName,
+        competitionCode: m.competition.code,
+      })),
+    };
+  }
+
+  return json({ month, days });
 }

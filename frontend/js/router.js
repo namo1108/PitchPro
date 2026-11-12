@@ -11,7 +11,7 @@ const els = {
   backButtons: document.querySelectorAll(".back-btn"),
 };
 
-PRIMARY_VIEWS.concat(["detail", "team", "player", "soccerschool", "admin"]).forEach((name) => {
+PRIMARY_VIEWS.concat(["detail", "team", "player", "calendar", "soccerschool", "admin"]).forEach((name) => {
   els.views[name] = document.getElementById(`view-${name}`);
 });
 

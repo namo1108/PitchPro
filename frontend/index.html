@@ -411,6 +411,22 @@
         </div>
       </section>
 
+      <!-- 날짜 선택 캘린더 (2026-11-12 사용자 피드백 - "화면 전체에 1일 단위로 어떤 경기 있는지
+           볼 수 있도록"). 작은 팝업이 아니라 다른 상세 화면들과 같은 전체화면 뷰로 둔다. -->
+      <section id="view-calendar" class="view">
+        <button class="back-btn">← 목록으로</button>
+        <div class="calendar-page-header">
+          <button type="button" id="calendar-prev-month" class="calendar-month-nav" aria-label="이전 달">‹</button>
+          <h2 id="calendar-month-label" class="calendar-month-label"></h2>
+          <button type="button" id="calendar-next-month" class="calendar-month-nav" aria-label="다음 달">›</button>
+          <button type="button" id="calendar-today-btn" class="calendar-today-btn">오늘</button>
+        </div>
+        <div class="calendar-weekday-row">
+          <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+        </div>
+        <div id="calendar-grid" class="calendar-grid"></div>
+      </section>
+
       <!-- 경기 상세 -->
       <section id="view-detail" class="view">
         <!-- 리그 탭과 같은 원리 - renderMatchDetail이 #view-detail에 data-theme를 얹으면 그 리그의
@@ -622,24 +638,6 @@
         </div>
         <div id="update-notes-date" class="update-notes-date"></div>
         <ul id="update-notes-list" class="update-notes-list"></ul>
-      </div>
-    </div>
-
-    <!-- 날짜 선택 캘린더(2026-11-12 사용자 피드백 - "캘린더에 어떤 경기들이 있는지 보이면 좋겠다").
-         네이티브 <input type="date">는 날짜별 경기 유무 표시를 커스터마이징할 수 없어서 직접 만든다. -->
-    <div id="calendar-modal" class="points-info-modal" style="display: none;">
-      <div class="points-info-backdrop"></div>
-      <div class="points-info-card calendar-card">
-        <div class="points-info-header">
-          <button type="button" id="calendar-prev-month" class="calendar-month-nav" aria-label="이전 달">‹</button>
-          <h3 id="calendar-month-label"></h3>
-          <button type="button" id="calendar-next-month" class="calendar-month-nav" aria-label="다음 달">›</button>
-          <button id="calendar-close" class="points-info-close" aria-label="닫기">✕</button>
-        </div>
-        <div class="calendar-weekday-row">
-          <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
-        </div>
-        <div id="calendar-grid" class="calendar-grid"></div>
       </div>
     </div>
 

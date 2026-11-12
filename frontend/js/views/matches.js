@@ -2055,19 +2055,16 @@ el.timeSortBtn?.addEventListener("click", () => {
 
 // ---------- 날짜 선택 캘린더 (2026-11-12 사용자 피드백) ----------
 // 네이티브 <input type="date">는 날짜별 경기 유무 표시를 커스터마이징할 수 없어서, 월 단위로
-// /matches/calendar(기존 캐시만 읽는 가벼운 집계 엔드포인트)를 불러와 직접 그린다.
+// /matches/calendar(기존 캐시만 읽는 가벼운 집계 엔드포인트)를 불러와 직접 그린다. 작은 팝업이
+// 아니라 다른 상세 화면과 같은 전체화면 뷰로 열어서(2026-11-12 사용자 요청) 칸을 넉넉하게 쓴다.
 const calendarState = { year: 0, month: 0 };
 
-function openCalendarPopup() {
+function openCalendarView() {
   const base = dateWithOffset(state.dayOffset);
   calendarState.year = base.getFullYear();
   calendarState.month = base.getMonth();
-  document.getElementById("calendar-modal").style.display = "flex";
+  pushDetail("calendar");
   loadCalendarMonth();
-}
-
-function closeCalendarPopup() {
-  document.getElementById("calendar-modal").style.display = "none";
 }
 
 async function loadCalendarMonth() {
@@ -2077,13 +2074,23 @@ async function loadCalendarMonth() {
   try {
     const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
     const data = await fetchJSON(`/matches/calendar?month=${monthStr}`);
-    renderCalendarGrid(data.counts || {});
+    renderCalendarGrid(data.days || {});
   } catch {
     renderCalendarGrid({});
   }
 }
 
-function renderCalendarGrid(counts) {
+// 하루에 많게는 80~90경기까지 몰려서(전세계 경기를 다 세므로) 칸 안에 전부 보여줄 수 없다 - 서버가
+// 이미 주요 대회(K리그1/2·5대리그·UEFA 클럽대항전) 위주로 최대 3개만 추려서 보내주면(routes/matches.js
+// 참고), 그걸 팀명만 짧게 적고 나머지는 "+N"으로 뭉뚱그린다.
+function calendarCellPreviewHtml(day) {
+  if (!day) return "";
+  const lines = day.preview.map((m) => `<div class="calendar-cell-match">${m.homeTeam} vs ${m.awayTeam}</div>`).join("");
+  const extra = day.count - day.preview.length;
+  return `${lines}${extra > 0 ? `<div class="calendar-cell-more">+${extra}경기</div>` : ""}`;
+}
+
+function renderCalendarGrid(days) {
   const { year, month } = calendarState;
   const firstWeekday = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -2094,11 +2101,11 @@ function renderCalendarGrid(counts) {
   for (let i = 0; i < firstWeekday; i++) cells.push('<div class="calendar-cell empty"></div>');
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    const count = counts[dateStr] || 0;
+    const day = days[dateStr];
     cells.push(`
       <button type="button" class="calendar-cell ${dateStr === todayStr ? "today" : ""} ${dateStr === selectedStr ? "selected" : ""}" data-date="${dateStr}">
-        <span class="calendar-cell-day">${d}</span>
-        ${count ? '<span class="calendar-cell-dot"></span>' : ""}
+        <span class="calendar-cell-day">${d}${day ? `<span class="calendar-cell-count">${day.count}</span>` : ""}</span>
+        ${calendarCellPreviewHtml(day)}
       </button>
     `);
   }
@@ -2110,7 +2117,7 @@ function renderCalendarGrid(counts) {
       const picked = new Date(`${cell.dataset.date}T00:00:00Z`);
       const today = new Date(`${toISODate(dateWithOffset(0))}T00:00:00Z`);
       state.dayOffset = Math.round((picked - today) / 86400000);
-      closeCalendarPopup();
+      history.back();
       loadMatches();
     });
   });
@@ -2132,10 +2139,17 @@ document.getElementById("calendar-next-month")?.addEventListener("click", () => 
   }
   loadCalendarMonth();
 });
-document.getElementById("calendar-close")?.addEventListener("click", closeCalendarPopup);
-document.querySelector("#calendar-modal .points-info-backdrop")?.addEventListener("click", closeCalendarPopup);
+// "오늘" 버튼(2026-11-12 사용자 요청) - 달만 오늘 달로 되돌리고, 실제 날짜 선택(오늘로 이동)은
+// 아래 날짜 칸 클릭과 똑같이 처리한다(선택 중인 날짜 표시가 같이 갱신되도록).
+document.getElementById("calendar-today-btn")?.addEventListener("click", () => {
+  const today = dateWithOffset(0);
+  calendarState.year = today.getFullYear();
+  calendarState.month = today.getMonth();
+  state.dayOffset = 0;
+  loadCalendarMonth();
+});
 
-el.datePickerBtn.addEventListener("click", openCalendarPopup);
+el.datePickerBtn.addEventListener("click", openCalendarView);
 
 onTabChange("matches", loadMatches);
 
