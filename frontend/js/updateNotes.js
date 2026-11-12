@@ -8,11 +8,16 @@ const SEEN_KEY_PREFIX = "update-notes-seen-";
 
 const UPDATE_NOTES = [
   {
-    date: "2026-11-12",
+    // 2026-11-12 하루 동안 나간 여러 업데이트를 한 번에 정리 - 같은 날짜 키로 여러 번 덧붙이면
+    // 이미 한 번 본 사용자에겐 안 뜨니(날짜 문자열 기준으로 "봤음" 처리), -v2로 새 키를 만들어서
+    // 다시 한 번 띄운다(사용자 요청 - "전체 업데이트한 내용 팝업 띄워주고").
+    date: "2026-11-12-v2",
     notes: [
-      "📅 날짜 선택 달력에서 경기 있는 날이 바로 보여요",
+      "📅 경기 탭 캘린더가 한 주씩 크게 보여요 - 날짜마다 그날 경기(국가대표 → K리그·5대리그·유럽 클럽대항전 → 친선경기 순)를 엠블럼으로 바로 확인하고, 눌러서 바로 경기 상세로 갈 수 있어요. '오늘' 버튼으로 바로 돌아올 수 있어요",
       "⚽ K리그1·2, 5대리그, 유럽 클럽대항전(CL·EL·ECL) 경기는 목록에서 바로 득점자를 확인할 수 있어요",
       "📰 최신뉴스를 전체/국내/해외로 나눠 볼 수 있어요",
+      "🎬 최신뉴스에 '오늘의 하이라이트'가 생겼어요 - 오늘 끝난 주요 경기를 유튜브/쿠팡플레이 다시보기로 바로 연결해드려요",
+      "⚡ 골/카드 등 경기 중 알림이 더 빨라졌어요",
     ],
   },
   {
@@ -114,7 +119,9 @@ function show() {
   const modal = modalEl();
   if (!modal) return;
   const dateEl = document.getElementById("update-notes-date");
-  if (dateEl) dateEl.textContent = latest.date;
+  // "-v2"처럼 하루에 여러 번 띄우려고 붙인 버전 꼬리표는 "봤음" 키로만 쓰고, 화면에 보여줄
+  // 날짜 라벨에서는 떼어낸다(사용자한테 날짜 뒤에 -v2가 그대로 보이면 버그처럼 보임).
+  if (dateEl) dateEl.textContent = latest.date.replace(/-v\d+$/, "");
   document.getElementById("update-notes-list").innerHTML = latest.notes.map((n) => `<li>${n}</li>`).join("");
   modal.style.display = "flex";
 }
