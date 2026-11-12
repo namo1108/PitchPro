@@ -1,5 +1,6 @@
 import { routeApiRequest } from "./router.js";
 import { runScheduledTasks } from "./scheduled/index.js";
+import { renderServerShell } from "./lib/ssr.js";
 
 // 앱인토스(Apps in Toss) 미니앱은 우리 사이트를 그대로 서빙하는 게 아니라 정적 파일을 통째로
 // 복사해 자기네 WebView 안(다른 출처)에서 띄우는 방식이라, 상대경로 /api 요청이 우리 서버가
@@ -30,6 +31,17 @@ export default {
           status: 502,
           headers: { "content-type": "application/json; charset=utf-8", ...CORS_HEADERS },
         });
+      }
+    }
+    // 애드센스 심사용 서버사이드 렌더링(2026-11-12, src/lib/ssr.js 참고) - 루트 경로만 가로채서
+    // 오늘 경기/최신 뉴스를 미리 HTML에 심어 보낸다. 그 외 정적 파일(/style.css, /js/* 등)은
+    // 평소처럼 ASSETS가 그대로 서빙한다(여기서 가로채면 괜히 느려지기만 함).
+    if (url.pathname === "/") {
+      try {
+        return await renderServerShell(request, env);
+      } catch (err) {
+        console.error("SSR shell failed, falling back to static index.html:", err);
+        return env.ASSETS.fetch(request);
       }
     }
     return env.ASSETS.fetch(request);

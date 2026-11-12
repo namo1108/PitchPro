@@ -5,7 +5,10 @@
   "assets": {
     "directory": "./frontend",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"]
+    // "/" 추가(2026-11-12) - 애드센스 심사용으로 루트 요청만 서버에서 가로채 실제 콘텐츠를
+    // 미리 심어 보낸다(src/lib/ssr.js). 그 외 정적 파일은 여전히 목록에 없어서 평소처럼 ASSETS가
+    // 바로 서빙한다(워커를 거치지 않아 더 빠름).
+    "run_worker_first": ["/api/*", "/"]
   },
   "kv_namespaces": [
     { "binding": "CACHE", "id": "4a82ab329c014cf781586986df945dbc" }
