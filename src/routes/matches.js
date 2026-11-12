@@ -73,11 +73,17 @@ export async function handleMatchesCalendar(request, env, url) {
       .sort((a, b) => (CALENDAR_PREVIEW_CODES.has(b.competition.code) ? 1 : 0) - (CALENDAR_PREVIEW_CODES.has(a.competition.code) ? 1 : 0));
     days[date] = {
       count: dayMatches.length,
-      preview: sorted.slice(0, CALENDAR_PREVIEW_MAX).map((m) => ({
-        homeTeam: koreanizeTeam(m.homeTeam).shortName,
-        awayTeam: koreanizeTeam(m.awayTeam).shortName,
-        competitionCode: m.competition.code,
-      })),
+      preview: sorted.slice(0, CALENDAR_PREVIEW_MAX).map((m) => {
+        const home = koreanizeTeam(m.homeTeam);
+        const away = koreanizeTeam(m.awayTeam);
+        return {
+          homeTeam: home.shortName,
+          homeCrest: home.crest,
+          awayTeam: away.shortName,
+          awayCrest: away.crest,
+          competitionCode: m.competition.code,
+        };
+      }),
     };
   }
 
