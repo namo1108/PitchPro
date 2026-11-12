@@ -4300,7 +4300,7 @@ table.standings-table {
 }
 
 .calendar-cell {
-  min-height: 98px;
+  min-height: 132px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;

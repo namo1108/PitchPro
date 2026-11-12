@@ -52,7 +52,7 @@ export async function handleMatches(request, env, url) {
 // 다 세므로) 칸 안에 전부 보여줄 수 없다. K리그1/2·5대리그·UEFA 클럽대항전(오늘 득점자 표시와 같은
 // 기준, 2026-11-12) 위주로 몇 개만 미리보기로 뽑고 나머지는 숫자로만("+N") 뭉뚱그린다.
 const CALENDAR_PREVIEW_CODES = new Set(["KL1", "KL2", "PL", "PD", "BL1", "SA", "FL1", "CL", "EL", "ECL"]);
-const CALENDAR_PREVIEW_MAX = 3;
+const CALENDAR_PREVIEW_MAX = 4;
 
 export async function handleMatchesCalendar(request, env, url) {
   const month = url.searchParams.get("month") || toKstDateString(new Date().toISOString()).slice(0, 7);
