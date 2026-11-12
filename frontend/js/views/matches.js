@@ -2091,12 +2091,14 @@ async function loadCalendarWeek() {
     weekEnd.getMonth() + 1
   }월 ${weekEnd.getDate()}일`;
 
-  renderCalendarGrid({});
+  // 로딩 중엔 빈 데이터로 그리지 않는다 - 빈 칸(day 없음)은 "경기 없음" 확정 표시로 쓰고 있어서,
+  // 로딩 중을 그걸로 그리면 아직 안 받아왔을 뿐인데 "경기 없음"으로 잘못 보인다(2026-11-12 확인).
+  document.getElementById("calendar-grid").innerHTML = skeletonList(3);
   try {
     const data = await fetchJSON(`/matches/calendar?from=${from}&to=${to}`);
     renderCalendarGrid(data.days || {});
-  } catch {
-    renderCalendarGrid({});
+  } catch (err) {
+    document.getElementById("calendar-grid").innerHTML = `<div class="error-state">일정을 불러오지 못했습니다.<br>${err.message}</div>`;
   }
 }
 
@@ -2106,7 +2108,10 @@ async function loadCalendarWeek() {
 // (2026-11-12) - 이름은 빼고 엠블럼만 가로로 "vs" 사이에 두는 걸로 바꿨다. 로고만으로도 어느
 // 팀인지 알아보기 쉽고, 폭이 훨씬 덜 빠듯하다(alt 텍스트로 팀명은 여전히 접근성에 남아있음).
 function calendarCellPreviewHtml(day) {
-  if (!day) return "";
+  // 경기가 0건인 날은 day 자체가 안 내려온다(서버가 실제로 경기 있는 날짜만 키를 만듦) - 빈 칸만
+  // 덩그러니 있으면 "아직 로딩 중"인지 "진짜로 경기가 없는"건지 구분이 안 된다는 제보(2026-11-12)로
+  // 안내 문구를 넣는다.
+  if (!day) return '<div class="calendar-cell-empty">경기 없음</div>';
   const lines = day.preview
     .map(
       (m) => `

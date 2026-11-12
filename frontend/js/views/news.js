@@ -1,8 +1,13 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange } from "../router.js";
-import { KST_TIME_ZONE, fadeIn, skeletonList } from "../format.js";
+import { KST_TIME_ZONE, fadeIn, skeletonList, crestImg } from "../format.js";
+import { loadMatchDetail } from "./matches.js";
 
-const el = { list: document.getElementById("news-list"), filterTabs: document.getElementById("news-filter-tabs") };
+const el = {
+  list: document.getElementById("news-list"),
+  filterTabs: document.getElementById("news-filter-tabs"),
+  highlights: document.getElementById("highlights-section"),
+};
 
 // 전체 받아온 뉴스를 들고 있다가 필터 탭 클릭 시 다시 서버에 안 물어보고 바로 걸러서 다시 그린다.
 let allItems = [];
@@ -72,4 +77,65 @@ function renderNews(items, animate) {
   if (animate) fadeIn(el.list);
 }
 
+// ---------- 오늘의 하이라이트 (2026-11-12 사용자 요청) ----------
+// "최신뉴스에서 그날 주요 경기 하이라이트를 유튜브/쿠팡플레이 등으로 볼 수 있게 해줘" - 공식 하이라이트
+// API는 따로 없어서(저작권상 API-Football도 영상을 안 줌), 유튜브 검색 링크(팀명만 맞으면 거의 항상
+// 뭔가는 나옴)를 기본으로 달고, 이미 중계 링크로 쓰고 있던 쿠팡플레이 허브 URL(config.js의
+// findBroadcastLink, match.broadcastUrl로 이미 내려옴)이 있으면 "다시보기"로 같이 보여준다.
+// K리그1/2·5대리그·UEFA 클럽대항전 한정(골 득점자 표시와 같은 기준) - 범위를 넓히면 하루에도 경기가
+// 너무 많아 의미 없는 하위리그/친선경기까지 다 뜬다.
+const HIGHLIGHT_CODES = new Set(["KL1", "KL2", "PL", "PD", "BL1", "SA", "FL1", "CL", "EL", "ECL"]);
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function youtubeHighlightUrl(home, away) {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${home} ${away} 하이라이트`)}`;
+}
+
+async function loadHighlights() {
+  if (!el.highlights) return;
+  try {
+    const todayKst = new Date(Date.now() + KST_OFFSET_MS).toISOString().slice(0, 10);
+    const data = await fetchJSON(`/matches?date=${todayKst}`);
+    const matches = (data.matches || []).filter((m) => m.status === "FINISHED" && HIGHLIGHT_CODES.has(m.competition.code));
+    renderHighlights(matches);
+  } catch {
+    el.highlights.innerHTML = "";
+  }
+}
+
+function renderHighlights(matches) {
+  if (!matches.length) {
+    el.highlights.innerHTML = "";
+    return;
+  }
+
+  el.highlights.innerHTML = `
+    <h2 class="section-title">🎬 오늘의 하이라이트</h2>
+    <div class="highlights-list">
+      ${matches
+        .map((m) => {
+          const home = m.homeTeam.shortName || m.homeTeam.name;
+          const away = m.awayTeam.shortName || m.awayTeam.name;
+          const score = `${m.score.fullTime.home} - ${m.score.fullTime.away}`;
+          return `
+        <div class="highlight-card" data-match-id="${m.id}">
+          <div class="highlight-teams">
+            ${crestImg(m.homeTeam, "highlight-crest")}<span class="highlight-score">${home} ${score} ${away}</span>${crestImg(m.awayTeam, "highlight-crest")}
+          </div>
+          <div class="highlight-links">
+            <a href="${youtubeHighlightUrl(home, away)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">▶ 유튜브에서 하이라이트</a>
+            ${m.broadcastUrl ? `<a href="${m.broadcastUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${m.broadcastProvider}에서 다시보기</a>` : ""}
+          </div>
+        </div>
+      `;
+        })
+        .join("")}
+    </div>
+  `;
+  el.highlights.querySelectorAll("[data-match-id]").forEach((card) => {
+    card.addEventListener("click", () => loadMatchDetail(card.dataset.matchId));
+  });
+}
+
 onTabChange("news", loadNews);
+onTabChange("news", loadHighlights);
