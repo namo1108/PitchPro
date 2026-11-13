@@ -94,6 +94,31 @@ const HIGHLIGHT_CATEGORY = {
   PL: "overseas", PD: "overseas", BL1: "overseas", SA: "overseas", FL1: "overseas", CL: "overseas", EL: "overseas", ECL: "overseas",
 };
 const HIGHLIGHT_CODES = new Set(Object.keys(HIGHLIGHT_CATEGORY));
+// 국가대표 친선경기는 전 세계 거의 모든 나라가 A매치 기간에 한꺼번에 뛰어서(우즈베키스탄 vs 러시아,
+// 몰타 vs 에스와티니처럼), 코드만으로 거르면 축구 비인기국 경기까지 다 쏟아진다는 제보(2026-11-13 -
+// "이게 너무 지저분하잖아"). 대한민국은 무조건 포함하고, 그 외엔 월드컵 단골/주요 축구 강국일 때만
+// 보여준다 - 완벽한 목록은 아니지만 "낯선 나라끼리 경기"는 걸러진다. U20/U23 등 연령별 대표팀도 뺀다.
+const NOTABLE_NATIONS = new Set([
+  "대한민국", "south korea", "korea republic",
+  "일본", "japan", "브라질", "brazil", "아르헨티나", "argentina", "프랑스", "france", "잉글랜드", "england",
+  "스페인", "spain", "독일", "germany", "이탈리아", "italy", "포르투갈", "portugal", "네덜란드", "netherlands",
+  "벨기에", "belgium", "크로아티아", "croatia", "우루과이", "uruguay", "콜롬비아", "colombia", "멕시코", "mexico",
+  "미국", "usa", "united states", "모로코", "morocco", "세네갈", "senegal", "나이지리아", "nigeria", "가나", "ghana",
+  "사우디아라비아", "saudi arabia", "이란", "iran", "호주", "australia", "카타르", "qatar", "덴마크", "denmark",
+  "스위스", "switzerland", "폴란드", "poland", "세르비아", "serbia", "오스트리아", "austria", "스웨덴", "sweden",
+  "노르웨이", "norway", "웨일스", "wales", "스코틀랜드", "scotland", "우크라이나", "ukraine", "튀르키예", "turkey",
+  "그리스", "greece", "체코", "czech republic", "러시아", "russia", "캐나다", "canada", "에콰도르", "ecuador",
+  "칠레", "chile", "페루", "peru", "파라과이", "paraguay", "튀니지", "tunisia", "알제리", "algeria",
+  "카메룬", "cameroon", "코트디부아르", "ivory coast", "남아프리카공화국", "south africa", "중국", "china",
+  "이라크", "iraq", "우즈베키스탄", "uzbekistan", "태국", "thailand", "베트남", "vietnam", "인도네시아", "indonesia",
+]);
+
+function isNotableNationalMatch(m) {
+  const home = (m.homeTeam.name || "").toLowerCase();
+  const away = (m.awayTeam.name || "").toLowerCase();
+  if (/\bu-?1[5-9]\b|\bu-?2[0-3]\b/i.test(home) || /\bu-?1[5-9]\b|\bu-?2[0-3]\b/i.test(away)) return false;
+  return NOTABLE_NATIONS.has(home) || NOTABLE_NATIONS.has(away);
+}
 const HIGHLIGHT_TABS = [
   { id: "all", label: "전체" },
   { id: "national", label: "국가대표" },
@@ -114,7 +139,9 @@ async function loadHighlights() {
   try {
     const todayKst = new Date(Date.now() + KST_OFFSET_MS).toISOString().slice(0, 10);
     const data = await fetchJSON(`/matches?date=${todayKst}`);
-    allHighlights = (data.matches || []).filter((m) => m.status === "FINISHED" && HIGHLIGHT_CODES.has(m.competition.code));
+    allHighlights = (data.matches || [])
+      .filter((m) => m.status === "FINISHED" && HIGHLIGHT_CODES.has(m.competition.code))
+      .filter((m) => HIGHLIGHT_CATEGORY[m.competition.code] !== "national" || isNotableNationalMatch(m));
     renderHighlights();
   } catch {
     el.highlights.innerHTML = "";
