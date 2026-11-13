@@ -66,9 +66,13 @@ function matchRowHtml(m) {
 
 // 친선경기(FRIENDLY)는 제외하고, 대회별로 묶어서 실제 화면과 비슷한 순서로 보여준다 - 완벽히 같은
 // 정렬일 필요는 없다(어차피 JS가 바로 이어받아 다시 그림), "친선경기 수십 개가 뒤죽박죽" 상태만 피하면 된다.
+// 단, 국대 기간처럼 그날 경기가 전부 친선경기뿐이면 다 걸러서 빈 문자열이 나가고, 그러면 호출부가
+// "불러오는 중..." 플레이스홀더를 그대로 남겨둬서 애드센스가 또 "콘텐츠 없음"으로 반려한다
+// (2026-11-13 재반려로 확인) - 그런 날은 친선경기라도 보여주는 게 아예 안 보여주는 것보다 낫다.
 function matchesSectionHtml(matches) {
-  const curated = matches.filter((m) => m.competition?.code !== "FRIENDLY");
-  if (!curated.length) return "";
+  if (!matches.length) return "";
+  const curatedOnly = matches.filter((m) => m.competition?.code !== "FRIENDLY");
+  const curated = curatedOnly.length ? curatedOnly : matches;
 
   const groups = new Map();
   for (const m of curated) {

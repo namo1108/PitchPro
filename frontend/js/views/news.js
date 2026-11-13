@@ -86,11 +86,24 @@ function renderNews(items, animate) {
 // 캘린더 우선순위와 같은 기준) - 범위를 넓히면 하루에도 경기가 너무 많아 의미 없는 하위리그/친선경기
 // 까지 다 뜬다. 국가대표를 포함한 건(2026-11-12), 빼놓으면 지금 같은 A매치 기간엔 클럽 경기가 거의
 // 없어서 섹션이 통째로 비어 보였기 때문("하이라이트 영상은?" 제보).
-const HIGHLIGHT_CODES = new Set([
-  "KL1", "KL2", "PL", "PD", "BL1", "SA", "FL1", "CL", "EL", "ECL",
-  "INTFRIENDLY", "UNL", "CNL", "EC", "WC", "ACUP", "AG",
-]);
+// 대회 코드 -> 카테고리. 쌓일수록 한눈에 안 들어온다는 제보(2026-11-13)로 탭을 나눴다 - 전체 하이라이트
+// 범위(HIGHLIGHT_CODES)는 그대로 두고, 탭은 그 안에서만 다시 나누는 필터라 서버 호출은 안 늘어난다.
+const HIGHLIGHT_CATEGORY = {
+  INTFRIENDLY: "national", UNL: "national", CNL: "national", EC: "national", WC: "national", ACUP: "national", AG: "national",
+  KL1: "kleague", KL2: "kleague",
+  PL: "overseas", PD: "overseas", BL1: "overseas", SA: "overseas", FL1: "overseas", CL: "overseas", EL: "overseas", ECL: "overseas",
+};
+const HIGHLIGHT_CODES = new Set(Object.keys(HIGHLIGHT_CATEGORY));
+const HIGHLIGHT_TABS = [
+  { id: "all", label: "전체" },
+  { id: "national", label: "국가대표" },
+  { id: "kleague", label: "K리그" },
+  { id: "overseas", label: "해외리그" },
+];
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+let allHighlights = [];
+let activeHighlightTab = "all";
 
 function youtubeHighlightUrl(home, away) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${home} ${away} 하이라이트`)}`;
@@ -101,45 +114,63 @@ async function loadHighlights() {
   try {
     const todayKst = new Date(Date.now() + KST_OFFSET_MS).toISOString().slice(0, 10);
     const data = await fetchJSON(`/matches?date=${todayKst}`);
-    const matches = (data.matches || []).filter((m) => m.status === "FINISHED" && HIGHLIGHT_CODES.has(m.competition.code));
-    renderHighlights(matches);
+    allHighlights = (data.matches || []).filter((m) => m.status === "FINISHED" && HIGHLIGHT_CODES.has(m.competition.code));
+    renderHighlights();
   } catch {
     el.highlights.innerHTML = "";
   }
 }
 
-function renderHighlights(matches) {
-  if (!matches.length) {
+function filteredHighlights() {
+  return activeHighlightTab === "all" ? allHighlights : allHighlights.filter((m) => HIGHLIGHT_CATEGORY[m.competition.code] === activeHighlightTab);
+}
+
+function renderHighlights() {
+  if (!allHighlights.length) {
     el.highlights.innerHTML = "";
     return;
   }
 
+  const matches = filteredHighlights();
+  const tabsHtml = HIGHLIGHT_TABS
+    // 경기가 하나도 없는 탭은 눌러도 빈 화면이라 아예 숨긴다("전체"는 항상 보여준다).
+    .filter((t) => t.id === "all" || allHighlights.some((m) => HIGHLIGHT_CATEGORY[m.competition.code] === t.id))
+    .map((t) => `<button type="button" class="highlight-tab ${t.id === activeHighlightTab ? "active" : ""}" data-highlight-tab="${t.id}">${t.label}</button>`)
+    .join("");
+
   el.highlights.innerHTML = `
     <h2 class="section-title">🎬 오늘의 하이라이트</h2>
+    <div class="highlight-tabs">${tabsHtml}</div>
     <div class="highlights-list">
-      ${matches
-        .map((m) => {
-          const home = m.homeTeam.shortName || m.homeTeam.name;
-          const away = m.awayTeam.shortName || m.awayTeam.name;
-          const score = `${m.score.fullTime.home} - ${m.score.fullTime.away}`;
-          return `
-        <div class="highlight-card" data-match-id="${m.id}">
-          <div class="highlight-teams">
-            ${crestImg(m.homeTeam, "highlight-crest")}<span class="highlight-score">${home} ${score} ${away}</span>${crestImg(m.awayTeam, "highlight-crest")}
-          </div>
-          <div class="highlight-links">
-            <a href="${youtubeHighlightUrl(home, away)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">▶ 유튜브에서 하이라이트</a>
-            ${m.broadcastUrl ? `<a href="${m.broadcastUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${m.broadcastProvider}에서 다시보기</a>` : ""}
-          </div>
-        </div>
-      `;
-        })
-        .join("")}
+      ${matches.length ? matches.map(highlightCardHtml).join("") : '<div class="empty-state">해당하는 경기가 없습니다.</div>'}
     </div>
   `;
+  el.highlights.querySelectorAll("[data-highlight-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeHighlightTab = btn.dataset.highlightTab;
+      renderHighlights();
+    });
+  });
   el.highlights.querySelectorAll("[data-match-id]").forEach((card) => {
     card.addEventListener("click", () => loadMatchDetail(card.dataset.matchId));
   });
+}
+
+function highlightCardHtml(m) {
+  const home = m.homeTeam.shortName || m.homeTeam.name;
+  const away = m.awayTeam.shortName || m.awayTeam.name;
+  const score = `${m.score.fullTime.home} - ${m.score.fullTime.away}`;
+  return `
+    <div class="highlight-card" data-match-id="${m.id}">
+      <div class="highlight-teams">
+        ${crestImg(m.homeTeam, "highlight-crest")}<span class="highlight-score">${home} ${score} ${away}</span>${crestImg(m.awayTeam, "highlight-crest")}
+      </div>
+      <div class="highlight-links">
+        <a href="${youtubeHighlightUrl(home, away)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">▶ 유튜브에서 하이라이트</a>
+        ${m.broadcastUrl ? `<a href="${m.broadcastUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${m.broadcastProvider}에서 다시보기</a>` : ""}
+      </div>
+    </div>
+  `;
 }
 
 onTabChange("news", loadNews);
