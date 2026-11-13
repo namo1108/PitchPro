@@ -86,14 +86,33 @@ function renderNews(items, animate) {
 // 캘린더 우선순위와 같은 기준) - 범위를 넓히면 하루에도 경기가 너무 많아 의미 없는 하위리그/친선경기
 // 까지 다 뜬다. 국가대표를 포함한 건(2026-11-12), 빼놓으면 지금 같은 A매치 기간엔 클럽 경기가 거의
 // 없어서 섹션이 통째로 비어 보였기 때문("하이라이트 영상은?" 제보).
-// 대회 코드 -> 카테고리. 쌓일수록 한눈에 안 들어온다는 제보(2026-11-13)로 탭을 나눴다 - 전체 하이라이트
-// 범위(HIGHLIGHT_CODES)는 그대로 두고, 탭은 그 안에서만 다시 나누는 필터라 서버 호출은 안 늘어난다.
-const HIGHLIGHT_CATEGORY = {
-  INTFRIENDLY: "national", UNL: "national", CNL: "national", EC: "national", WC: "national", ACUP: "national", AG: "national",
-  KL1: "kleague", KL2: "kleague",
-  PL: "overseas", PD: "overseas", BL1: "overseas", SA: "overseas", FL1: "overseas", CL: "overseas", EL: "overseas", ECL: "overseas",
-};
-const HIGHLIGHT_CODES = new Set(Object.keys(HIGHLIGHT_CATEGORY));
+// 2026-11-13: "국대도 친선경기/네이션스리그/월드컵/아시안컵/유로/프리미어리그 이런식으로 카테고리
+// 나눠서 날짜별로 보여줘" - 국가대표 대회도 뭉뚱그리지 않고 대회별로 탭을 쪼개고, 하루치만 보면
+// 탭이 거의 다 비어 보이니 최근 며칠(HIGHLIGHT_LOOKBACK_DAYS)치를 모아 날짜별로 묶어서 보여준다.
+// 이 배열 하나로 탭 종류/순서/묶음을 관리한다 - codes가 여러 개면 그 코드들을 한 탭으로 합친다
+// (UEFA/CONCACAF 네이션스리그처럼 사용자한테는 "네이션스리그" 하나로 보이면 충분한 경우).
+const CATEGORY_DEFS = [
+  { id: "wc", label: "월드컵", codes: ["WC"] },
+  { id: "euro", label: "유로", codes: ["EC"] },
+  { id: "acup", label: "아시안컵", codes: ["ACUP"] },
+  { id: "ag", label: "아시안게임", codes: ["AG"] },
+  { id: "nations", label: "네이션스리그", codes: ["UNL", "CNL"] },
+  { id: "intfriendly", label: "국가대표 친선경기", codes: ["INTFRIENDLY"] },
+  { id: "kleague", label: "K리그", codes: ["KL1", "KL2"] },
+  { id: "pl", label: "프리미어리그", codes: ["PL"] },
+  { id: "pd", label: "라리가", codes: ["PD"] },
+  { id: "bl1", label: "분데스리가", codes: ["BL1"] },
+  { id: "sa", label: "세리에A", codes: ["SA"] },
+  { id: "fl1", label: "리그1", codes: ["FL1"] },
+  { id: "cl", label: "챔피언스리그", codes: ["CL"] },
+  { id: "el", label: "유로파리그", codes: ["EL"] },
+  { id: "ecl", label: "컨퍼런스리그", codes: ["ECL"] },
+];
+const HIGHLIGHT_CODES = new Set(CATEGORY_DEFS.flatMap((c) => c.codes));
+const CODE_TO_CATEGORY = new Map(CATEGORY_DEFS.flatMap((c) => c.codes.map((code) => [code, c.id])));
+// 국가대표 "친선성" 대회(정식 친선경기·네이션스리그)만 비인기국 필터를 적용한다 - 월드컵/유로/
+// 아시안컵/아시안게임은 이미 본선에 오른 팀들끼리만 붙어서 코드만으로도 거를 이유가 없다.
+const FRIENDLY_LIKE_CODES = new Set(["INTFRIENDLY", "UNL", "CNL"]);
 // 국가대표 친선경기는 전 세계 거의 모든 나라가 A매치 기간에 한꺼번에 뛰어서(우즈베키스탄 vs 러시아,
 // 몰타 vs 에스와티니처럼), 코드만으로 거르면 축구 비인기국 경기까지 다 쏟아진다는 제보(2026-11-13 -
 // "이게 너무 지저분하잖아"). 대한민국은 무조건 포함하고, 그 외엔 월드컵 단골/주요 축구 강국일 때만
@@ -119,16 +138,17 @@ function isNotableNationalMatch(m) {
   if (/\bu-?1[5-9]\b|\bu-?2[0-3]\b/i.test(home) || /\bu-?1[5-9]\b|\bu-?2[0-3]\b/i.test(away)) return false;
   return NOTABLE_NATIONS.has(home) || NOTABLE_NATIONS.has(away);
 }
-const HIGHLIGHT_TABS = [
-  { id: "all", label: "전체" },
-  { id: "national", label: "국가대표" },
-  { id: "kleague", label: "K리그" },
-  { id: "overseas", label: "해외리그" },
-];
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+// 하루치만 보면 대부분의 탭이 비어 보여서(그날 경기가 몰린 2~3개 대회 외엔 전부 0경기), 최근
+// 며칠을 모아 날짜별로 묶어서 보여준다. 너무 길게 가면 오히려 지저분해지니 3일로 제한.
+const HIGHLIGHT_LOOKBACK_DAYS = 3;
 
 let allHighlights = [];
 let activeHighlightTab = "all";
+
+function kstDateString(offsetDays = 0) {
+  return new Date(Date.now() + KST_OFFSET_MS - offsetDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
 
 function youtubeHighlightUrl(home, away) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${home} ${away} 하이라이트`)}`;
@@ -137,11 +157,16 @@ function youtubeHighlightUrl(home, away) {
 async function loadHighlights() {
   if (!el.highlights) return;
   try {
-    const todayKst = new Date(Date.now() + KST_OFFSET_MS).toISOString().slice(0, 10);
-    const data = await fetchJSON(`/matches?date=${todayKst}`);
-    allHighlights = (data.matches || [])
+    const dates = Array.from({ length: HIGHLIGHT_LOOKBACK_DAYS }, (_, i) => kstDateString(i));
+    const byDate = await Promise.all(
+      dates.map((date) =>
+        fetchJSON(`/matches?date=${date}`).then((data) => (data.matches || []).map((m) => ({ ...m, _highlightDate: date })))
+      )
+    );
+    allHighlights = byDate
+      .flat()
       .filter((m) => m.status === "FINISHED" && HIGHLIGHT_CODES.has(m.competition.code))
-      .filter((m) => HIGHLIGHT_CATEGORY[m.competition.code] !== "national" || isNotableNationalMatch(m));
+      .filter((m) => !FRIENDLY_LIKE_CODES.has(m.competition.code) || isNotableNationalMatch(m));
     renderHighlights();
   } catch {
     el.highlights.innerHTML = "";
@@ -149,7 +174,12 @@ async function loadHighlights() {
 }
 
 function filteredHighlights() {
-  return activeHighlightTab === "all" ? allHighlights : allHighlights.filter((m) => HIGHLIGHT_CATEGORY[m.competition.code] === activeHighlightTab);
+  return activeHighlightTab === "all" ? allHighlights : allHighlights.filter((m) => CODE_TO_CATEGORY.get(m.competition.code) === activeHighlightTab);
+}
+
+function highlightDateLabel(dateStr, todayStr) {
+  const label = new Date(`${dateStr}T00:00:00Z`).toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short", timeZone: "UTC" });
+  return dateStr === todayStr ? `오늘 · ${label}` : label;
 }
 
 function renderHighlights() {
@@ -159,18 +189,34 @@ function renderHighlights() {
   }
 
   const matches = filteredHighlights();
-  const tabsHtml = HIGHLIGHT_TABS
+  const tabsHtml = [{ id: "all", label: "전체" }, ...CATEGORY_DEFS]
     // 경기가 하나도 없는 탭은 눌러도 빈 화면이라 아예 숨긴다("전체"는 항상 보여준다).
-    .filter((t) => t.id === "all" || allHighlights.some((m) => HIGHLIGHT_CATEGORY[m.competition.code] === t.id))
+    .filter((t) => t.id === "all" || allHighlights.some((m) => CODE_TO_CATEGORY.get(m.competition.code) === t.id))
     .map((t) => `<button type="button" class="highlight-tab ${t.id === activeHighlightTab ? "active" : ""}" data-highlight-tab="${t.id}">${t.label}</button>`)
     .join("");
 
-  el.highlights.innerHTML = `
-    <h2 class="section-title">🎬 오늘의 하이라이트</h2>
-    <div class="highlight-tabs">${tabsHtml}</div>
-    <div class="highlights-list">
-      ${matches.length ? matches.map(highlightCardHtml).join("") : '<div class="empty-state">해당하는 경기가 없습니다.</div>'}
+  const todayStr = kstDateString(0);
+  const groups = new Map();
+  for (const m of matches) {
+    if (!groups.has(m._highlightDate)) groups.set(m._highlightDate, []);
+    groups.get(m._highlightDate).push(m);
+  }
+  const groupsHtml = [...groups.keys()]
+    .sort((a, b) => (a < b ? 1 : -1))
+    .map(
+      (date) => `
+    <div class="highlight-date-group">
+      <div class="highlight-date-label">${highlightDateLabel(date, todayStr)}</div>
+      <div class="highlights-list">${groups.get(date).map(highlightCardHtml).join("")}</div>
     </div>
+  `
+    )
+    .join("");
+
+  el.highlights.innerHTML = `
+    <h2 class="section-title">🎬 최근 하이라이트</h2>
+    <div class="highlight-tabs">${tabsHtml}</div>
+    ${matches.length ? groupsHtml : '<div class="empty-state">해당하는 경기가 없습니다.</div>'}
   `;
   el.highlights.querySelectorAll("[data-highlight-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {

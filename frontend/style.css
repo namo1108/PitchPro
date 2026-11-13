@@ -3078,11 +3078,22 @@ table.standings-table {
   color: var(--accent);
 }
 
+.highlight-date-group {
+  margin-bottom: 18px;
+}
+
+.highlight-date-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
 .highlights-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 22px;
+  margin-bottom: 0;
 }
 
 .highlight-card {
