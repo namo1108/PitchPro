@@ -56,6 +56,15 @@ export async function detectGoalsAndNotify(env) {
   // 승부차기 스코어(score.penalty)는 fullTime과 별개 필드라 따로 이전 값을 기억해야 한다 - 연장까지
   // 마친 뒤 무승부라 승부차기에 들어간 경기만 이 값이 채워진다(리그 경기 등은 항상 null).
   const prevPenalty = prev?.penalty || {};
+  // 경기를 처음 추적하기 시작한 틱에 벌써 스코어가 0이 아니면, 아래 "처음 보는 틱" 로직이 그
+  // 스코어를 그냥 기준점으로 삼켜버려서 그 골 알림이 통째로 사라진다 - 킥오프 직후(elapsed 분
+  // 이내)에 처음 인지한 경기라면 "우리가 보기 전 짧은 틈에 이미 첫 골이 들어간 것"일 뿐이니
+  // 0-0을 기준점으로 쳐서 보통 골처럼 알림이 나가게 한다. kickoff 시각(utcDate) 대신 elapsed
+  // (API-Football이 주는 실제 경기 시계)를 쓰는 이유는 킥오프가 지연된 경기에서도 안 흔들리게.
+  // 반대로(elapsed가 이미 많이 지난 뒤 처음 인지한 경기) 그동안 쌓인 골까지 전부 새 골처럼
+  // 알리면 안 되니 원래 로직(조용히 기준점만 잡음)을 그대로 둔다(2026-11-14, 아르헨티나 vs
+  // 우루과이 경기에서 첫 골 알림만 누락된 제보로 발견).
+  const FRESH_KICKOFF_ELAPSED_MINUTES = 8;
   const nextScores = {};
   const nextPending = {};
   const nextPenalty = {};
@@ -84,13 +93,20 @@ export async function detectGoalsAndNotify(env) {
     const home = m.score.fullTime.home ?? 0;
     const away = m.score.fullTime.away ?? 0;
     const observed = { home, away };
-    const confirmed = prevScores[m.id];
+    let confirmed = prevScores[m.id];
 
-    // 이 경기를 처음 보는 틱 - 기준점만 잡고 알림은 안 보낸다(경기 중간에 처음 인지했다고 그동안
-    // 쌓인 골까지 전부 새 골처럼 알리면 안 되니까).
+    // 이 경기를 처음 보는 틱.
     if (!confirmed) {
-      nextScores[m.id] = observed;
-      continue;
+      const isFreshKickoff = typeof m.elapsed === "number" && m.elapsed <= FRESH_KICKOFF_ELAPSED_MINUTES;
+      if (!isFreshKickoff || (home === 0 && away === 0)) {
+        // 꽤 진행된 경기를 처음 인지했거나 아직 0-0이면 기준점만 잡고 알림은 안 보낸다(경기
+        // 중간에 처음 인지했다고 그동안 쌓인 골까지 전부 새 골처럼 알리면 안 되니까).
+        nextScores[m.id] = observed;
+        continue;
+      }
+      // 킥오프 직후인데 벌써 스코어가 0이 아니면 바로 위 주석대로 0-0을 기준점으로 쳐서, 아래
+      // 일반 변경 감지 로직(2틱 확인 포함)을 그대로 타게 한다.
+      confirmed = { home: 0, away: 0 };
     }
 
     // 변화 없음 - 흔들리던 값이 있었으면(pending) 원래대로 돌아온 거니 그냥 버린다.
