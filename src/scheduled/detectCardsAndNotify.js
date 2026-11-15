@@ -36,9 +36,25 @@ function extractCards(events) {
   return { redCards, yellowCards };
 }
 
+// 페널티 실축은 스코어가 안 바뀌어서(골이 아니니까) detectGoalsAndNotify.js의 "스코어 변화" 감지로는
+// 절대 못 잡는다 - API-Football이 type:"Goal", detail:"Missed Penalty"로 이벤트에만 남겨준다.
+// 카드 알림을 보내려고 이미 하는 events 조회에 얹어서 감지하면(2026-11-15 사용자 요청) 추가 API
+// 호출이 전혀 들지 않는다.
+function extractPenaltyMisses(events) {
+  return (events || [])
+    .filter((e) => e.type === "Goal" && e.detail === "Missed Penalty")
+    .map((e) => ({
+      teamId: String(e.team.id),
+      playerId: e.player?.id != null ? String(e.player.id) : "unknown",
+      playerName: e.player?.name || "선수",
+      minute: formatMinute(e.time),
+    }));
+}
+
 const CARD_COPY = {
   red: { type: "redcard", emoji: "🟥", verb: "퇴장", badge: "RED CARD", color: "#ef4444" },
   yellow: { type: "yellowcard", emoji: "🟨", verb: "경고", badge: "YELLOW CARD", color: "#f5c542" },
+  penaltymiss: { type: "penaltymiss", emoji: "😮", verb: "페널티 실축", badge: "MISSED PENALTY", color: "#64748b" },
 };
 
 async function notifyCards(env, match, subscriptions, cards, kind) {
@@ -120,6 +136,7 @@ export async function detectCardsAndNotify(env) {
     }
 
     const { redCards, yellowCards } = extractCards(events);
+    const penaltyMisses = extractPenaltyMisses(events);
 
     const redCardTeamIds = [...new Set(redCards.map((c) => c.teamId))];
     const prevRedCardTeamIds = match.redCardTeamIds || [];
@@ -128,19 +145,21 @@ export async function detectCardsAndNotify(env) {
       matchesChanged = true;
     }
 
-    if (!redCards.length && !yellowCards.length) continue;
+    if (!redCards.length && !yellowCards.length && !penaltyMisses.length) continue;
 
     const seen = new Set(notified[match.id] || []);
     const freshRed = redCards.filter((c) => !seen.has(`red:${c.playerId}:${c.minute}`));
     const freshYellow = yellowCards.filter((c) => !seen.has(`yellow:${c.playerId}:${c.minute}`));
-    if (!freshRed.length && !freshYellow.length) continue;
+    const freshPenaltyMiss = penaltyMisses.filter((c) => !seen.has(`penaltymiss:${c.playerId}:${c.minute}`));
+    if (!freshRed.length && !freshYellow.length && !freshPenaltyMiss.length) continue;
 
-    const [redResult, yellowResult] = await Promise.all([
+    const [redResult, yellowResult, penaltyMissResult] = await Promise.all([
       notifyCards(env, match, subscriptions, freshRed, "red"),
       notifyCards(env, match, subscriptions, freshYellow, "yellow"),
+      notifyCards(env, match, subscriptions, freshPenaltyMiss, "penaltymiss"),
     ]);
-    for (const key of [...redResult.keys, ...yellowResult.keys]) seen.add(key);
-    if (redResult.changed || yellowResult.changed) notifiedChanged = true;
+    for (const key of [...redResult.keys, ...yellowResult.keys, ...penaltyMissResult.keys]) seen.add(key);
+    if (redResult.changed || yellowResult.changed || penaltyMissResult.changed) notifiedChanged = true;
 
     notified[match.id] = [...seen];
   }

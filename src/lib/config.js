@@ -258,6 +258,8 @@ export const NOTIFICATION_TYPES = [
   { id: "goal" },
   { id: "concede" },
   { id: "var_cancel" },
+  { id: "shootout" },
+  { id: "penaltymiss" },
   { id: "kickoff_soon" },
   { id: "kickoff" },
   { id: "halftime" },

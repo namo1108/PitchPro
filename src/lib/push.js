@@ -23,13 +23,22 @@ function vapidEmail(subject) {
   return (subject || "admin@example.com").replace(/^mailto:/i, "");
 }
 
+// urgency를 안 넘기면(예전 상태) Web Push 스펙상 기본값은 "normal"인데, 안드로이드는 기기가
+// Doze(절전 대기) 상태면 "normal" 이하 우선순위 푸시는 즉시 안 깨우고 다음 유지보수 창(길게는
+// 수십 분)까지 묶어뒀다가 한꺼번에 배달한다 - "70분인데 1-0 골 알림이 지금 왔다"는 제보(2026-11-15,
+// 실제 스코어는 이미 3-1)의 원인. urgency:"high"를 명시하면 Doze 중에도 즉시 깨워서 배달하도록
+// 요청한다. TTL(기본 24시간)도 1시간으로 줄여서, 그렇게까지 오래 못 배달된 푸시는(그 시점엔 이미
+// 의미 없는 옛날 스코어이니) 차라리 버려지게 한다.
+const PUSH_OPTIONS = { algorithm: "aes128gcm", urgency: "high", ttl: 60 * 60 };
+
 export async function sendGoalPush(env, subscription, payload) {
   const keyPair = await getKeyPair(env);
   return sendPushNotification(
     keyPair,
     { endpoint: subscription.endpoint, keys: subscription.keys },
     vapidEmail(env.VAPID_SUBJECT),
-    JSON.stringify(payload)
+    JSON.stringify(payload),
+    PUSH_OPTIONS
   );
 }
 

@@ -11,6 +11,8 @@ const NOTIFICATION_TYPES = [
   { id: "goal", icon: "⚽", label: "골" },
   { id: "concede", icon: "😢", label: "실점" },
   { id: "var_cancel", icon: "🚫", label: "골 취소(VAR)" },
+  { id: "shootout", icon: "🥅", label: "승부차기" },
+  { id: "penaltymiss", icon: "😮", label: "페널티 실축" },
   { id: "kickoff_soon", icon: "⏱", label: "경기 시작 5분 전" },
   { id: "kickoff", icon: "⚽💨", label: "경기 시작" },
   { id: "halftime", icon: "⏸", label: "전반전 종료" },

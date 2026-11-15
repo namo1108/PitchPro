@@ -223,6 +223,8 @@ export async function detectGoalsAndNotify(env) {
   // 승부차기 성공 키커의 이름은 API-Football 이벤트 detail이 일반 페널티킥과 똑같이 "Penalty"라 정규
   // 시간 PK와 구분할 방법이 없다(득점자를 특정할 수 없음) - 그래서 득점자 없이 "현재 스코어"만으로
   // 알린다(정규시간 골 알림처럼 이름은 못 붙이지만, "지금 성공했다"는 실시간성 자체가 핵심 정보다).
+  // type은 "goal"/"concede"가 아니라 별도의 "shootout"으로 둔다 - 설정 탭에서 일반 골 알림과 승부차기
+  // 알림을 따로 끄고 켤 수 있게 해달라는 요청(2026-11-15).
   for (const { match, scoringTeamId, otherTeamId } of shootoutEvents) {
     const pen = match.score.penalty;
     const scoreLine = `${match.homeTeam.shortName || match.homeTeam.name} ${pen.home} - ${pen.away} ${match.awayTeam.shortName || match.awayTeam.name} (승부차기)`;
@@ -230,9 +232,9 @@ export async function detectGoalsAndNotify(env) {
       const cheersScoringTeam = sub.teamIds?.includes(scoringTeamId);
       const cheersOtherTeam = sub.teamIds?.includes(otherTeamId);
       if (cheersOtherTeam && !cheersScoringTeam) {
-        return { type: "concede", title: "😢 승부차기 실점...", body: scoreLine, matchId: match.id };
+        return { type: "shootout", title: "😢 승부차기 실점...", body: scoreLine, matchId: match.id };
       }
-      return { type: "goal", title: "⚽ 승부차기 성공!", body: scoreLine, matchId: match.id };
+      return { type: "shootout", title: "⚽ 승부차기 성공!", body: scoreLine, matchId: match.id };
     });
   }
 }
