@@ -96,6 +96,66 @@ function predictionBar(prediction) {
   `;
 }
 
+// 백엔드(lib/analysis.js)의 "조 인원이 6팀 이하면 상위권/하위권 구분 없이 1위/꼴찌만 특별 취급,
+// 아니면 전체의 25%를 상/하위 경계로" 기준과 그대로 맞춰야 한다 - 안 그러면 문구(standingsNotes)랑
+// 그래프 색이 서로 다른 얘기를 하게 된다.
+function standingZone(position, total) {
+  if (total <= 6) {
+    if (position === 1) return "top";
+    if (position === total) return "bottom";
+    return "mid";
+  }
+  const edge = Math.max(1, Math.round(total * 0.25));
+  if (position <= edge) return "top";
+  if (position > total - edge) return "bottom";
+  return "mid";
+}
+
+const ZONE_LABEL = { top: "상위", bottom: "하위", mid: "중위" };
+
+// 네이션스리그 4팀 조처럼 전체 인원이 적을 때 "4위인데 상위권"이라고 말로만 하면 여전히 헷갈릴 수
+// 있어(2026-11-15 사용자 요청 - "좀더 정교하고 그래프도 넣을 수 있으면") 조/리그 안에서 실제
+// 몇 번째 자리에 있는지를 트랙 + 마커로 바로 보여준다.
+function standingBarRow(name, pos) {
+  if (!pos || !pos.position || !pos.total) return "";
+  const { position, total } = pos;
+  const zone = standingZone(position, total);
+  const edge = total <= 6 ? 1 : Math.max(1, Math.round(total * 0.25));
+  const edgePct = (edge / total) * 100;
+  const markerLeft = ((position - 0.5) / total) * 100;
+  return `
+    <div class="standing-bar-row">
+      <div class="standing-bar-head">
+        <span class="standing-bar-name">${name}</span>
+        <span class="standing-bar-pos zone-${zone}">${position}위 / ${total}팀 (${ZONE_LABEL[zone]}권)</span>
+      </div>
+      <div class="standing-bar-track">
+        <div class="standing-bar-zone top" style="width:${edgePct}%"></div>
+        <div class="standing-bar-zone bottom" style="width:${edgePct}%"></div>
+        <div class="standing-bar-marker zone-${zone}" style="left:${markerLeft}%"></div>
+      </div>
+    </div>
+  `;
+}
+
+function standingsSection(c) {
+  const bars = [
+    standingBarRow(c.homeTeam.shortName || c.homeTeam.name, c.standings?.home),
+    standingBarRow(c.awayTeam.shortName || c.awayTeam.name, c.standings?.away),
+  ]
+    .filter(Boolean)
+    .join("");
+  const notes = c.standingsNotes || [];
+  if (!bars && !notes.length) return "";
+  return `
+    <div class="ai-section">
+      <div class="ai-section-title">📊 순위</div>
+      ${bars ? `<div class="standing-bars">${bars}</div>` : ""}
+      ${notes.map((n) => `<p class="ai-note">${n}</p>`).join("")}
+    </div>
+  `;
+}
+
 function noteList(title, icon, notes) {
   if (!notes || !notes.length) return "";
   return `
@@ -144,7 +204,7 @@ function renderAnalysis(cards, animate) {
         ${noteList("K리그 공식 최근 기록", "📋", c.kleagueOfficialNotes)}
         ${noteList("최근 폼", "📈", c.formNotes)}
         ${noteList("상대전적", "🆚", c.h2hNotes)}
-        ${noteList("순위", "📊", c.standingsNotes)}
+        ${standingsSection(c)}
         ${noteList("결장 이슈", "⚕", c.injuryNotes)}
       </div>
     </div>

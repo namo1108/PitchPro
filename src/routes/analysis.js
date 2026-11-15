@@ -10,7 +10,10 @@ import { fetchTeamRank, KLEAGUE_SITE_TEAM_ID_TO_APIFOOTBALL_ID } from "../schedu
 // v17: featured 대회 목록/필터/정렬 기준이 바뀌면(2026-10-17, MLS 추가 + 한국 날짜 기준 정렬 +
 // FA컵 하위리그 구단 제외 + 최종 표시 순서를 시간순으로 재정렬) 예전 필터로 만들어둔 캐시가
 // TTL(3시간) 동안 그대로 남아있으니, 버전을 올려서 즉시 새로 만들어지게 한다.
-const ANALYSIS_CACHE_KEY = "analysis:v17";
+// v18: 조 인원이 적은(네이션스리그 등 4팀 조) 경기에서 "4위인데 상위권"처럼 잘못 말하던 순위
+// 문구를 고치고 순위 그래프(standings)를 응답에 추가했다(2026-11-15) - 예전 캐시가 TTL(3시간) 동안
+// 남아있으면 고친 문구가 바로 반영되지 않으니 버전을 올려 즉시 새로 계산되게 한다.
+const ANALYSIS_CACHE_KEY = "analysis:v18";
 // 사전 갱신 크론 주기(scheduled/index.js)의 2배로 넉넉하게 잡아서, 쿼터가 빡빡해 사전 갱신 틱이
 // 한 번 건너뛰어져도(isQuotaTight) 다음 틱 전에 캐시가 만료되지 않게 한다(사용자 제보: "AI 분석
 // 열 때 딜레이가 있다" - 콜드캐시로 직접 계산을 떠맡는 순간이 그 지연이다).

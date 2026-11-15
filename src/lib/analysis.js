@@ -211,10 +211,40 @@ const STANDING_MID_TEMPLATES = [
   (n, p) => `${n}는 ${p}위로 중위권에서 순위 경쟁 중입니다.`,
 ];
 
+// 네이션스리그처럼 4팀이 한 조인 소규모 조 편성에서는 "4위인데 상위권"처럼 터무니없는 말이
+// 나왔었다(2026-11-15 사용자 제보) - 예전엔 "1~4위는 무조건 상위권, 끝에서 3팀은 무조건 하위권"
+// 처럼 절대 순위 기준이었어서 조 전체 인원이 4명이면 전원이 상위권(1~4위)이면서 동시에 끝 3팀도
+// 하위권이 되는 모순이 있었다. "상위권/하위권"이라는 말 자체도 조 인원이 몇 안 될 땐 안 맞는
+// 표현이라(비교 대상이 너무 적음), 조 인원이 6팀 이하면 상위권/하위권 대신 "총 N팀 중 N위/선두/꼴찌"처럼
+// 있는 그대로의 순위를 말해준다. 조 인원이 많은 일반 리그는 전체 인원의 25%를 상/하위 경계로 써서
+// 팀 수가 달라도(12팀 K리그1 vs 20팀 EPL) 비슷한 비율로 상/하위권이 갈리게 한다.
+const SMALL_GROUP_SIZE = 6;
+
+const GROUP_LEADER_TEMPLATES = [
+  (n, t) => `${n}은(는) ${t}개 팀이 겨루는 조에서 1위(선두)를 달리고 있습니다.`,
+  (n, t) => `${t}개 팀 조 편성에서 ${n}가 현재 선두(1위)에 올라 있습니다.`,
+];
+const GROUP_LAST_TEMPLATES = [
+  (n, t, p) => `${n}은(는) ${t}개 팀 중 최하위(${p}위)에 머물러 있어 반등이 필요합니다.`,
+  (n, t, p) => `${t}개 팀이 겨루는 조에서 ${n}가 꼴찌(${p}위)에 자리하고 있습니다.`,
+];
+const GROUP_MID_TEMPLATES = [
+  (n, t, p) => `${n}은(는) ${t}개 팀 중 ${p}위에 올라 있습니다.`,
+  (n, t, p) => `${t}개 팀이 겨루는 조에서 ${n}는 ${p}위를 기록하고 있습니다.`,
+];
+
 function standingsPhrase(name, position, total, seed) {
-  if (!position) return null;
-  if (position <= 4) return pick(STANDING_TOP_TEMPLATES, seed)(name, position);
-  if (position > total - 3) return pick(STANDING_BOTTOM_TEMPLATES, seed)(name, position);
+  if (!position || !total) return null;
+
+  if (total <= SMALL_GROUP_SIZE) {
+    if (position === 1) return pick(GROUP_LEADER_TEMPLATES, seed)(name, total);
+    if (position === total) return pick(GROUP_LAST_TEMPLATES, seed)(name, total, position);
+    return pick(GROUP_MID_TEMPLATES, seed)(name, total, position);
+  }
+
+  const edgeCount = Math.max(1, Math.round(total * 0.25));
+  if (position <= edgeCount) return pick(STANDING_TOP_TEMPLATES, seed)(name, position);
+  if (position > total - edgeCount) return pick(STANDING_BOTTOM_TEMPLATES, seed)(name, position);
   return pick(STANDING_MID_TEMPLATES, seed)(name, position);
 }
 
@@ -377,6 +407,7 @@ export function buildMatchAnalysis(match, teamRecents, standingsTables, teamInju
     utcDate: match.utcDate,
     formNotes,
     standingsNotes,
+    standings: { home: homePos, away: awayPos },
     injuryNotes,
     h2hNotes,
     prediction,
