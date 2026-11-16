@@ -145,6 +145,10 @@ const HIGHLIGHT_LOOKBACK_DAYS = 3;
 
 let allHighlights = [];
 let activeHighlightTab = "all";
+// 날짜별로 쌓이다 보니 스크롤이 너무 길어진다는 피드백(2026-11-16) - 날짜 그룹을 아코디언으로
+// 접어두고, 가장 최근 날짜 하나만 기본으로 펼친다. 탭을 바꾸거나 다시 그릴 때도 사용자가 직접
+// 펼친/접은 상태가 유지되도록 날짜 문자열 기준으로 따로 들고 있는다.
+let expandedHighlightDates = new Set();
 
 function kstDateString(offsetDays = 0) {
   return new Date(Date.now() + KST_OFFSET_MS - offsetDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -201,16 +205,25 @@ function renderHighlights() {
     if (!groups.has(m._highlightDate)) groups.set(m._highlightDate, []);
     groups.get(m._highlightDate).push(m);
   }
-  const groupsHtml = [...groups.keys()]
-    .sort((a, b) => (a < b ? 1 : -1))
-    .map(
-      (date) => `
-    <div class="highlight-date-group">
-      <div class="highlight-date-label">${highlightDateLabel(date, todayStr)}</div>
-      <div class="highlights-list">${groups.get(date).map(highlightCardHtml).join("")}</div>
+  const sortedDates = [...groups.keys()].sort((a, b) => (a < b ? 1 : -1));
+  // 처음 그릴 때만(아직 아무것도 펼친 적 없을 때) 가장 최근 날짜를 기본으로 펼쳐둔다.
+  if (!expandedHighlightDates.size && sortedDates.length) expandedHighlightDates.add(sortedDates[0]);
+
+  const groupsHtml = sortedDates
+    .map((date) => {
+      const dayMatches = groups.get(date);
+      const isOpen = expandedHighlightDates.has(date);
+      return `
+    <div class="highlight-date-group ${isOpen ? "expanded" : ""}" data-highlight-date="${date}">
+      <button type="button" class="highlight-date-toggle">
+        <span class="highlight-date-label">${highlightDateLabel(date, todayStr)}</span>
+        <span class="highlight-date-count">${dayMatches.length}경기</span>
+        <span class="highlight-date-arrow">▾</span>
+      </button>
+      <div class="highlights-list">${dayMatches.map(highlightCardHtml).join("")}</div>
     </div>
-  `
-    )
+  `;
+    })
     .join("");
 
   el.highlights.innerHTML = `
@@ -221,6 +234,14 @@ function renderHighlights() {
   el.highlights.querySelectorAll("[data-highlight-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {
       activeHighlightTab = btn.dataset.highlightTab;
+      renderHighlights();
+    });
+  });
+  el.highlights.querySelectorAll("[data-highlight-date]").forEach((group) => {
+    group.querySelector(".highlight-date-toggle")?.addEventListener("click", () => {
+      const date = group.dataset.highlightDate;
+      if (expandedHighlightDates.has(date)) expandedHighlightDates.delete(date);
+      else expandedHighlightDates.add(date);
       renderHighlights();
     });
   });
