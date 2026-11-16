@@ -43,7 +43,7 @@ async function buildDecisionOption(env, save, kind) {
     case "transfer": {
       const [club] = await pickTransferCandidates(env, save, { count: 1 });
       if (!club) return null;
-      const fee = estimateTransferFee(save.ovr, save.age);
+      const fee = estimateTransferFee(save.ovr, save.age, club.competitionCode);
       return { id: "move", label: "이적 제안", description: `${club.name}로 이적 (이적료 ${fee}억원)`, club, effect: { type: "transfer", club, fee } };
     }
     case "extend_contract":
@@ -56,7 +56,7 @@ async function buildDecisionOption(env, save, kind) {
     case "overseas_transfer": {
       const [club] = await pickTransferCandidates(env, save, { count: 1, preferHigherTier: true, excludeDomestic: true });
       if (!club) return null;
-      const fee = Math.round(estimateTransferFee(save.ovr, save.age) * 1.4);
+      const fee = estimateTransferFee(save.ovr, save.age, club.competitionCode);
       return { id: "overseas", label: "해외 진출", description: `${club.name}로 이적 (이적료 ${fee}억원)`, club, effect: { type: "overseas_transfer", club, fee } };
     }
     case "stay_domestic":

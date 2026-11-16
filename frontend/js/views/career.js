@@ -59,7 +59,39 @@ function randomLookSeed() {
   return Math.floor(Math.random() * 1e9);
 }
 
-function playerCardSvg({ identity, club }) {
+function clampNum(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+// FIFA 얼티밋팀/파니니 카드 느낌으로 등급(브론즈/실버/골드/스페셜)을 나눠서 배경·테두리 색을
+// 다르게 준다(2026-11-16 사용자 요청 - "너무 단조로운거 아니야, 이거 참고해서" + FUT/파니니
+// 카드 스크린샷 첨부). OVR을 모를 때(캐릭터 생성 미리보기)는 bronze로 둔다.
+function rarityTier(ovr) {
+  if (ovr == null) return "bronze";
+  if (ovr >= 85) return "special";
+  if (ovr >= 75) return "gold";
+  if (ovr >= 65) return "silver";
+  return "bronze";
+}
+
+const TIER_THEME = {
+  bronze: { from: "#8a5a35", to: "#3d2614", border: "#c98a52", ink: "#2b1a0d", stripe: false },
+  silver: { from: "#c9d2d8", to: "#6d767c", border: "#eef3f6", ink: "#1f2428", stripe: false },
+  gold: { from: "#f6d97a", to: "#a9761e", border: "#ffecb0", ink: "#3a2a05", stripe: false },
+  special: { from: "#1f8a4c", to: "#06180d", border: "#8dffb8", ink: "#ffffff", stripe: true },
+};
+
+function starRow(ovr, color) {
+  if (ovr == null) return "";
+  const count = clampNum(Math.round(ovr / 20), 1, 5);
+  let svg = "";
+  for (let i = 0; i < 5; i++) {
+    svg += `<text x="${24 + i * 13}" y="92" font-size="13" fill="${i < count ? color : "rgba(255,255,255,0.3)"}">★</text>`;
+  }
+  return svg;
+}
+
+function playerCardSvg({ identity, club, ovr = null }) {
   const seed = identity?.lookSeed || 1;
   const skin = SKIN_TONES[seed % SKIN_TONES.length];
   const hair = HAIR_COLORS[Math.floor(seed / 7) % HAIR_COLORS.length];
@@ -73,9 +105,8 @@ function playerCardSvg({ identity, club }) {
       : hairStyle === 1
       ? `<path d="M38 42 a32 30 0 0 1 64 0 l-3 6 a30 22 0 0 0 -58 0 z" fill="${hair}" />`
       : "";
-
-  return `
-    <svg viewBox="0 0 140 190" class="career-player-card-svg" role="img" aria-label="선수 카드">
+  const faceGroup = `
+    <g transform="translate(35,70) scale(0.78)">
       <path d="M20 190 L20 122 Q20 97 44 90 L58 82 Q70 94 82 82 L96 90 Q120 97 120 122 L120 190 Z" fill="${jerseyColor}" />
       <path d="M20 122 L7 137 L20 152 Z" fill="${sleeveColor}" />
       <path d="M120 122 L133 137 L120 152 Z" fill="${sleeveColor}" />
@@ -87,8 +118,54 @@ function playerCardSvg({ identity, club }) {
       <circle cx="60" cy="46" r="3" fill="#2b2b2b" />
       <circle cx="80" cy="46" r="3" fill="#2b2b2b" />
       <path d="M61 58 Q70 63 79 58" stroke="#8a5a3c" stroke-width="2.5" fill="none" stroke-linecap="round" />
+    </g>
+  `;
+
+  const tier = rarityTier(ovr);
+  const theme = TIER_THEME[tier];
+  const flagUri = identity?.nationality?.crest || null;
+  const clubCrestUri = club?.crest || null;
+  const name = identity?.name || "";
+
+  return `
+    <svg viewBox="0 0 220 300" class="career-player-card-svg" role="img" aria-label="선수 카드">
+      <defs>
+        <linearGradient id="cardBg${seed}" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="${theme.from}" />
+          <stop offset="100%" stop-color="${theme.to}" />
+        </linearGradient>
+        ${
+          theme.stripe
+            ? `<pattern id="cardStripe${seed}" width="18" height="18" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+                 <rect width="18" height="18" fill="transparent" />
+                 <rect width="9" height="18" fill="rgba(255,255,255,0.07)" />
+               </pattern>`
+            : ""
+        }
+      </defs>
+      <rect x="3" y="3" width="214" height="294" rx="20" fill="url(#cardBg${seed})" stroke="${theme.border}" stroke-width="4" />
+      ${theme.stripe ? `<rect x="3" y="3" width="214" height="294" rx="20" fill="url(#cardStripe${seed})" />` : ""}
+
+      <text x="22" y="46" font-size="38" font-weight="900" fill="${theme.ink}">${ovr ?? "?"}</text>
+      <text x="22" y="64" font-size="15" font-weight="800" fill="${theme.ink}">${identity?.position || ""}</text>
+      ${starRow(ovr, theme.ink)}
+
+      ${flagUri ? `<image href="${flagUri}" x="178" y="14" width="26" height="26" style="object-fit:contain" />` : ""}
+      ${clubCrestUri ? `<image href="${clubCrestUri}" x="178" y="44" width="26" height="26" style="object-fit:contain" />` : ""}
+
+      <rect x="18" y="104" width="184" height="150" rx="14" fill="rgba(0,0,0,0.18)" />
+      ${faceGroup}
+
+      <rect x="14" y="258" width="192" height="30" rx="7" fill="rgba(0,0,0,0.5)" />
+      <text x="110" y="279" text-anchor="middle" font-size="15" font-weight="800" fill="#ffffff">${escapeAttr(name)}</text>
     </svg>
   `;
+}
+
+// SVG 텍스트 노드 안에 이름을 그대로 넣으면 &, <, > 같은 문자가 들어있을 때 마크업이 깨질 수 있어
+// (escapeHtml은 "로 바꾸는 등 속성용이라 쓰임새가 다름) 최소한의 이스케이프만 따로 한다.
+function escapeAttr(str) {
+  return String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 async function loadCareer() {
@@ -132,8 +209,15 @@ function updateCreatePreview() {
   const previewEl = document.getElementById("career-preview-card");
   if (!previewEl) return;
   previewEl.innerHTML = playerCardSvg({
-    identity: { jerseyNumber: draft.jerseyNumber || "-", lookSeed: draft.lookSeed },
+    identity: {
+      name: draft.name || "이름",
+      jerseyNumber: draft.jerseyNumber || "-",
+      position: draft.position || "",
+      nationality: draft.nationality,
+      lookSeed: draft.lookSeed,
+    },
     club: null,
+    ovr: null,
   });
 }
 
@@ -192,7 +276,10 @@ async function renderCreate() {
 
   const nameInput = document.getElementById("career-name");
   const numberInput = document.getElementById("career-number");
-  nameInput.addEventListener("input", () => (draft.name = nameInput.value));
+  nameInput.addEventListener("input", () => {
+    draft.name = nameInput.value;
+    updateCreatePreview();
+  });
   numberInput.addEventListener("input", () => {
     draft.jerseyNumber = numberInput.value;
     updateCreatePreview();
@@ -209,6 +296,7 @@ async function renderCreate() {
     btn.addEventListener("click", () => {
       draft.position = btn.dataset.pos;
       document.querySelectorAll(".career-pos-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      updateCreatePreview();
     });
   });
 
@@ -237,6 +325,7 @@ async function renderCreate() {
         draft.nationality = matches[i];
         searchInput.value = matches[i].name;
         listEl.innerHTML = "";
+        updateCreatePreview();
       });
     });
   });
@@ -330,7 +419,7 @@ function renderActive(save) {
     <h2 class="section-title">⚽ 축구인생</h2>
     <div class="career-id-card">
       <div class="career-id-card-body">
-        <div class="career-player-card">${playerCardSvg(save)}</div>
+        <div class="career-player-card">${playerCardSvg({ identity, club: save.club, ovr: save.ovr })}</div>
         <div class="career-id-info">
           <div class="career-id-top">
             <span class="career-id-name">#${identity.jerseyNumber} ${escapeHtml(identity.name)}</span>
@@ -456,7 +545,7 @@ function renderRetirement(save) {
     <h2 class="section-title">⚽ 축구인생</h2>
     <div class="career-id-card retired">
       <div class="career-id-card-body">
-        <div class="career-player-card">${playerCardSvg(save)}</div>
+        <div class="career-player-card">${playerCardSvg({ identity: save.identity, club: save.club, ovr: r.finalOvr })}</div>
         <div class="career-id-info">
           <div class="career-id-top">
             <span class="career-id-name">#${save.identity.jerseyNumber} ${escapeHtml(save.identity.name)}</span>

@@ -104,16 +104,32 @@ export function rollPersonalAwards(save, stats) {
   return awards;
 }
 
-// 이적료(2026-11-16 사용자 요청 - "이적료도 나오고") - 실제 시세 데이터가 없어 OVR/나이만으로
-// 대략적인 느낌을 낸다. 단위는 "억원"(한국 유저에게 익숙한 단위). valueIndex는 OVR 40을 0으로 두고
-// 제곱으로 키워서, 상위권 선수일수록 이적료가 훨씬 가파르게 뛰는 실제 이적 시장 느낌을 흉내낸다.
-export function estimateTransferFee(ovr, age) {
-  const valueIndex = clamp(ovr - 40, 0, 59);
-  let fee = valueIndex * valueIndex * 0.05;
+// 이적료(2026-11-16 사용자 요청 - "이적료도 나오고", 이어서 "K리그는 30억까지 안 간다"는 지적
+// 반영) - 처음엔 OVR/나이만 봐서 리그 수준과 무관하게 똑같은 금액이 나왔다(K리그로 가는 이적도
+// 5대리그급 금액이 나와 비현실적이었음). 리그별 실제 이적시장 체급 차이가 훨씬 크므로, K리그1을
+// 기준값(1.0)으로 두고 리그마다 배율을 따로 둔다 - careerClubs.js의 CLUB_TIER_BY_CODE와는 별개
+// 기준이다(그쪽은 "경기력 수준", 이쪽은 "이적료 체급"이라 겹치는 리그라도 배율이 다를 수 있음,
+// 예: MLS/사우디는 실력 대비 이적료가 크고 J리그/스칸디나비아는 수수한 편).
+const LEAGUE_FEE_MULTIPLIER = {
+  PL: 14, PD: 11, BL1: 10, SA: 10, FL1: 7,
+  KSA: 9, MLS: 5, CHN: 4, BSA: 3.5,
+  DED: 4, PPL: 4, ELC: 2.5,
+  J1: 1.8, SCO: 1.5, NOR: 1, DEN: 1, AUS: 1,
+  KL1: 1, J2: 0.5, KL2: 0.3, J3: 0.15, K3: 0.08, K4: 0.04,
+};
+
+// 단위는 "억원"(한국 유저에게 익숙한 단위). valueIndex는 OVR 50을 0으로 두고 제곱으로 키워서
+// 상위권 선수일수록 가파르게 뛰게 한 뒤, K리그1 기준으로 보정한 계수(0.011)를 곱한다 - K리그
+// 역대 국내 이적료가 대개 수억~20억대, 아주 드물게 30억 안팎인 현실 체감에 맞춘 값(사용자 피드백,
+// 2026-11-16). 다른 리그는 LEAGUE_FEE_MULTIPLIER로 그 기준에서 올리거나 내린다.
+export function estimateTransferFee(ovr, age, competitionCode) {
+  const valueIndex = clamp(ovr - 50, 0, 49);
+  let fee = valueIndex * valueIndex * 0.011;
   if (age <= 23) fee *= 1.3; // 어린 유망주 프리미엄
   else if (age <= 29) fee *= 1.0;
   else if (age <= 33) fee *= 0.55;
   else fee *= 0.25;
+  fee *= LEAGUE_FEE_MULTIPLIER[competitionCode] ?? 1;
   fee *= randFloat(0.85, 1.15);
   return Math.max(1, Math.round(fee));
 }

@@ -5235,8 +5235,12 @@ table.standings-table {
   margin-bottom: 16px;
 }
 
+.career-preview-wrap .career-player-card {
+  width: 200px;
+}
+
 .career-player-card {
-  width: 140px;
+  width: 160px;
   flex-shrink: 0;
 }
 
