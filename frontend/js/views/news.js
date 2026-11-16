@@ -96,7 +96,10 @@ const CATEGORY_DEFS = [
   { id: "euro", label: "유로", codes: ["EC"] },
   { id: "acup", label: "아시안컵", codes: ["ACUP"] },
   { id: "ag", label: "아시안게임", codes: ["AG"] },
-  { id: "nations", label: "네이션스리그", codes: ["UNL", "CNL"] },
+  // UEFA(유럽)와 CONCACAF(북중미카리브)는 완전히 다른 대륙 대회인데 하나로 합쳐놔서 "유럽 얘기하다가
+  // 뜬금없이 북중미 경기가 섞여 나온다"는 제보(2026-11-16) - 대륙별로 탭을 분리한다.
+  { id: "unl", label: "유럽 네이션스리그", codes: ["UNL"] },
+  { id: "cnl", label: "북중미 네이션스리그", codes: ["CNL"] },
   { id: "intfriendly", label: "국가대표 친선경기", codes: ["INTFRIENDLY"] },
   { id: "kleague", label: "K리그", codes: ["KL1", "KL2"] },
   { id: "pl", label: "프리미어리그", codes: ["PL"] },
