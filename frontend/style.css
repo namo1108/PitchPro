@@ -5375,6 +5375,12 @@ table.standings-table {
   font-size: 14px;
 }
 
+.career-ovr-badge small {
+  font-weight: 600;
+  opacity: 0.75;
+  font-size: 10px;
+}
+
 .career-ovr-badge {
   background: var(--accent-soft);
   color: var(--accent);

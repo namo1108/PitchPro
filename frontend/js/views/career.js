@@ -432,9 +432,16 @@ function historyRowHtml(h) {
   `;
 }
 
+// 은퇴 요약과 같은 기준(careerEngine.js의 peakOvr)으로 "지금까지 커리어 최고 OVR"을 구한다 - 프론트는
+// 서버 코드를 import할 수 없는 별도 정적 자산이라 같은 계산식을 여기서도 한 번 더 둔다.
+function peakOvr(save) {
+  return save.history.reduce((max, h) => Math.max(max, h.ovr), save.ovr);
+}
+
 function renderActive(save) {
   const { identity } = save;
   const latestStory = save.history.length ? save.history[save.history.length - 1].story : null;
+  const peak = peakOvr(save);
 
   el.root.innerHTML = `
     <h2 class="section-title">⚽ 축구인생</h2>
@@ -455,7 +462,7 @@ function renderActive(save) {
           <div class="career-id-club">
             ${save.club?.crest ? `<img src="${save.club.crest}" alt="" />` : ""}
             <span>${escapeHtml(save.club?.name || "자유계약")}</span>
-            <span class="career-ovr-badge">OVR ${save.ovr}</span>
+            <span class="career-ovr-badge">OVR ${save.ovr}${peak > save.ovr ? ` <small>(최고 ${peak})</small>` : ""}</span>
           </div>
           ${save.maxTransferFee ? `<div class="career-fee-badge">💰 최고 이적료 ${save.maxTransferFee}억원</div>` : ""}
         </div>
@@ -480,7 +487,7 @@ function renderActive(save) {
     <button type="button" class="career-start-btn" id="career-advance-btn">다음 시즌 ▶</button>
   `;
 
-  mountPlayerCard("career-active-canvas", { identity, club: save.club, ovr: save.ovr });
+  mountPlayerCard("career-active-canvas", { identity, club: save.club, ovr: peak });
 
   document.getElementById("career-advance-btn").addEventListener("click", advanceSeason);
 
@@ -574,7 +581,7 @@ function renderRetirement(save) {
             <span class="career-id-name">#${save.identity.jerseyNumber} ${escapeHtml(save.identity.name)}</span>
             <span class="career-id-pos">${save.identity.position}</span>
           </div>
-          <div class="career-retire-headline">은퇴 (나이 ${r.finalAge}세) · 최종 OVR ${r.finalOvr}</div>
+          <div class="career-retire-headline">은퇴 (나이 ${r.finalAge}세) · 커리어 최고 OVR ${r.finalOvr}</div>
           <div class="career-retire-stats">
             <span>통산 출전 ${r.totalApps}</span>
             <span>통산 득점 ${r.totalGoals}</span>

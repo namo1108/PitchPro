@@ -203,6 +203,14 @@ export function shouldRetire(save) {
   return save.age >= save.retirementAge;
 }
 
+// 은퇴 시점 OVR(save.ovr)은 보통 30대 하락기를 거쳐 전성기보다 낮아져 있다 - "커리어를 대표하는
+// 능력치"는 그 낮아진 마지막 값이 아니라 커리어 통틀어 가장 높았던 값이어야 한다는 사용자 피드백
+// (2026-11-16, "오버롤은 가장 높은걸 반영해야지") 반영. 별도 필드를 추가/갱신하는 대신 이미 쌓여있는
+// history의 시즌별 ovr 중 최댓값으로 그때그때 계산한다(세이브 구조를 안 건드려도 됨).
+export function peakOvr(save) {
+  return save.history.reduce((max, h) => Math.max(max, h.ovr), save.ovr);
+}
+
 export function buildRetirementSummary(save) {
   const totals = save.history.reduce(
     (acc, h) => ({
@@ -216,7 +224,7 @@ export function buildRetirementSummary(save) {
   return {
     retiredAt: new Date().toISOString(),
     finalAge: save.age,
-    finalOvr: save.ovr,
+    finalOvr: peakOvr(save),
     totalApps: totals.apps,
     totalGoals: totals.goals,
     totalAssists: totals.assists,
