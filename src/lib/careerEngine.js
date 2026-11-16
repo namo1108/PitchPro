@@ -1,6 +1,7 @@
 // 커리어 시뮬레이터(미니게임)의 핵심 계산 - "실제 통계적 리얼리즘"보다 "믿을만하면서 재밌는" 걸
 // 목표로 한다. 레퍼런스(copero.com.ar simulador-carrera)처럼 능력치는 랜덤으로 오르내리고,
 // 2시즌마다 선택지가 등장해 커리어 방향이 갈린다.
+import { trophyNamesForClub } from "./careerClubs.js";
 
 export const POSITIONS = ["GK", "CB", "LB", "RB", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW", "ST"];
 
@@ -84,22 +85,29 @@ export function statsForSeason(save) {
   return { apps, goals, assists };
 }
 
-const TROPHY_NAMES = ["리그 우승", "리그 준우승", "컵대회 우승", "시즌 베스트 11 선정"];
-
-export function rollTrophies(ovr) {
+// 트로피 이름은 "리그 우승"처럼 뭉뚱그리지 않고 실제 소속 리그/컵 이름을 쓴다(2026-11-16 사용자
+// 요청 - "트로피랑 리그는 api 데이터에서 따오면 좋을 것 같아"). careerClubs.js의
+// trophyNamesForClub이 config.js COMPETITIONS에서 실제 리그명 + (있으면) 국내컵/대륙대항전 이름을
+// 가져온다.
+export function rollTrophies(ovr, club) {
   const chance = clamp(0.08 + (ovr - 50) * 0.004, 0.05, 0.35);
   if (Math.random() >= chance) return [];
-  return [TROPHY_NAMES[randInt(0, TROPHY_NAMES.length - 1)]];
+  const { leagueName, cupName } = trophyNamesForClub(club);
+  const pool = [`${leagueName} 우승`, `${leagueName} 준우승`, "시즌 베스트 11 선정"];
+  if (cupName) pool.push(`${cupName} 우승`);
+  return [pool[randInt(0, pool.length - 1)]];
 }
 
 // 팀 트로피와 별개로, 개인 성적에 따른 "수상"도 추가한다(2026-11-16 사용자 요청 - "수상도 하고").
 // 같은 trophies 배열에 그대로 합쳐서 저장한다 - 화면에서 트로피/수상을 구분해서 다룰 필요가 아직
 // 없고(은퇴 요약 등 전부 "총 수상 내역"으로 뭉뚱그려 보여주면 충분), 스키마를 늘리지 않아도 된다.
+// 득점왕/도움왕도 트로피와 마찬가지로 실제 리그 이름을 붙인다.
 export function rollPersonalAwards(save, stats) {
   const awards = [];
-  if (stats.goals >= 20) awards.push("리그 득점왕");
-  if (stats.assists >= 12) awards.push("리그 도움왕");
-  if (save.ovr >= 85 && Math.random() < 0.25) awards.push("리그 MVP");
+  const { leagueName } = trophyNamesForClub(save.club);
+  if (stats.goals >= 20) awards.push(`${leagueName} 득점왕`);
+  if (stats.assists >= 12) awards.push(`${leagueName} 도움왕`);
+  if (save.ovr >= 85 && Math.random() < 0.25) awards.push(`${leagueName} MVP`);
   if (save.age <= 21 && save.ovr >= 68 && Math.random() < 0.3) awards.push("올해의 영플레이어");
   return awards;
 }

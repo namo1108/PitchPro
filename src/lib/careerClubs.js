@@ -2,7 +2,7 @@
 // 순위표(KV_KEYS.standings, analysis.js가 쓰는 것과 같은 shape)를 재사용한다. 등급(1=최상위
 // ~4=최하위)은 실제 리그 코드를 수동으로 매핑한다 - 전부 config.js COMPETITIONS에 실존하는 코드만 사용.
 import { getJSON } from "./kv.js";
-import { KV_KEYS } from "./config.js";
+import { KV_KEYS, findCompetition } from "./config.js";
 
 const CLUB_TIER_BY_CODE = {
   PL: 1, PD: 1, BL1: 1, SA: 1, FL1: 1,
@@ -11,6 +11,30 @@ const CLUB_TIER_BY_CODE = {
   K3: 4, K4: 4,
 };
 const DOMESTIC_CODES = new Set(["KL1", "KL2", "K3", "K4"]);
+
+// 트로피/수상 이름(2026-11-16 사용자 요청 - "트로피랑 리그는 api 데이터에서 따오면 좋을 것 같아")에
+// 쓸 실제 리그/컵 이름. 국내컵은 config.js COMPETITIONS에 실제로 등록돼있는 나라만(한국=코리아컵,
+// 잉글랜드=FA컵) 쓰고, 그 외 리그는 국내컵 데이터가 없어 지역+등급에 맞는 대륙대항전으로 대신한다
+// (유럽은 챔피언스/유로파/컨퍼런스리그, 아시아는 AFC챔피언스리그 엘리트/투 - CLUB_TIER_BY_CODE의
+// 등급을 그대로 재사용). 둘 다 해당 안 되는 리그(MLS/브라질/호주 등)는 컵 트로피 없이 리그 우승/
+// 준우승만 돈다 - 없는 대회를 지어내지 않는다.
+const DOMESTIC_CUP_CODE = { KL1: "KFA", KL2: "KFA", K3: "KFA", K4: "KFA", PL: "FA", ELC: "FA" };
+const EUROPE_CODES = new Set(["PL", "PD", "BL1", "SA", "FL1", "DED", "PPL", "ELC", "NOR", "DEN", "SCO"]);
+const ASIA_CODES = new Set(["KL1", "KL2", "K3", "K4", "KSA", "CHN", "J1", "J2", "J3"]);
+
+export function trophyNamesForClub(club) {
+  const code = club?.competitionCode;
+  const leagueName = findCompetition(code)?.name || "리그";
+  const tier = CLUB_TIER_BY_CODE[code] || 3;
+
+  let cupCode = DOMESTIC_CUP_CODE[code];
+  if (!cupCode) {
+    if (EUROPE_CODES.has(code)) cupCode = tier === 1 ? "CL" : tier === 2 ? "EL" : "ECL";
+    else if (ASIA_CODES.has(code)) cupCode = tier <= 2 ? "ACL" : "ACL2";
+  }
+  const cupName = cupCode ? findCompetition(cupCode)?.name || null : null;
+  return { leagueName, cupName };
+}
 
 export const CAREER_CLUB_DISCLAIMER =
   "이 시뮬레이션에 등장하는 구단명과 엠블럼은 재미를 위한 식별 목적으로만 사용되며, 실제 구단과 제휴·후원·공식적인 관계가 없습니다.";

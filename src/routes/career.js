@@ -202,7 +202,7 @@ export async function handleCareerAdvanceSeason(request, env) {
 
   const stats = statsForSeason(save);
   const { apps, goals, assists } = stats;
-  const trophies = [...rollTrophies(save.ovr), ...rollPersonalAwards(save, stats)];
+  const trophies = [...rollTrophies(save.ovr, save.club), ...rollPersonalAwards(save, stats)];
   const story = buildSeasonStory(save, stats, trophies);
   save.career.seasonIndex += 1;
   save.seasonsAtClub += 1;

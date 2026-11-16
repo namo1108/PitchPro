@@ -553,6 +553,15 @@ function renderDecisionModal(save) {
 }
 
 // ---------- 5. 은퇴 요약 ----------
+// 트로피 이름이 이제 실제 리그/컵 이름이라(careerEngine.js의 rollTrophies 참고) 아이콘만 나열하지
+// 않고 "K리그1 우승 x2"처럼 같은 트로피는 묶어서 보여준다(2026-11-16 사용자 요청 - "트로피랑 리그는
+// api 데이터에서 따오면 좋을 것 같아").
+function groupTrophies(trophies) {
+  const counts = new Map();
+  for (const name of trophies) counts.set(name, (counts.get(name) || 0) + 1);
+  return [...counts.entries()].map(([name, count]) => ({ name, count }));
+}
+
 // "커리어 하이라이트" - 20시즌 넘게 쌓인 스토리를 전부 보여주면 지저분하니, 데뷔/수상 시즌/은퇴
 // 시즌만 골라 짧게 보여준다(2026-11-16 사용자 요청 - "약간 스토리도 넣어주고").
 function careerHighlights(save) {
@@ -588,7 +597,7 @@ function renderRetirement(save) {
             <span>통산 도움 ${r.totalAssists}</span>
             ${r.maxTransferFee ? `<span>최고 이적료 ${r.maxTransferFee}억</span>` : ""}
           </div>
-          ${r.trophies.length ? `<div class="career-retire-trophies">${r.trophies.map(() => "🏆").join("")}</div>` : ""}
+          ${r.trophies.length ? `<div class="career-retire-trophies">${groupTrophies(r.trophies).map((t) => `<span class="career-trophy-pill">🏆 ${escapeHtml(t.name)}${t.count > 1 ? ` x${t.count}` : ""}</span>`).join("")}</div>` : ""}
           ${
             save.nationalTeam.called
               ? `<div class="career-national-strip">🏳 국가대표 ${save.nationalTeam.caps}캡 · ${save.nationalTeam.goals}골 · ${save.nationalTeam.assists}도움</div>`
