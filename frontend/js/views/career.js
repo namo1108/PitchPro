@@ -34,9 +34,13 @@ async function loadNationalities() {
 }
 
 // 폼 입력값은 화면을 다시 그려도(예: 국적 검색 결과 클릭) 안 날아가도록 모듈 레벨에 들고 있는다.
-// lookSeed는 미리보기 카드(얼굴/유니폼)를 결정하는 값 - 생성 화면에 들어올 때 한 번만 굴려서,
-// 입력하는 동안 얼굴이 계속 바뀌어 보이지 않게 한다.
+// lookSeed는 예전 SVG 생성형 얼굴 버전의 흔적 - 지금은 카드 템플릿 이미지의 얼굴이 고정이라 화면
+// 표시에는 안 쓰이지만, 이미 저장된 세이브의 identity.lookSeed 필드와 호환되게 계속 채워서 보낸다.
 const draft = { name: "", jerseyNumber: "", nationality: null, preferredFoot: "right", position: null, lookSeed: null };
+
+function randomLookSeed() {
+  return Math.floor(Math.random() * 1e9);
+}
 
 // ---------- 선수 카드(사용자가 준 레퍼런스 이미지를 그대로 사용) ----------
 // 처음엔 코드로 그린 도형(SVG)으로 비슷하게 흉내냈는데 "이게 아니야, player card 그대로 가져와"라는
