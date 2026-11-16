@@ -322,6 +322,127 @@ export async function renderShareCardImage(
   return renderCard(env, element, SHARE_CARD_WIDTH, SHARE_CARD_HEIGHT);
 }
 
+// 커리어 시뮬레이터 은퇴 요약 공유카드 - renderShareCardImage와 같은 satori+resvg 파이프라인을
+// 재사용하되, 경기 결과 대신 가상 선수의 커리어 전체(최종 OVR/은퇴나이/거쳐온 구단/통산 기록/
+// 트로피/국가대표 기록)를 한 장에 담는다.
+const CAREER_CARD_WIDTH = 1000;
+const CAREER_CARD_HEIGHT = 620;
+
+function careerStatBlock(value, label) {
+  return {
+    type: "div",
+    props: {
+      style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 6 },
+      children: [
+        { type: "div", props: { style: { display: "flex", fontSize: 40, fontWeight: 700, color: "#ffffff" }, children: String(value) } },
+        { type: "div", props: { style: { display: "flex", fontSize: 16, color: "#9fb0a8" }, children: label } },
+      ],
+    },
+  };
+}
+
+export async function renderCareerShareCardImage(
+  env,
+  { lastName, jerseyNumber, nationalityFlag, position, finalAge, finalOvr, clubHistory = [], totalApps, totalGoals, totalAssists, trophies = [], nationalCaps }
+) {
+  const [nationalityCrestUri, ...clubCrestUris] = await Promise.all([
+    toDataUri(env, nationalityFlag),
+    ...clubHistory.slice(-6).map((c) => toDataUri(env, c.crestUrl)),
+  ]);
+
+  const trophyShown = trophies.slice(0, 8);
+  const trophyOverflow = trophies.length - trophyShown.length;
+
+  const element = {
+    type: "div",
+    props: {
+      style: { ...CARD_STYLE_BASE, height: CAREER_CARD_HEIGHT, flexDirection: "column", gap: 18, border: `6px solid ${ACCENT}` },
+      children: [
+        {
+          type: "div",
+          props: {
+            style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 14 },
+            children: [
+              ...(nationalityCrestUri
+                ? [{ type: "img", props: { src: nationalityCrestUri, width: 36, height: 36, style: { objectFit: "contain" } } }]
+                : []),
+              {
+                type: "div",
+                props: {
+                  style: { display: "flex", fontSize: 36, fontWeight: 700, color: "#ffffff", textTransform: "uppercase" },
+                  children: `#${jerseyNumber} ${lastName}`,
+                },
+              },
+              {
+                type: "div",
+                props: {
+                  style: { display: "flex", fontSize: 24, fontWeight: 700, color: ACCENT, border: `2px solid ${ACCENT}`, borderRadius: 999, padding: "4px 16px" },
+                  children: position,
+                },
+              },
+            ],
+          },
+        },
+        {
+          type: "div",
+          props: {
+            style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 4 },
+            children: [
+              { type: "div", props: { style: { display: "flex", fontSize: 96, fontWeight: 700, color: ACCENT }, children: String(finalOvr) } },
+              { type: "div", props: { style: { display: "flex", fontSize: 22, color: "#c8cfcb" }, children: `은퇴 (나이 ${finalAge}세)` } },
+            ],
+          },
+        },
+        {
+          type: "div",
+          props: {
+            style: { display: "flex", justifyContent: "center", alignItems: "center", gap: 10 },
+            children: clubCrestUris.map((uri) => crestNode(uri, 70, 48)),
+          },
+        },
+        {
+          type: "div",
+          props: {
+            style: { display: "flex", justifyContent: "center", gap: 60 },
+            children: [careerStatBlock(totalApps, "통산 출전"), careerStatBlock(totalGoals, "통산 득점"), careerStatBlock(totalAssists, "통산 도움")],
+          },
+        },
+        ...(trophyShown.length
+          ? [
+              {
+                type: "div",
+                props: {
+                  style: { display: "flex", justifyContent: "center", alignItems: "center", gap: 10, fontSize: 30 },
+                  children: [trophyShown.map(() => "🏆").join(""), trophyOverflow > 0 ? ` +${trophyOverflow}` : ""].join(""),
+                },
+              },
+            ]
+          : []),
+        ...(nationalCaps?.called
+          ? [
+              {
+                type: "div",
+                props: {
+                  style: { display: "flex", justifyContent: "center" },
+                  children: pill(`국가대표 ${nationalCaps.caps}캡 ${nationalCaps.goals}골 ${nationalCaps.assists}도움`, ACCENT),
+                },
+              },
+            ]
+          : []),
+        {
+          type: "div",
+          props: {
+            style: { display: "flex", justifyContent: "center", fontSize: 18, color: "#6b7a72", marginTop: "auto" },
+            children: "PITCH PRO · 축구선수 인생",
+          },
+        },
+      ],
+    },
+  };
+
+  return renderCard(env, element, CAREER_CARD_WIDTH, CAREER_CARD_HEIGHT);
+}
+
 // 이적 소식용 - 선수명 + 이전팀 -> 이적팀(화살표) 구도.
 export async function renderTransferImage(env, { playerName, fromTeam, fromCrestUrl, toTeam, toCrestUrl }) {
   const [fromCrestDataUri, toCrestDataUri] = await Promise.all([toDataUri(env, fromCrestUrl), toDataUri(env, toCrestUrl)]);

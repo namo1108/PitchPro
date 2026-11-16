@@ -247,6 +247,14 @@ export const KV_KEYS = {
   // 외부 분석 도구 없이 자체적으로 남기는 익명 집계 통계(개인 식별 불가) - 날짜별로 탭 조회수/주요
   // 이벤트(가입/로그인/집관인증) 횟수만 더한다. 개인정보처리방침 7항에서 안내하는 바로 그 통계.
   analyticsPrefix: "analytics:",
+  // 커리어 시뮬레이터 미니게임(선택 기능, 2026-11-16) - 유저당 세이브 1개, user: 레코드처럼 TTL 없이
+  // 영구 보관한다. 은퇴한 세이브들의 랭킹(명예의전당 "커리어 레전드" 탭)은 leaderboard.js의 포인트
+  // 랭킹과 같은 패턴(env.CACHE.list로 전수 스캔 -> 정렬 -> 캐시)으로 계산해 이 키에 캐싱한다.
+  careerPrefix: "career:",
+  // "career:" 접두사를 그대로 쓰면 아래 전수 스캔(env.CACHE.list({prefix: careerPrefix}))에 이
+  // 캐시 키 자체가 같이 걸려서(값이 세이브가 아니라 랭킹 배열이라 careerStage 체크로 걸러지긴
+  // 하지만) 혼란스러우니 아예 다른 접두사를 쓴다.
+  careerLegendsCache: "careerlegends:cache",
 };
 
 export const POINTS_LOG_MAX_ENTRIES = 50;
@@ -322,6 +330,12 @@ export const POINTS_PREDICTION_RESULT = 5;
 export const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const LEADERBOARD_CACHE_TTL_SECONDS = 300;
 export const LEADERBOARD_SIZE = 100;
+
+// 커리어 시뮬레이터 - decisionCadence는 세이브에 저장해두는 값이라 여기선 "새 커리어 시작 시 기본값"
+// 역할만 한다. 나중에 난이도(Intense/Express)를 추가하면 start 시점에 다른 값을 넣어주면 됨.
+export const CAREER_DECISION_CADENCE_SEASONS = 2;
+export const CAREER_LEGENDS_CACHE_TTL_SECONDS = 300;
+export const CAREER_LEGENDS_SIZE = 50;
 
 // 여기 적은 아이디(소문자)는 포인트와 상관없이 레벨 99 "나 개발자(Goat)"로 고정 표시된다(운영자 이스터에그).
 export const GOAT_USERNAMES = ["bongmars"];

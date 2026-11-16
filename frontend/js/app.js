@@ -7,6 +7,7 @@ import "./views/transfers.js";
 import "./views/aiAnalysis.js";
 import "./views/myTeam.js";
 import "./views/hallOfFame.js";
+import "./views/career.js";
 import "./views/community.js";
 import "./views/soccerSchool.js";
 import "./views/settings.js";

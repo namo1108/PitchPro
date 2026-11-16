@@ -3,7 +3,11 @@ import { onTabChange } from "../router.js";
 import { fadeIn, skeletonList, escapeHtml } from "../format.js";
 import { authFetch, isLoggedIn, getToken, onAuthChange } from "../auth.js";
 
-const el = { list: document.getElementById("hof-list") };
+const el = {
+  list: document.getElementById("hof-list"),
+  careerList: document.getElementById("hof-career-list"),
+  tabs: document.getElementById("hof-tabs"),
+};
 
 const MEDAL = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
@@ -107,6 +111,56 @@ function renderLeaderboard(entries, goats, me, animate) {
     btn.addEventListener("click", () => handleFriendAction(btn));
   });
 }
+
+// "커리어 레전드"(명예의전당 2번째 탭, 2026-11-16) - 축구인생 미니게임에서 은퇴한 가상 선수들의
+// 최종 능력치 랭킹. 커리어 세이브는 포인트 랭킹과 별개 데이터라 /career/legends를 따로 조회한다.
+let careerLegendsLoadedOnce = false;
+
+function careerLegendRowHtml(entry) {
+  return `
+    <div class="hof-row career">
+      <span class="hof-rank">${MEDAL[entry.rank] || entry.rank}</span>
+      <span class="hof-nickname">${escapeHtml(entry.nickname)}
+        <span class="hof-title">${escapeHtml(entry.lastName)} · ${escapeHtml(entry.position)} · ${escapeHtml(entry.nationality?.name || "")}</span>
+      </span>
+      <span class="hof-level">OVR ${entry.finalOvr}</span>
+      <span class="hof-points">🏆${entry.trophyCount}</span>
+    </div>
+  `;
+}
+
+async function loadCareerLegends() {
+  if (!el.careerList) return;
+  if (!careerLegendsLoadedOnce) el.careerList.innerHTML = skeletonList(8);
+  try {
+    const data = await fetchJSON("/career/legends");
+    const entries = data.entries || [];
+    el.careerList.innerHTML = entries.length
+      ? `
+        <div class="hof-list-header">
+          <span class="hof-rank">순위</span>
+          <span class="hof-nickname">선수</span>
+          <span class="hof-level">OVR</span>
+          <span class="hof-points">트로피</span>
+        </div>
+        ${entries.map(careerLegendRowHtml).join("")}
+      `
+      : '<div class="empty-state">아직 은퇴한 선수가 없습니다. 축구인생에서 첫 레전드가 되어보세요!</div>';
+    careerLegendsLoadedOnce = true;
+  } catch (err) {
+    if (!careerLegendsLoadedOnce) el.careerList.innerHTML = `<div class="error-state">불러오지 못했습니다.<br>${err.message}</div>`;
+  }
+}
+
+el.tabs?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-hof-tab]");
+  if (!btn) return;
+  const tab = btn.dataset.hofTab;
+  el.tabs.querySelectorAll(".school-tab-btn").forEach((t) => t.classList.toggle("active", t === btn));
+  el.list.style.display = tab === "points" ? "" : "none";
+  el.careerList.style.display = tab === "career" ? "" : "none";
+  if (tab === "career") loadCareerLegends();
+});
 
 onTabChange("hof", loadLeaderboard);
 onAuthChange(() => {

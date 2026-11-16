@@ -1,7 +1,7 @@
 import { saveViewState } from "./viewState.js";
 import { trackView } from "./analytics.js";
 
-const PRIMARY_VIEWS = ["matches", "news", "leagues", "transfers", "ai", "myteam", "hof", "community", "settings"];
+const PRIMARY_VIEWS = ["matches", "news", "leagues", "transfers", "ai", "myteam", "hof", "community", "settings", "career"];
 
 const state = { view: "matches" };
 

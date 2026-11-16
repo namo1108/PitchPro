@@ -44,6 +44,17 @@ import {
 import { handlePointsHistory } from "./routes/points.js";
 import { handleCheckin, handleCheckinStatus } from "./routes/checkin.js";
 import { handleSubmitPrediction, handlePredictionStatus } from "./routes/prediction.js";
+import {
+  handleCareerState,
+  handleCareerNationalities,
+  handleCareerStart,
+  handleCareerAcademyChoice,
+  handleCareerAdvanceSeason,
+  handleCareerChooseDecision,
+  handleCareerReset,
+  handleCareerShareImage,
+  handleCareerLegends,
+} from "./routes/career.js";
 import { handleMyRecords } from "./routes/myRecords.js";
 import { handleMatchShareImage } from "./routes/shareImage.js";
 import {
@@ -234,6 +245,34 @@ export async function routeApiRequest(request, env, ctx) {
   }
   if (segments[1] === "predict" && segments.length === 2 && request.method === "POST") {
     return handleSubmitPrediction(request, env);
+  }
+  // 커리어 시뮬레이터 미니게임(2026-11-16) - /api/career/share/:username.png만 인증 없이 공개.
+  if (segments[1] === "career" && segments[2] === "state" && segments.length === 3 && request.method === "GET") {
+    return handleCareerState(request, env);
+  }
+  if (segments[1] === "career" && segments[2] === "nationalities" && segments.length === 3 && request.method === "GET") {
+    return handleCareerNationalities(request, env);
+  }
+  if (segments[1] === "career" && segments[2] === "start" && segments.length === 3 && request.method === "POST") {
+    return handleCareerStart(request, env);
+  }
+  if (segments[1] === "career" && segments[2] === "academy-choice" && segments.length === 3 && request.method === "POST") {
+    return handleCareerAcademyChoice(request, env);
+  }
+  if (segments[1] === "career" && segments[2] === "advance-season" && segments.length === 3 && request.method === "POST") {
+    return handleCareerAdvanceSeason(request, env);
+  }
+  if (segments[1] === "career" && segments[2] === "choose-decision" && segments.length === 3 && request.method === "POST") {
+    return handleCareerChooseDecision(request, env);
+  }
+  if (segments[1] === "career" && segments[2] === "reset" && segments.length === 3 && request.method === "POST") {
+    return handleCareerReset(request, env);
+  }
+  if (segments[1] === "career" && segments[2] === "legends" && segments.length === 3 && request.method === "GET") {
+    return handleCareerLegends(request, env);
+  }
+  if (segments[1] === "career" && segments[2] === "share" && segments.length === 4 && request.method === "GET") {
+    return handleCareerShareImage(request, env, segments[3].replace(/\.png$/, ""));
   }
   if (segments[1] === "me" && segments[2] === "records" && request.method === "GET") {
     return handleMyRecords(request, env);
