@@ -92,6 +92,76 @@ export function rollTrophies(ovr) {
   return [TROPHY_NAMES[randInt(0, TROPHY_NAMES.length - 1)]];
 }
 
+// 팀 트로피와 별개로, 개인 성적에 따른 "수상"도 추가한다(2026-11-16 사용자 요청 - "수상도 하고").
+// 같은 trophies 배열에 그대로 합쳐서 저장한다 - 화면에서 트로피/수상을 구분해서 다룰 필요가 아직
+// 없고(은퇴 요약 등 전부 "총 수상 내역"으로 뭉뚱그려 보여주면 충분), 스키마를 늘리지 않아도 된다.
+export function rollPersonalAwards(save, stats) {
+  const awards = [];
+  if (stats.goals >= 20) awards.push("리그 득점왕");
+  if (stats.assists >= 12) awards.push("리그 도움왕");
+  if (save.ovr >= 85 && Math.random() < 0.25) awards.push("리그 MVP");
+  if (save.age <= 21 && save.ovr >= 68 && Math.random() < 0.3) awards.push("올해의 영플레이어");
+  return awards;
+}
+
+// 이적료(2026-11-16 사용자 요청 - "이적료도 나오고") - 실제 시세 데이터가 없어 OVR/나이만으로
+// 대략적인 느낌을 낸다. 단위는 "억원"(한국 유저에게 익숙한 단위). valueIndex는 OVR 40을 0으로 두고
+// 제곱으로 키워서, 상위권 선수일수록 이적료가 훨씬 가파르게 뛰는 실제 이적 시장 느낌을 흉내낸다.
+export function estimateTransferFee(ovr, age) {
+  const valueIndex = clamp(ovr - 40, 0, 59);
+  let fee = valueIndex * valueIndex * 0.05;
+  if (age <= 23) fee *= 1.3; // 어린 유망주 프리미엄
+  else if (age <= 29) fee *= 1.0;
+  else if (age <= 33) fee *= 0.55;
+  else fee *= 0.25;
+  fee *= randFloat(0.85, 1.15);
+  return Math.max(1, Math.round(fee));
+}
+
+// ---------- 시즌 스토리(짧은 서사 한 줄, 2026-11-16 사용자 요청 - "약간 스토리도 넣어주고") ----------
+// 숫자(OVR/골/도움)만 나열하면 재미가 없어서, 그 시즌에 어울리는 짧은 문장을 하나 붙여준다.
+// 결정론적일 필요가 없다(한 번 계산해서 history에 그대로 저장하고 다시 계산하지 않음).
+function pick(templates, ...args) {
+  return templates[randInt(0, templates.length - 1)](...args);
+}
+
+const STORY_TROPHY = [(n, s, t) => `${n}와(과) 동료들은 집중력을 잃지 않고 시즌 내내 달려, 마침내 ${t[0]}을(를) 들어올렸습니다.`];
+const STORY_BREAKOUT = [
+  (n, s) => `${n}, 이번 시즌 ${s.goals}골을 몰아넣으며 팀의 떠오르는 샛별로 주목받았습니다.`,
+  (n, s) => `어린 나이에도 ${s.apps}경기를 소화한 ${n}, 구단의 미래로 평가받기 시작했습니다.`,
+];
+const STORY_MVP = [
+  (n, s) => `${n}의 완벽한 활약(${s.goals}골 ${s.assists}도움) 속에 팀은 최고의 시즌을 보냈습니다.`,
+  (n) => `리그를 지배한 ${n}, 상대 팀 감독들의 최우선 경계 대상이 됐습니다.`,
+];
+const STORY_DECLINE = [
+  (n) => `노장이 된 ${n}, 체력 저하를 경험했지만 여전히 후배들에게 모범이 되고 있습니다.`,
+  (n) => `전성기는 지났지만 ${n}의 경기 운영 능력만큼은 녹슬지 않았습니다.`,
+];
+const STORY_STRUGGLE = [
+  (n) => `좀처럼 출전 기회를 잡지 못한 ${n}, 반등의 기회를 노리고 있습니다.`,
+  (n) => `벤치를 지키는 날이 많았던 ${n}에게는 인내가 필요한 시즌이었습니다.`,
+];
+const STORY_INJURY = [
+  (n) => `${n}, 시즌 중 잔부상에 시달렸지만 꾸준히 그라운드를 지켰습니다.`,
+  (n) => `크고 작은 부상이 있었지만 ${n}는 묵묵히 버텨냈습니다.`,
+];
+const STORY_AVERAGE = [
+  (n, s) => `${n}는 ${s.apps}경기에 나서며 묵묵히 제 몫을 다했습니다.`,
+  (n, s) => `특별한 반전은 없었지만, ${n}는 꾸준히 팀에 보탬이 됐습니다.`,
+];
+
+export function buildSeasonStory(save, stats, trophies) {
+  const name = save.identity.name || "선수";
+  if (trophies.length && Math.random() < 0.6) return pick(STORY_TROPHY, name, stats, trophies);
+  if (save.age <= 20 && stats.goals + stats.apps > 0 && Math.random() < 0.5) return pick(STORY_BREAKOUT, name, stats);
+  if (save.ovr >= 85 && Math.random() < 0.4) return pick(STORY_MVP, name, stats);
+  if (save.age >= 33) return pick(STORY_DECLINE, name, stats);
+  if (stats.apps < 12) return pick(STORY_STRUGGLE, name, stats);
+  if (Math.random() < 0.12) return pick(STORY_INJURY, name, stats);
+  return pick(STORY_AVERAGE, name, stats);
+}
+
 function callUpChance(ovr) {
   if (ovr < 75) return 0;
   return clamp((ovr - 74) * 0.05, 0, 0.6);
@@ -135,6 +205,7 @@ export function buildRetirementSummary(save) {
     totalGoals: totals.goals,
     totalAssists: totals.assists,
     trophies: totals.trophies,
+    maxTransferFee: save.maxTransferFee || 0,
   };
 }
 
@@ -178,6 +249,7 @@ export function applyDecisionEffect(save, effect) {
       if (effect.type === "overseas_transfer") {
         save.ovr = clamp(save.ovr + randInt(1, 3), 40, 99);
       }
+      if (effect.fee) save.maxTransferFee = Math.max(save.maxTransferFee || 0, effect.fee);
       break;
     }
     case "loan": {

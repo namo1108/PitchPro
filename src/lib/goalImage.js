@@ -343,7 +343,21 @@ function careerStatBlock(value, label) {
 
 export async function renderCareerShareCardImage(
   env,
-  { lastName, jerseyNumber, nationalityFlag, position, finalAge, finalOvr, clubHistory = [], totalApps, totalGoals, totalAssists, trophies = [], nationalCaps }
+  {
+    name,
+    jerseyNumber,
+    nationalityFlag,
+    position,
+    finalAge,
+    finalOvr,
+    clubHistory = [],
+    totalApps,
+    totalGoals,
+    totalAssists,
+    trophies = [],
+    nationalCaps,
+    maxTransferFee = 0,
+  }
 ) {
   const [nationalityCrestUri, ...clubCrestUris] = await Promise.all([
     toDataUri(env, nationalityFlag),
@@ -370,7 +384,7 @@ export async function renderCareerShareCardImage(
                 type: "div",
                 props: {
                   style: { display: "flex", fontSize: 36, fontWeight: 700, color: "#ffffff", textTransform: "uppercase" },
-                  children: `#${jerseyNumber} ${lastName}`,
+                  children: `#${jerseyNumber} ${name}`,
                 },
               },
               {
@@ -403,8 +417,13 @@ export async function renderCareerShareCardImage(
         {
           type: "div",
           props: {
-            style: { display: "flex", justifyContent: "center", gap: 60 },
-            children: [careerStatBlock(totalApps, "통산 출전"), careerStatBlock(totalGoals, "통산 득점"), careerStatBlock(totalAssists, "통산 도움")],
+            style: { display: "flex", justifyContent: "center", gap: 50 },
+            children: [
+              careerStatBlock(totalApps, "통산 출전"),
+              careerStatBlock(totalGoals, "통산 득점"),
+              careerStatBlock(totalAssists, "통산 도움"),
+              ...(maxTransferFee > 0 ? [careerStatBlock(`${maxTransferFee}억`, "최고 이적료")] : []),
+            ],
           },
         },
         ...(trophyShown.length

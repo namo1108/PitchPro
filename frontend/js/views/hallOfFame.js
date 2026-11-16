@@ -121,7 +121,7 @@ function careerLegendRowHtml(entry) {
     <div class="hof-row career">
       <span class="hof-rank">${MEDAL[entry.rank] || entry.rank}</span>
       <span class="hof-nickname">${escapeHtml(entry.nickname)}
-        <span class="hof-title">${escapeHtml(entry.lastName)} · ${escapeHtml(entry.position)} · ${escapeHtml(entry.nationality?.name || "")}</span>
+        <span class="hof-title">${escapeHtml(entry.name)} · ${escapeHtml(entry.position)} · ${escapeHtml(entry.nationality?.name || "")}</span>
       </span>
       <span class="hof-level">OVR ${entry.finalOvr}</span>
       <span class="hof-points">🏆${entry.trophyCount}</span>

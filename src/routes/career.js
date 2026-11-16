@@ -12,9 +12,12 @@ import {
   advanceOvr,
   statsForSeason,
   rollTrophies,
+  rollPersonalAwards,
   rollNationalCallUp,
   shouldRetire,
   buildRetirementSummary,
+  buildSeasonStory,
+  estimateTransferFee,
   DECISION_TEMPLATES,
   applyDecisionEffect,
 } from "../lib/careerEngine.js";
@@ -40,19 +43,21 @@ async function buildDecisionOption(env, save, kind) {
     case "transfer": {
       const [club] = await pickTransferCandidates(env, save, { count: 1 });
       if (!club) return null;
-      return { id: "move", label: "이적 제안", description: `${club.name}로 이적`, club, effect: { type: "transfer", club } };
+      const fee = estimateTransferFee(save.ovr, save.age);
+      return { id: "move", label: "이적 제안", description: `${club.name}로 이적 (이적료 ${fee}억원)`, club, effect: { type: "transfer", club, fee } };
     }
     case "extend_contract":
       return { id: "extend", label: "재계약", description: "소속팀 잔류, 계약 연장", effect: { type: "extend_contract" } };
     case "loan": {
       const [club] = await pickTransferCandidates(env, save, { count: 1, preferLowerTier: true });
       if (!club) return null;
-      return { id: "loan", label: "임대 이적", description: `${club.name}로 1시즌 임대`, club, effect: { type: "loan", club } };
+      return { id: "loan", label: "임대 이적", description: `${club.name}로 1시즌 임대 (임대료 없음)`, club, effect: { type: "loan", club } };
     }
     case "overseas_transfer": {
       const [club] = await pickTransferCandidates(env, save, { count: 1, preferHigherTier: true, excludeDomestic: true });
       if (!club) return null;
-      return { id: "overseas", label: "해외 진출", description: `${club.name}로 이적`, club, effect: { type: "overseas_transfer", club } };
+      const fee = Math.round(estimateTransferFee(save.ovr, save.age) * 1.4);
+      return { id: "overseas", label: "해외 진출", description: `${club.name}로 이적 (이적료 ${fee}억원)`, club, effect: { type: "overseas_transfer", club, fee } };
     }
     case "stay_domestic":
       return { id: "stay", label: "국내 잔류", description: "안정적인 환경 유지", effect: { type: "stay_domestic" } };
@@ -104,13 +109,17 @@ export async function handleCareerStart(request, env) {
   }
 
   const body = await request.json().catch(() => null);
-  const lastName = String(body?.lastName || "").trim().slice(0, 20);
+  const name = String(body?.name || "").trim().slice(0, 20);
   const jerseyNumber = Number(body?.jerseyNumber);
   const preferredFoot = PREFERRED_FEET.has(body?.preferredFoot) ? body.preferredFoot : "right";
   const position = POSITIONS.includes(body?.position) ? body.position : null;
   const nationality = body?.nationality;
+  // lookSeed는 선수 카드(얼굴/유니폼) 생김새를 고정하는 값 - 캐릭터 생성 화면에서 미리보기로 보여준
+  // 값을 그대로 보내게 해서, 저장 후에도 "방금 봤던 그 얼굴"이 유지되게 한다. 순전히 꾸밈용이라
+  // 클라이언트가 보낸 값을 그대로 신뢰해도 문제없다(숫자가 아니면 서버에서 새로 굴림).
+  const lookSeed = Number.isFinite(Number(body?.lookSeed)) ? Math.floor(Number(body.lookSeed)) : Math.floor(Math.random() * 1e9);
 
-  if (!lastName) return json({ detail: "이름을 입력해주세요." }, 400);
+  if (!name) return json({ detail: "이름을 입력해주세요." }, 400);
   if (!Number.isInteger(jerseyNumber) || jerseyNumber < 1 || jerseyNumber > 99) {
     return json({ detail: "등번호는 1~99 사이로 입력해주세요." }, 400);
   }
@@ -125,11 +134,12 @@ export async function handleCareerStart(request, env) {
     version: 1,
     careerStage: "academy_offer",
     identity: {
-      lastName,
+      name,
       jerseyNumber,
       nationality: { code: nationality.code || null, name: String(nationality.name).slice(0, 40), crest: nationality.crest || null },
       preferredFoot,
       position,
+      lookSeed,
     },
     age: 16,
     ovr,
@@ -139,6 +149,7 @@ export async function handleCareerStart(request, env) {
     contractStatus: "자유계약",
     loanParentClubId: null,
     seasonsAtClub: 0,
+    maxTransferFee: 0,
     career: { seasonIndex: 0, decisionCadence: CAREER_DECISION_CADENCE_SEASONS },
     nextSeasonModifier: null,
     history: [],
@@ -189,8 +200,10 @@ export async function handleCareerAdvanceSeason(request, env) {
   save.ovr = advanceOvr(save, nextAge);
   save.age = nextAge;
 
-  const { apps, goals, assists } = statsForSeason(save);
-  const trophies = rollTrophies(save.ovr);
+  const stats = statsForSeason(save);
+  const { apps, goals, assists } = stats;
+  const trophies = [...rollTrophies(save.ovr), ...rollPersonalAwards(save, stats)];
+  const story = buildSeasonStory(save, stats, trophies);
   save.career.seasonIndex += 1;
   save.seasonsAtClub += 1;
   save.nextSeasonModifier = null;
@@ -207,6 +220,7 @@ export async function handleCareerAdvanceSeason(request, env) {
     assists,
     onLoan: save.contractStatus === "임대중",
     trophies,
+    story,
   });
 
   const calledUp = rollNationalCallUp(save);
@@ -263,7 +277,7 @@ export async function handleCareerShareImage(request, env, username) {
     if (!save || save.careerStage !== "retired") return new Response(null, { status: 404 });
 
     const png = await renderCareerShareCardImage(env, {
-      lastName: save.identity.lastName,
+      name: save.identity.name,
       jerseyNumber: save.identity.jerseyNumber,
       nationalityFlag: save.identity.nationality?.crest || null,
       position: save.identity.position,
@@ -275,6 +289,7 @@ export async function handleCareerShareImage(request, env, username) {
       totalAssists: save.retirement.totalAssists,
       trophies: save.retirement.trophies,
       nationalCaps: save.nationalTeam,
+      maxTransferFee: save.retirement.maxTransferFee,
     });
 
     return new Response(png, { headers: { "content-type": "image/png", "cache-control": "public, max-age=1800" } });
@@ -296,7 +311,7 @@ async function computeCareerLegends(env) {
       const user = await getJSON(env, userKey(username));
       return {
         nickname: user?.nickname || username,
-        lastName: save.identity.lastName,
+        name: save.identity.name,
         nationality: save.identity.nationality,
         position: save.identity.position,
         finalOvr: save.retirement.finalOvr,
