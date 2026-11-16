@@ -5244,10 +5244,11 @@ table.standings-table {
   flex-shrink: 0;
 }
 
-.career-player-card-svg {
+.career-player-card-canvas {
   width: 100%;
   height: auto;
   display: block;
+  border-radius: 10px;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
 }
 

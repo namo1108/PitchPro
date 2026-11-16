@@ -38,148 +38,154 @@ async function loadNationalities() {
 // 입력하는 동안 얼굴이 계속 바뀌어 보이지 않게 한다.
 const draft = { name: "", jerseyNumber: "", nationality: null, preferredFoot: "right", position: null, lookSeed: null };
 
-// ---------- 선수 카드(얼굴 + 유니폼) ----------
-// 가상 선수라 실제 사진은 당연히 없다 - 생성형 아바타(피부톤/머리 스타일은 lookSeed로 고정, 유니폼
-// 색은 소속 구단 id로 계산)로 "선수 카드" 느낌만 흉내낸다. 실제 구단 킷 컬러 데이터는 없어서
-// 구단 id를 해시해 색을 하나 고정 배정한다 - 같은 구단이면 항상 같은 색이 나와 이적할 때만 유니폼
-// 색이 바뀌는 것처럼 보인다.
-const SKIN_TONES = ["#ffdbac", "#f1c27d", "#e0ac69", "#c68642", "#8d5524", "#5a3825"];
-const HAIR_COLORS = ["#1b1b1b", "#3b2414", "#6b4423", "#2c2c2c", "#4a3728"];
+// ---------- 선수 카드(사용자가 준 레퍼런스 이미지를 그대로 사용) ----------
+// 처음엔 코드로 그린 도형(SVG)으로 비슷하게 흉내냈는데 "이게 아니야, player card 그대로 가져와"라는
+// 피드백을 받았다(2026-11-16) - frontend/img/career-card-template.png(사용자가 올려준 원본을 그대로
+// 복사한 파일, 원본은 "player card.png")를 실제 배경으로 쓰고, 그 위에 캔버스로 실제 데이터(OVR/
+// 포지션/별점/국적/구단/등번호/이름)를 덮어 그린다. 얼굴 그림과 기본 유니폼 색(초록)은 이 한 장의
+// 그림에 고정된 그림이라 선수마다 다르게 바꿀 수는 없다(이미지 생성·편집 도구가 없어 얼굴만 따로
+// 다시 그릴 수 없음) - 그 부분만은 모든 선수가 같은 "기본 얼굴"을 공유하는 셈이다.
+const CARD_TEMPLATE_SRC = "/img/career-card-template.png";
+const CARD_W = 992;
+const CARD_H = 1064;
 
-function hashSeed(str) {
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return Math.abs(h);
-}
+// 템플릿 이미지에서 실측한 배경색(겹쳐 그릴 때 밑에 있던 숫자/별 등을 지우는 용도) - 정확한
+// 좌표는 눈대중으로 잡은 값이라 다소 어긋나 보이면 조정 가능.
+const CARD_BG_COLOR = "#cca985";
+const CARD_RIBBON_COLOR = "#614631";
+const CARD_JERSEY_COLOR = "#3a8a55";
 
-function randomLookSeed() {
-  return Math.floor(Math.random() * 1e9);
-}
+const CARD_REGIONS = {
+  rating: { x: 140, y: 150, w: 210, h: 118 },
+  position: { x: 155, y: 258, w: 170, h: 75 },
+  stars: { x: 138, y: 358, w: 275, h: 58 },
+  flagBadge: { x: 672, y: 156, w: 108, h: 86 },
+  crestBadge: { x: 676, y: 238, w: 92, h: 106 },
+  jerseyNumber: { x: 412, y: 712, w: 180, h: 125 },
+  nameRibbon: { x: 182, y: 910, w: 625, h: 115 },
+};
 
 function clampNum(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-// FIFA 얼티밋팀/파니니 카드 느낌으로 등급(브론즈/실버/골드/스페셜)을 나눠서 배경·테두리 색을
-// 다르게 준다(2026-11-16 사용자 요청 - "너무 단조로운거 아니야, 이거 참고해서" + FUT/파니니
-// 카드 스크린샷 첨부). OVR을 모를 때(캐릭터 생성 미리보기)는 bronze로 둔다.
-function rarityTier(ovr) {
-  if (ovr == null) return "bronze";
-  if (ovr >= 85) return "special";
-  if (ovr >= 75) return "gold";
-  if (ovr >= 65) return "silver";
-  return "bronze";
-}
-
-const TIER_THEME = {
-  bronze: { from: "#8a5a35", to: "#3d2614", border: "#c98a52", ink: "#2b1a0d", stripe: false },
-  silver: { from: "#c9d2d8", to: "#6d767c", border: "#eef3f6", ink: "#1f2428", stripe: false },
-  gold: { from: "#f6d97a", to: "#a9761e", border: "#ffecb0", ink: "#3a2a05", stripe: false },
-  special: { from: "#1f8a4c", to: "#06180d", border: "#8dffb8", ink: "#ffffff", stripe: true },
-};
-
-function starRow(ovr, color) {
-  if (ovr == null) return "";
-  const count = clampNum(Math.round(ovr / 20), 1, 5);
-  let svg = "";
-  for (let i = 0; i < 5; i++) {
-    svg += `<text x="${20 + i * 13}" y="90" font-size="14" fill="${i < count ? color : "none"}" stroke="${color}" stroke-width="${i < count ? 0 : 0.8}">★</text>`;
+let cardTemplateImgPromise = null;
+function loadCardTemplate() {
+  if (!cardTemplateImgPromise) {
+    cardTemplateImgPromise = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = CARD_TEMPLATE_SRC;
+    });
   }
-  return svg;
+  return cardTemplateImgPromise;
 }
 
-function playerCardSvg({ identity, club, ovr = null }) {
-  const seed = identity?.lookSeed || 1;
-  const skin = SKIN_TONES[seed % SKIN_TONES.length];
-  const hair = HAIR_COLORS[Math.floor(seed / 7) % HAIR_COLORS.length];
-  const hairStyle = Math.floor(seed / 31) % 3;
-  const jerseyHue = club ? hashSeed(String(club.id)) % 360 : 0;
-  const jerseyColor = club ? `hsl(${jerseyHue}, 55%, 40%)` : "#4a5560";
-  const sleeveColor = club ? `hsl(${jerseyHue}, 55%, 30%)` : "#39414a";
-  const capHair =
-    hairStyle === 0
-      ? `<path d="M40 44 a30 28 0 0 1 60 0 v4 a30 24 0 0 0 -60 0 z" fill="${hair}" />`
-      : hairStyle === 1
-      ? `<path d="M38 42 a32 30 0 0 1 64 0 l-3 6 a30 22 0 0 0 -58 0 z" fill="${hair}" />`
-      : "";
-  const faceGroup = `
-    <g transform="translate(35,70) scale(0.78)">
-      <path d="M20 190 L20 122 Q20 97 44 90 L58 82 Q70 94 82 82 L96 90 Q120 97 120 122 L120 190 Z" fill="${jerseyColor}" />
-      <path d="M20 122 L7 137 L20 152 Z" fill="${sleeveColor}" />
-      <path d="M120 122 L133 137 L120 152 Z" fill="${sleeveColor}" />
-      <path d="M58 82 Q70 100 82 82 L78 88 Q70 96 62 88 Z" fill="#ffffff" opacity="0.85" />
-      <text x="70" y="156" text-anchor="middle" font-size="32" font-weight="800" fill="#ffffff">${identity?.jerseyNumber ?? ""}</text>
-      ${hairStyle === 2 ? `<circle cx="70" cy="42" r="34" fill="${hair}" />` : ""}
-      <circle cx="70" cy="44" r="29" fill="${skin}" />
-      ${capHair}
-      <circle cx="60" cy="46" r="3" fill="#2b2b2b" />
-      <circle cx="80" cy="46" r="3" fill="#2b2b2b" />
-      <path d="M61 58 Q70 63 79 58" stroke="#8a5a3c" stroke-width="2.5" fill="none" stroke-linecap="round" />
-    </g>
-  `;
-
-  const tier = rarityTier(ovr);
-  const theme = TIER_THEME[tier];
-  const flagUri = identity?.nationality?.crest || null;
-  const clubCrestUri = club?.crest || null;
-  const name = identity?.name || "";
-
-  // 사용자가 참고로 준 FUT/파니니풍 카드 이미지(frontend/img/player card.png)의 구도를 그대로 코드로
-  // 옮긴다 - 좌상단 OVR+포지션+별점, 우상단 국기/구단 배지(흰 스티커), 가운데 둥근 사진창, 하단
-  // 리본형 이름판, 전체에 옅은 다이아몬드(홀로그램) 패턴. 실제 사진은 못 쓰니 사진창 안쪽은 생성형
-  // 아바타(얼굴+유니폼)로 대신한다.
-  return `
-    <svg viewBox="0 0 220 300" class="career-player-card-svg" role="img" aria-label="선수 카드">
-      <defs>
-        <linearGradient id="cardBg${seed}" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="${theme.from}" />
-          <stop offset="100%" stop-color="${theme.to}" />
-        </linearGradient>
-        <pattern id="cardHolo${seed}" width="34" height="34" patternUnits="userSpaceOnUse" patternTransform="rotate(18)">
-          <polygon points="0,0 17,0 8,17" fill="rgba(255,255,255,0.06)" />
-          <polygon points="17,0 34,0 25,17" fill="rgba(255,255,255,0.1)" />
-          <polygon points="8,17 25,17 17,34" fill="rgba(255,255,255,0.05)" />
-          <polygon points="0,17 17,17 8,34" fill="rgba(255,255,255,0.08)" />
-        </pattern>
-      </defs>
-      <rect x="3" y="3" width="214" height="294" rx="20" fill="url(#cardBg${seed})" stroke="${theme.border}" stroke-width="4" />
-      <rect x="3" y="3" width="214" height="294" rx="20" fill="url(#cardHolo${seed})" />
-      <rect x="9" y="9" width="202" height="282" rx="15" fill="none" stroke="${theme.border}" stroke-width="1" opacity="0.55" />
-
-      <text x="20" y="44" font-size="36" font-weight="900" fill="${theme.ink}">${ovr ?? "?"}</text>
-      <text x="20" y="62" font-size="14" font-weight="800" fill="${theme.ink}" letter-spacing="1">${identity?.position || ""}</text>
-      ${starRow(ovr, theme.ink)}
-
-      ${
-        flagUri
-          ? `<rect x="174" y="12" width="32" height="24" rx="4" fill="#ffffff" />
-             <image href="${flagUri}" x="177" y="15" width="26" height="18" style="object-fit:contain" />`
-          : ""
-      }
-      ${
-        clubCrestUri
-          ? `<rect x="178" y="40" width="24" height="24" rx="12" fill="#ffffff" />
-             <image href="${clubCrestUri}" x="181" y="43" width="18" height="18" style="object-fit:contain" />`
-          : ""
-      }
-
-      <rect x="18" y="104" width="184" height="148" rx="16" fill="${theme.to}" opacity="0.55" />
-      <rect x="18" y="104" width="184" height="148" rx="16" fill="none" stroke="${theme.border}" stroke-width="1.5" opacity="0.6" />
-      ${faceGroup}
-
-      <rect x="14" y="258" width="192" height="30" rx="15" fill="${theme.to}" stroke="${theme.border}" stroke-width="1.5" />
-      <text x="110" y="279" text-anchor="middle" font-size="15" font-weight="800" fill="#ffffff">${escapeAttr(name)}</text>
-    </svg>
-  `;
+function loadExternalImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
 }
 
-// SVG 텍스트 노드 안에 이름을 그대로 넣으면 &, <, > 같은 문자가 들어있을 때 마크업이 깨질 수 있어
-// (escapeHtml은 "로 바꾸는 등 속성용이라 쓰임새가 다름) 최소한의 이스케이프만 따로 한다.
-function escapeAttr(str) {
-  return String(str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function roundRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// 국기/구단 배지 자리에 흰 스티커를 그리고 그 위에 실제 이미지를 올린다(템플릿엔 샘플 국기/구단이
+// 박혀있어 지우고 다시 그려야 함). crest가 없으면 스티커만 비워둔다(없는 이미지로 깨지지 않게).
+async function drawBadge(ctx, src, rect, { square = false } = {}) {
+  if (!src) return;
+  try {
+    const img = await loadExternalImage(src);
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+    const size = Math.min(rect.w, rect.h) * 0.82;
+    ctx.save();
+    ctx.fillStyle = "#ffffff";
+    if (square) roundRectPath(ctx, cx - size / 2 - 5, cy - size / 2 - 5, size + 10, size + 10, 8);
+    else roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, 6);
+    ctx.fill();
+    ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size);
+    ctx.restore();
+  } catch {
+    // 외부 이미지 로드 실패 시 조용히 스킵(빈 스티커도 안 남기면 템플릿 원본 그대로 보임 - 괜찮음)
+  }
+}
+
+async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
+  const template = await loadCardTemplate();
+  canvas.width = CARD_W;
+  canvas.height = CARD_H;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(template, 0, 0, CARD_W, CARD_H);
+  ctx.textBaseline = "alphabetic";
+
+  const r = CARD_REGIONS.rating;
+  ctx.fillStyle = CARD_BG_COLOR;
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.fillStyle = "#1c150c";
+  ctx.font = "900 92px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(ovr != null ? String(ovr) : "?", r.x, r.y + r.h - 18);
+
+  const p = CARD_REGIONS.position;
+  ctx.fillStyle = CARD_BG_COLOR;
+  ctx.fillRect(p.x, p.y, p.w, p.h);
+  ctx.fillStyle = "#1c150c";
+  ctx.font = "800 36px sans-serif";
+  ctx.fillText(identity?.position || "", p.x, p.y + p.h - 18);
+
+  const s = CARD_REGIONS.stars;
+  ctx.fillStyle = CARD_BG_COLOR;
+  ctx.fillRect(s.x, s.y, s.w, s.h);
+  if (ovr != null) {
+    const count = clampNum(Math.round(ovr / 20), 1, 5);
+    ctx.font = "34px sans-serif";
+    for (let i = 0; i < 5; i++) {
+      ctx.fillStyle = i < count ? "#d8a33c" : "#b89a79";
+      ctx.fillText("★", s.x + i * 42, s.y + s.h - 14);
+    }
+  }
+
+  const j = CARD_REGIONS.jerseyNumber;
+  ctx.fillStyle = CARD_JERSEY_COLOR;
+  ctx.fillRect(j.x, j.y, j.w, j.h);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "900 96px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(identity?.jerseyNumber != null ? String(identity.jerseyNumber) : "", j.x + j.w / 2, j.y + j.h - 26);
+
+  const n = CARD_REGIONS.nameRibbon;
+  ctx.fillStyle = CARD_RIBBON_COLOR;
+  ctx.fillRect(n.x, n.y, n.w, n.h);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "800 48px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText(identity?.name || "", n.x + n.w / 2, n.y + n.h - 34);
+  ctx.textAlign = "left";
+
+  await Promise.all([
+    drawBadge(ctx, identity?.nationality?.crest, CARD_REGIONS.flagBadge),
+    drawBadge(ctx, club?.crest, CARD_REGIONS.crestBadge, { square: true }),
+  ]);
+}
+
+// 캔버스는 비동기로(템플릿/배지 이미지 로딩 후) 채워지므로, 먼저 빈 <canvas>를 심어두고 나중에
+// drawPlayerCard로 채운다. canvas 엘리먼트를 못 찾으면(그 사이 다른 화면으로 넘어간 경우) 조용히 무시.
+function mountPlayerCard(canvasId, ctx) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  drawPlayerCard(canvas, ctx).catch((err) => console.error("선수 카드 렌더 실패:", err));
 }
 
 async function loadCareer() {
@@ -222,7 +228,8 @@ function render(save) {
 function updateCreatePreview() {
   const previewEl = document.getElementById("career-preview-card");
   if (!previewEl) return;
-  previewEl.innerHTML = playerCardSvg({
+  previewEl.innerHTML = '<canvas id="career-preview-canvas" class="career-player-card-canvas"></canvas>';
+  mountPlayerCard("career-preview-canvas", {
     identity: {
       name: draft.name || "이름",
       jerseyNumber: draft.jerseyNumber || "-",
@@ -433,7 +440,7 @@ function renderActive(save) {
     <h2 class="section-title">⚽ 축구인생</h2>
     <div class="career-id-card">
       <div class="career-id-card-body">
-        <div class="career-player-card">${playerCardSvg({ identity, club: save.club, ovr: save.ovr })}</div>
+        <div class="career-player-card"><canvas id="career-active-canvas" class="career-player-card-canvas"></canvas></div>
         <div class="career-id-info">
           <div class="career-id-top">
             <span class="career-id-name">#${identity.jerseyNumber} ${escapeHtml(identity.name)}</span>
@@ -472,6 +479,8 @@ function renderActive(save) {
 
     <button type="button" class="career-start-btn" id="career-advance-btn">다음 시즌 ▶</button>
   `;
+
+  mountPlayerCard("career-active-canvas", { identity, club: save.club, ovr: save.ovr });
 
   document.getElementById("career-advance-btn").addEventListener("click", advanceSeason);
 
@@ -559,7 +568,7 @@ function renderRetirement(save) {
     <h2 class="section-title">⚽ 축구인생</h2>
     <div class="career-id-card retired">
       <div class="career-id-card-body">
-        <div class="career-player-card">${playerCardSvg({ identity: save.identity, club: save.club, ovr: r.finalOvr })}</div>
+        <div class="career-player-card"><canvas id="career-retire-canvas" class="career-player-card-canvas"></canvas></div>
         <div class="career-id-info">
           <div class="career-id-top">
             <span class="career-id-name">#${save.identity.jerseyNumber} ${escapeHtml(save.identity.name)}</span>
@@ -601,6 +610,8 @@ function renderRetirement(save) {
       <button type="button" class="career-start-btn" id="career-replay-btn">다시하기</button>
     </div>
   `;
+
+  mountPlayerCard("career-retire-canvas", { identity: save.identity, club: save.club, ovr: r.finalOvr });
 
   fadeIn(el.root);
   document.getElementById("career-share-btn").addEventListener("click", () => openShareImage());
