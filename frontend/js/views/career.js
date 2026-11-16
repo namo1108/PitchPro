@@ -86,7 +86,7 @@ function starRow(ovr, color) {
   const count = clampNum(Math.round(ovr / 20), 1, 5);
   let svg = "";
   for (let i = 0; i < 5; i++) {
-    svg += `<text x="${24 + i * 13}" y="92" font-size="13" fill="${i < count ? color : "rgba(255,255,255,0.3)"}">★</text>`;
+    svg += `<text x="${20 + i * 13}" y="90" font-size="14" fill="${i < count ? color : "none"}" stroke="${color}" stroke-width="${i < count ? 0 : 0.8}">★</text>`;
   }
   return svg;
 }
@@ -127,6 +127,10 @@ function playerCardSvg({ identity, club, ovr = null }) {
   const clubCrestUri = club?.crest || null;
   const name = identity?.name || "";
 
+  // 사용자가 참고로 준 FUT/파니니풍 카드 이미지(frontend/img/player card.png)의 구도를 그대로 코드로
+  // 옮긴다 - 좌상단 OVR+포지션+별점, 우상단 국기/구단 배지(흰 스티커), 가운데 둥근 사진창, 하단
+  // 리본형 이름판, 전체에 옅은 다이아몬드(홀로그램) 패턴. 실제 사진은 못 쓰니 사진창 안쪽은 생성형
+  // 아바타(얼굴+유니폼)로 대신한다.
   return `
     <svg viewBox="0 0 220 300" class="career-player-card-svg" role="img" aria-label="선수 카드">
       <defs>
@@ -134,29 +138,39 @@ function playerCardSvg({ identity, club, ovr = null }) {
           <stop offset="0%" stop-color="${theme.from}" />
           <stop offset="100%" stop-color="${theme.to}" />
         </linearGradient>
-        ${
-          theme.stripe
-            ? `<pattern id="cardStripe${seed}" width="18" height="18" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-                 <rect width="18" height="18" fill="transparent" />
-                 <rect width="9" height="18" fill="rgba(255,255,255,0.07)" />
-               </pattern>`
-            : ""
-        }
+        <pattern id="cardHolo${seed}" width="34" height="34" patternUnits="userSpaceOnUse" patternTransform="rotate(18)">
+          <polygon points="0,0 17,0 8,17" fill="rgba(255,255,255,0.06)" />
+          <polygon points="17,0 34,0 25,17" fill="rgba(255,255,255,0.1)" />
+          <polygon points="8,17 25,17 17,34" fill="rgba(255,255,255,0.05)" />
+          <polygon points="0,17 17,17 8,34" fill="rgba(255,255,255,0.08)" />
+        </pattern>
       </defs>
       <rect x="3" y="3" width="214" height="294" rx="20" fill="url(#cardBg${seed})" stroke="${theme.border}" stroke-width="4" />
-      ${theme.stripe ? `<rect x="3" y="3" width="214" height="294" rx="20" fill="url(#cardStripe${seed})" />` : ""}
+      <rect x="3" y="3" width="214" height="294" rx="20" fill="url(#cardHolo${seed})" />
+      <rect x="9" y="9" width="202" height="282" rx="15" fill="none" stroke="${theme.border}" stroke-width="1" opacity="0.55" />
 
-      <text x="22" y="46" font-size="38" font-weight="900" fill="${theme.ink}">${ovr ?? "?"}</text>
-      <text x="22" y="64" font-size="15" font-weight="800" fill="${theme.ink}">${identity?.position || ""}</text>
+      <text x="20" y="44" font-size="36" font-weight="900" fill="${theme.ink}">${ovr ?? "?"}</text>
+      <text x="20" y="62" font-size="14" font-weight="800" fill="${theme.ink}" letter-spacing="1">${identity?.position || ""}</text>
       ${starRow(ovr, theme.ink)}
 
-      ${flagUri ? `<image href="${flagUri}" x="178" y="14" width="26" height="26" style="object-fit:contain" />` : ""}
-      ${clubCrestUri ? `<image href="${clubCrestUri}" x="178" y="44" width="26" height="26" style="object-fit:contain" />` : ""}
+      ${
+        flagUri
+          ? `<rect x="174" y="12" width="32" height="24" rx="4" fill="#ffffff" />
+             <image href="${flagUri}" x="177" y="15" width="26" height="18" style="object-fit:contain" />`
+          : ""
+      }
+      ${
+        clubCrestUri
+          ? `<rect x="178" y="40" width="24" height="24" rx="12" fill="#ffffff" />
+             <image href="${clubCrestUri}" x="181" y="43" width="18" height="18" style="object-fit:contain" />`
+          : ""
+      }
 
-      <rect x="18" y="104" width="184" height="150" rx="14" fill="rgba(0,0,0,0.18)" />
+      <rect x="18" y="104" width="184" height="148" rx="16" fill="${theme.to}" opacity="0.55" />
+      <rect x="18" y="104" width="184" height="148" rx="16" fill="none" stroke="${theme.border}" stroke-width="1.5" opacity="0.6" />
       ${faceGroup}
 
-      <rect x="14" y="258" width="192" height="30" rx="7" fill="rgba(0,0,0,0.5)" />
+      <rect x="14" y="258" width="192" height="30" rx="15" fill="${theme.to}" stroke="${theme.border}" stroke-width="1.5" />
       <text x="110" y="279" text-anchor="middle" font-size="15" font-weight="800" fill="#ffffff">${escapeAttr(name)}</text>
     </svg>
   `;
