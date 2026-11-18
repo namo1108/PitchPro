@@ -48,15 +48,15 @@ function randomLookSeed() {
   return Math.floor(Math.random() * 1e9);
 }
 
-// ---------- 선수 카드(전부 코드로 그리는 벡터 카드) ----------
-// 네 번 연속으로 사용자가 준 레퍼런스 이미지(player card.png)를 "재색칠"하려다 버그가 났다(숨은
-// 흰 배지가 밝게 남음, 머리카락이 사진창 밖으로 삐져나가 회색으로 지워짐, 색이 섞여 탁해짐 등,
-// 2026-11-16~18) - 그림 한 장에 이미 칠해진 색을 실시간으로 "다른 색"으로 바꾸는 접근 자체가
-// 한계였다. 결국 "그냥 니가 새로 한번 만들어줘 fc온라인 카드 참고해서"라는 요청을 받고(2026-11-18),
-// 레퍼런스 이미지의 구도(FC 온라인/FIFA 얼티밋팀과 같은 계열 - 좌상단 레이팅+포지션+별점, 우상단
-// 국적+소속팀 배지, 가운데 인물, 하단 이름 리본, 등급별 배경색)는 유지하되 전부 캔버스로 새로
-// 그린다. "재색칠"이 아니라 "그릴 때부터 원하는 색으로" 그리므로 색이 섞이거나 숨은 디테일에
-// 걸릴 일이 구조적으로 없다.
+// ---------- 선수 카드(FC 온라인/FIFA 얼티밋팀 카드 참고, 전부 코드로 그림) ----------
+// 레퍼런스 이미지(player card.png)를 "재색칠"하려던 시도가 네 번 연속 버그가 나서(2026-11-16~18)
+// 템플릿 이미지 의존을 완전히 버렸는데도 "디자인 좀 잘좀 해줘"라는 피드백을 받았다. 사용자가 실제
+// FC 온라인 카드 사진과 "YOUR NAME" 플레이스홀더 카드 이미지를 보여주며 "fc온라인 카드 이미지로
+// 입혀주고, 선수 이미지 만들기가 어려우면 unnamed 이미지처럼 만들어줘"라고 요청해서(2026-11-18),
+// 1) 카드 테두리를 단순 둥근 사각형이 아니라 방패(크레스트) 모양으로 바꾸고, 2) 사실적인 얼굴을
+// 직접 그리는 대신(계속 "그럴듯해 보이는 얼굴"을 그리기가 어려웠다) 공식 카드 플레이스홀더 템플릿
+// 그대로 실루엣으로 처리하고, 3) 이름 아래에 PAC/SHO/PAS/DRI/DEF/PHY 6개 세부 능력치 줄을 추가했다
+// (그 템플릿 이미지가 보여준 구성 그대로). 실루엣은 평면 단색이라 재색칠 버그가 날 여지 자체가 없다.
 const CARD_W = 700;
 const CARD_H = 980;
 
@@ -93,18 +93,6 @@ const CARD_TIER_THEME = {
 };
 const RAINBOW_STOPS = ["#ff4d4d", "#ff9d4d", "#ffe14d", "#4dff88", "#4dc8ff", "#7a4dff", "#ff4dd2"];
 
-// 유니폼 색 - 실제 소속팀 킷 컬러 데이터가 없어서(API-Football이 안 줌) 구단 id를 해시해 그 팀
-// 전용 색을 하나 고정 배정한다(2026-11-18 사용자 요청 - "선수도 팀 바뀌면 거기에 맞게 유니폼도
-// 바뀌고"). 같은 구단이면 항상 같은 색이 나오고, 이적하면 실제로 유니폼 색이 바뀐 것처럼 보인다.
-const DEFAULT_JERSEY_HUE = 140; // 소속팀 없을 때(자유계약/미리보기) 기본 초록
-function clubJerseyHue(club) {
-  if (!club) return DEFAULT_JERSEY_HUE;
-  return hashSeed(String(club.id)) % 360;
-}
-
-const SKIN_TONES = ["#ffdbac", "#f1c27d", "#e0ac69", "#c68642", "#8d5524", "#5a3825"];
-const HAIR_COLORS = ["#1b1b1b", "#3b2414", "#6b4423", "#2c2c2c", "#4a3728"];
-
 function loadExternalImage(src) {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -124,8 +112,23 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// 국기/구단 배지 - 흰 스티커를 깔고 그 위에 실제 이미지를 올린다. crest가 없으면 스티커만 비워둔다
-// (없는 이미지로 깨지지 않게).
+// 카드 전체 테두리 - 레퍼런스처럼 위는 둥근 사각형, 아래는 뾰족하게 모이는 "방패(크레스트)" 모양.
+function shieldPath(ctx, x, y, w, h) {
+  const topR = w * 0.045;
+  const waistY = y + h * 0.88; // 이 아래부터 뾰족하게 좁아짐(여유 있게 낮춰서 안쪽 콘텐츠가 안 잘림)
+  ctx.beginPath();
+  ctx.moveTo(x + topR, y);
+  ctx.lineTo(x + w - topR, y);
+  ctx.arcTo(x + w, y, x + w, y + topR, topR);
+  ctx.lineTo(x + w, waistY);
+  ctx.lineTo(x + w / 2, y + h);
+  ctx.lineTo(x, waistY);
+  ctx.lineTo(x, y + topR);
+  ctx.arcTo(x, y, x + topR, y, topR);
+  ctx.closePath();
+}
+
+// 국기/구단 배지 - 흰 스티커를 깔고 그 위에 실제 이미지를 올린다. crest가 없으면 스티커만 비워둔다.
 async function drawBadge(ctx, src, rect, { square = false } = {}) {
   if (!src) return;
   try {
@@ -158,32 +161,20 @@ function tierBackgroundFill(ctx, tier) {
   return grad;
 }
 
-// 카드 테두리 안쪽에 옅은 대각선 홀로그램 느낌의 결을 몇 줄 그어 FC 온라인/FIFA 카드 특유의
-// "반짝이는 재질" 느낌을 낸다 - 과하지 않게 아주 옅게.
-function drawHoloSheen(ctx) {
+// 레퍼런스(unnamed.jpg)의 배경 다이아몬드 패턴을 흉내 - 인물 실루엣 뒤로 옅은 다이아몬드 몇 개.
+function drawDiamondMotif(ctx, cx, cy, color) {
   ctx.save();
-  roundRectPath(ctx, 14, 14, CARD_W - 28, CARD_H - 28, 26);
-  ctx.clip();
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
-  ctx.lineWidth = 10;
-  for (let x = -CARD_H; x < CARD_W + CARD_H; x += 38) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x + CARD_H, CARD_H);
-    ctx.stroke();
-  }
+  ctx.fillStyle = color;
+  const sizes = [160, 115, 75];
+  sizes.forEach((s, i) => {
+    ctx.save();
+    ctx.translate(cx, cy - i * 6);
+    ctx.rotate(Math.PI / 4);
+    ctx.globalAlpha = 0.16 - i * 0.03;
+    ctx.fillRect(-s / 2, -s / 2, s, s);
+    ctx.restore();
+  });
   ctx.restore();
-}
-
-function starRow(ctx, x, y, ovr) {
-  if (ovr == null) return;
-  const count = clampNum(Math.round(ovr / 20), 1, 5);
-  ctx.font = "22px sans-serif";
-  ctx.textAlign = "left";
-  for (let i = 0; i < 5; i++) {
-    ctx.fillStyle = i < count ? "#ffd23f" : "rgba(255,255,255,0.3)";
-    ctx.fillText("★", x + i * 25, y);
-  }
 }
 
 function outlinedText(ctx, text, x, y, font, fillColor, strokeColor = "#ffffff", lineWidth = 5) {
@@ -195,130 +186,77 @@ function outlinedText(ctx, text, x, y, font, fillColor, strokeColor = "#ffffff",
   ctx.fillText(text, x, y);
 }
 
-// 인물(머리+유니폼) - 사람 전체를 로컬 좌표계(0~140 x, 0~190 y)에 그려두고 카드 중앙에 맞게 확대/
-// 이동한다(이전 SVG 버전의 도형을 그대로 재사용 - 모양 자체는 문제된 적 없고 "재색칠"만 문제였다).
-function drawFigure(ctx, { identity, club, cx, topY, scale }) {
-  const seed = identity?.lookSeed || 1;
-  const skin = SKIN_TONES[seed % SKIN_TONES.length];
-  const hair = HAIR_COLORS[Math.floor(seed / 7) % HAIR_COLORS.length];
-  const hairStyle = Math.floor(seed / 31) % 3;
-  const hue = clubJerseyHue(club);
-  const jerseyLight = `hsl(${hue}, 60%, 46%)`;
-  const jerseyDark = `hsl(${hue}, 60%, 30%)`;
-  const sleeveColor = `hsl(${hue}, 55%, 24%)`;
-
+// 사실적인 얼굴은 계속 "이상하다"는 피드백을 받아서(2026-11-16~18), 공식 카드 플레이스홀더
+// 템플릿(unnamed.jpg)이 쓰는 방식 그대로 실루엣 하나로 대신한다 - 평면 단색이라 재색칠/디테일
+// 버그가 날 구조 자체가 없다. 포지션에 따라 살짝 다른 자세(골키퍼는 양팔을 살짝 벌림)만 둔다.
+function drawSilhouette(ctx, { position, cx, topY, scale }) {
   ctx.save();
   ctx.translate(cx - 70 * scale, topY);
   ctx.scale(scale, scale);
+  ctx.fillStyle = "rgba(20, 22, 26, 0.72)";
 
-  // 은은한 그림자(스포트라이트 느낌) - 인물 뒤에 한 번만.
-  const shadow = ctx.createRadialGradient(70, 150, 10, 70, 150, 90);
-  shadow.addColorStop(0, "rgba(0,0,0,0.28)");
-  shadow.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = shadow;
   ctx.beginPath();
-  ctx.ellipse(70, 150, 85, 55, 0, 0, Math.PI * 2);
+  ctx.arc(70, 40, 26, 0, Math.PI * 2);
   ctx.fill();
 
-  // 유니폼(그라디언트로 입체감)
-  const jerseyGrad = ctx.createLinearGradient(20, 82, 120, 190);
-  jerseyGrad.addColorStop(0, jerseyLight);
-  jerseyGrad.addColorStop(1, jerseyDark);
-  ctx.fillStyle = jerseyGrad;
+  const shoulderSpread = position === "GK" ? 58 : 48;
   ctx.beginPath();
-  ctx.moveTo(20, 190);
-  ctx.lineTo(20, 122);
-  ctx.quadraticCurveTo(20, 97, 44, 90);
-  ctx.lineTo(58, 82);
-  ctx.quadraticCurveTo(70, 94, 82, 82);
-  ctx.lineTo(96, 90);
-  ctx.quadraticCurveTo(120, 97, 120, 122);
-  ctx.lineTo(120, 190);
+  ctx.moveTo(70 - shoulderSpread, 190);
+  ctx.quadraticCurveTo(70 - shoulderSpread - 6, 110, 70 - 22, 66);
+  ctx.quadraticCurveTo(70, 50, 70 + 22, 66);
+  ctx.quadraticCurveTo(70 + shoulderSpread + 6, 110, 70 + shoulderSpread, 190);
   ctx.closePath();
   ctx.fill();
-
-  ctx.fillStyle = sleeveColor;
-  ctx.beginPath();
-  ctx.moveTo(20, 122);
-  ctx.lineTo(7, 137);
-  ctx.lineTo(20, 152);
-  ctx.closePath();
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(120, 122);
-  ctx.lineTo(133, 137);
-  ctx.lineTo(120, 152);
-  ctx.closePath();
-  ctx.fill();
-
-  // 옷깃 하이라이트
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.beginPath();
-  ctx.moveTo(58, 82);
-  ctx.quadraticCurveTo(70, 100, 82, 82);
-  ctx.lineTo(78, 88);
-  ctx.quadraticCurveTo(70, 96, 62, 88);
-  ctx.closePath();
-  ctx.fill();
-
-  // 등번호
-  const numberText = identity?.jerseyNumber != null ? String(identity.jerseyNumber) : "";
-  ctx.textAlign = "center";
-  ctx.font = "900 32px sans-serif";
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = "rgba(0,0,0,0.3)";
-  ctx.strokeText(numberText, 70, 156);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(numberText, 70, 156);
-
-  // 머리(헤어스타일 3종)
-  const capHairPath = () => {
-    ctx.beginPath();
-    if (hairStyle === 0) {
-      ctx.moveTo(40, 44);
-      ctx.arc(70, 44, 30, Math.PI, 0, false); // 윗머리 반원
-      ctx.lineTo(100, 48);
-      ctx.arc(70, 48, 30, 0, Math.PI, true);
-      ctx.closePath();
-    } else {
-      ctx.moveTo(38, 42);
-      ctx.quadraticCurveTo(70, 8, 102, 42);
-      ctx.lineTo(99, 48);
-      ctx.quadraticCurveTo(70, 20, 41, 48);
-      ctx.closePath();
-    }
-  };
-
-  if (hairStyle === 2) {
-    ctx.fillStyle = hair;
-    ctx.beginPath();
-    ctx.arc(70, 42, 34, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.fillStyle = skin;
-  ctx.beginPath();
-  ctx.arc(70, 44, 29, 0, Math.PI * 2);
-  ctx.fill();
-  if (hairStyle !== 2) {
-    ctx.fillStyle = hair;
-    capHairPath();
-    ctx.fill();
-  }
-  ctx.fillStyle = "#2b2b2b";
-  ctx.beginPath();
-  ctx.arc(60, 46, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(80, 46, 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#8a5a3c";
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(61, 58);
-  ctx.quadraticCurveTo(70, 63, 79, 58);
-  ctx.stroke();
 
   ctx.restore();
+}
+
+// PAC/SHO/PAS/DRI/DEF/PHY 6개 세부 능력치(레퍼런스 unnamed.jpg 구성 그대로) - 저장 데이터엔 OVR
+// 하나뿐이라, 포지션별 전형적인 프로필(공격수는 PAC/SHO 높고 DEF 낮음 등)에 맞춰 OVR에서 가감한
+// 뒤 lookSeed로 고정된 약간의 편차를 더해 선수마다 조금씩 다르게 보이게 한다(화면 표시 전용 - 실제
+// 골/도움 계산에는 영향 없음).
+const STAT_POSITION_GROUP = {
+  GK: "GK", CB: "DEF", LB: "DEF", RB: "DEF", CDM: "DEF",
+  CM: "MID", CAM: "MID", LM: "MID", RM: "MID",
+  LW: "FWD", RW: "FWD", ST: "FWD",
+};
+const STAT_MODIFIERS = {
+  GK: { PAC: -25, SHO: -35, PAS: -12, DRI: -25, DEF: 0, PHY: 10 },
+  DEF: { PAC: -2, SHO: -15, PAS: -5, DRI: -8, DEF: 14, PHY: 8 },
+  MID: { PAC: 0, SHO: -6, PAS: 10, DRI: 8, DEF: -6, PHY: 0 },
+  FWD: { PAC: 9, SHO: 13, PAS: -5, DRI: 6, DEF: -18, PHY: 0 },
+};
+function deriveSixStats(ovr, position, seed) {
+  const base = ovr ?? 50;
+  const group = STAT_POSITION_GROUP[position] || "MID";
+  const mods = STAT_MODIFIERS[group];
+  const keys = ["PAC", "SHO", "PAS", "DRI", "DEF", "PHY"];
+  const out = {};
+  keys.forEach((key) => {
+    const jitter = (hashSeed(`${seed}:${key}`) % 9) - 4; // -4~+4
+    out[key] = clampNum(Math.round(base + mods[key] + jitter), 1, 99);
+  });
+  return out;
+}
+
+function drawStatRow(ctx, { identity, ovr, cx, y, ink }) {
+  const keys = ["PAC", "SHO", "PAS", "DRI", "DEF", "PHY"];
+  const stats = deriveSixStats(ovr, identity?.position, identity?.lookSeed || 1);
+  const colW = 72;
+  const startX = cx - (colW * keys.length) / 2;
+  ctx.textAlign = "center";
+  keys.forEach((key, i) => {
+    const x = startX + colW * i + colW / 2;
+    ctx.font = "700 15px sans-serif";
+    ctx.fillStyle = ink;
+    ctx.globalAlpha = 0.85;
+    ctx.fillText(key, x, y);
+    ctx.globalAlpha = 1;
+    ctx.font = "800 24px sans-serif";
+    ctx.fillStyle = ink;
+    ctx.fillText(String(stats[key]), x, y + 30);
+  });
+  ctx.textAlign = "left";
 }
 
 async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
@@ -328,47 +266,43 @@ async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
   const tier = cardTier(ovr);
   const theme = CARD_TIER_THEME[tier];
 
-  // 1) 카드 바탕(테두리+배경 그라디언트)
-  roundRectPath(ctx, 10, 10, CARD_W - 20, CARD_H - 20, 30);
+  // 1) 카드 바탕(방패 모양 + 등급 그라디언트 + 테두리)
+  shieldPath(ctx, 12, 12, CARD_W - 24, CARD_H - 24);
   ctx.fillStyle = tierBackgroundFill(ctx, tier);
   ctx.fill();
+  ctx.save();
+  shieldPath(ctx, 12, 12, CARD_W - 24, CARD_H - 24);
+  ctx.clip();
+  drawDiamondMotif(ctx, CARD_W / 2, CARD_H * 0.42, "#ffffff");
+  ctx.restore();
   ctx.lineWidth = 7;
   ctx.strokeStyle = theme.border;
+  shieldPath(ctx, 12, 12, CARD_W - 24, CARD_H - 24);
   ctx.stroke();
-  drawHoloSheen(ctx);
 
   ctx.textBaseline = "alphabetic";
 
-  // 2) 좌상단: 레이팅 + 포지션 + 별점
-  outlinedText(ctx, ovr != null ? String(ovr) : "?", 38, 108, "900 72px sans-serif", theme.ink, "#ffffff", 5);
-  outlinedText(ctx, identity?.position || "", 38, 148, "800 28px sans-serif", theme.ink, "#ffffff", 4);
-  starRow(ctx, 38, 182, ovr);
+  // 2) 좌상단: 레이팅 + 포지션
+  outlinedText(ctx, ovr != null ? String(ovr) : "?", 42, 108, "900 72px sans-serif", theme.ink, "#ffffff", 5);
+  outlinedText(ctx, identity?.position || "", 44, 148, "800 28px sans-serif", theme.ink, "#ffffff", 4);
 
-  // 3) 인물(얼굴+유니폼) - 사진창 테두리 없이 카드 배경 위에 바로 올라간다(레퍼런스처럼 머리가
-  // 위쪽 배경과 자연스럽게 이어지는 느낌).
-  drawFigure(ctx, { identity, club, cx: CARD_W / 2, topY: 230, scale: 3.1 });
+  // 3) 인물 실루엣
+  drawSilhouette(ctx, { position: identity?.position, cx: CARD_W / 2, topY: 220, scale: 2.9 });
 
-  // 4) 하단 이름 리본
-  const ribbonX = 40;
-  const ribbonY = CARD_H - 92;
-  const ribbonW = CARD_W - 80;
-  const ribbonH = 58;
-  roundRectPath(ctx, ribbonX, ribbonY, ribbonW, ribbonH, 16);
-  ctx.fillStyle = "rgba(0,0,0,0.42)";
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = theme.border;
-  ctx.stroke();
+  // 4) 이름
   ctx.textAlign = "center";
-  ctx.font = "800 30px sans-serif";
-  ctx.fillStyle = "#ffffff";
-  ctx.fillText(identity?.name || "", ribbonX + ribbonW / 2, ribbonY + ribbonH / 2 + 10);
+  ctx.font = "800 36px sans-serif";
+  ctx.fillStyle = theme.ink;
+  ctx.fillText(identity?.name || "", CARD_W / 2, 650);
   ctx.textAlign = "left";
 
-  // 5) 우상단: 국적 + 소속팀 배지
+  // 5) 6개 세부 능력치
+  drawStatRow(ctx, { identity, ovr, cx: CARD_W / 2, y: 706, ink: theme.ink });
+
+  // 6) 국적 + 소속팀 배지(이름/스탯 아래, 레퍼런스처럼 한 줄로)
   await Promise.all([
-    drawBadge(ctx, identity?.nationality?.crest, { x: CARD_W - 110, y: 32, w: 72, h: 50 }),
-    drawBadge(ctx, club?.crest, { x: CARD_W - 104, y: 92, w: 60, h: 60 }, { square: true }),
+    drawBadge(ctx, identity?.nationality?.crest, { x: CARD_W / 2 - 92, y: 762, w: 64, h: 44 }),
+    drawBadge(ctx, club?.crest, { x: CARD_W / 2 + 28, y: 756, w: 56, h: 56 }, { square: true }),
   ]);
 }
 
