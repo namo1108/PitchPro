@@ -5236,11 +5236,11 @@ table.standings-table {
 }
 
 .career-preview-wrap .career-player-card {
-  width: 230px;
+  width: 270px;
 }
 
 .career-player-card {
-  width: 190px;
+  width: 230px;
   flex-shrink: 0;
 }
 
