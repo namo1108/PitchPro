@@ -92,13 +92,41 @@ export function statsForSeason(save) {
 // 요청 - "트로피랑 리그는 api 데이터에서 따오면 좋을 것 같아"). careerClubs.js의
 // trophyNamesForClub이 config.js COMPETITIONS에서 실제 리그명 + (있으면) 국내컵/대륙대항전 이름을
 // 가져온다.
+//
+// 처음엔 트로피 종류를 똑같은 확률로 뽑아서, 5대리그 소속이기만 하면(꼭 빅클럽이 아니어도) 챔피언스
+// 리그 우승이 리그 준우승/베스트11만큼 쉽게 나왔다(2026-11-18 사용자 피드백 - "빅클럽도 아닌데
+// 챔스우승이나 주요대회 우승은 좀 밸런스가 안 맞는거 같아"). 가중치를 둬서 준우승/개인수상을 훨씬
+// 흔하게, 리그 우승은 그보다 드물게, 대륙대항전(챔스/유로파 등) 우승은 가장 드물게 하고, 대륙대항전은
+// OVR이 진짜 정점급(88+)일 때만 아예 후보에 들어가게 했다 - "어쩌다 한 번 빅이어를 든 전설적인 시즌"
+// 정도의 희귀도를 노린 것. 국내컵(코리아컵/FA컵)은 이변이 잦은 대회 특성상 상대적으로 덜 깐깐하게 둔다.
+function weightedPick(entries) {
+  const total = entries.reduce((sum, [, w]) => sum + w, 0);
+  let roll = Math.random() * total;
+  for (const [value, weight] of entries) {
+    if (roll < weight) return value;
+    roll -= weight;
+  }
+  return entries[entries.length - 1][0];
+}
+
 export function rollTrophies(ovr, club) {
   const chance = clamp(0.08 + (ovr - 50) * 0.004, 0.05, 0.35);
   if (Math.random() >= chance) return [];
-  const { leagueName, cupName } = trophyNamesForClub(club);
-  const pool = [`${leagueName} 우승`, `${leagueName} 준우승`, "시즌 베스트 11 선정"];
-  if (cupName) pool.push(`${cupName} 우승`);
-  return [pool[randInt(0, pool.length - 1)]];
+
+  const { leagueName, cupName, isContinentalCup } = trophyNamesForClub(club);
+  const entries = [
+    [`${leagueName} 준우승`, 32],
+    ["시즌 베스트 11 선정", 30],
+    [`${leagueName} 우승`, 16],
+  ];
+  if (cupName) {
+    if (isContinentalCup) {
+      if (ovr >= 88) entries.push([`${cupName} 우승`, 4]); // 대륙대항전은 정점급 시즌에만, 가장 희귀하게
+    } else {
+      entries.push([`${cupName} 우승`, 14]); // 국내컵은 이변 변수가 커서 조금 더 자주
+    }
+  }
+  return [weightedPick(entries)];
 }
 
 // 팀 트로피와 별개로, 개인 성적에 따른 "수상"도 추가한다(2026-11-16 사용자 요청 - "수상도 하고").

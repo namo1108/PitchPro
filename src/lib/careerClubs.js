@@ -28,12 +28,14 @@ export function trophyNamesForClub(club) {
   const tier = CLUB_TIER_BY_CODE[code] || 3;
 
   let cupCode = DOMESTIC_CUP_CODE[code];
+  let isContinentalCup = false;
   if (!cupCode) {
     if (EUROPE_CODES.has(code)) cupCode = tier === 1 ? "CL" : tier === 2 ? "EL" : "ECL";
     else if (ASIA_CODES.has(code)) cupCode = tier <= 2 ? "ACL" : "ACL2";
+    isContinentalCup = !!cupCode;
   }
   const cupName = cupCode ? findCompetition(cupCode)?.name || null : null;
-  return { leagueName, cupName };
+  return { leagueName, cupName, isContinentalCup };
 }
 
 export const CAREER_CLUB_DISCLAIMER =

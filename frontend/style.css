@@ -5552,23 +5552,46 @@ table.standings-table {
 
 .career-retire-actions {
   display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
-.career-retire-actions .career-start-btn {
-  flex: 1;
+.career-share-row {
+  display: flex;
+  gap: 8px;
 }
 
-.career-share-btn {
+.career-share-btn,
+.career-save-btn,
+.career-fb-btn {
   flex: 1;
   background: var(--bg-card);
   border: 1px solid var(--accent);
   color: var(--accent);
   border-radius: 12px;
-  padding: 14px;
+  padding: 12px 6px;
   font-weight: 800;
-  font-size: 15px;
+  font-size: 13px;
   cursor: pointer;
+}
+
+.career-save-btn,
+.career-fb-btn {
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.career-share-btn:disabled,
+.career-save-btn:disabled,
+.career-fb-btn:disabled {
+  opacity: 0.6;
+}
+
+.career-share-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: -2px 0 0;
 }
 
 /* ---------- Team detail ---------- */

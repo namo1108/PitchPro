@@ -1,7 +1,8 @@
-import { fetchJSON } from "../api.js";
+import { fetchJSON, API } from "../api.js";
 import { onTabChange } from "../router.js";
-import { authFetch, isLoggedIn, onAuthChange, getCurrentUser } from "../auth.js";
+import { authFetch, isLoggedIn, onAuthChange, getCurrentUser, getToken } from "../auth.js";
 import { escapeHtml, fadeIn } from "../format.js";
+import { trackEvent } from "../analytics.js";
 
 const el = { root: document.getElementById("career-root") };
 
@@ -92,75 +93,57 @@ function hashSeed(str) {
   return Math.abs(h);
 }
 
-// 캔버스의 globalCompositeOperation="hue"와 수학적으로 같은 결과를 내는 순수 JS 버전 - 평평한 색
-// 패치(등번호/레이팅 바탕 등)는 굳이 캔버스 합성모드를 안 써도 미리 계산한 hex로 바로 채울 수 있다.
-function hexToHsl(hex) {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
-    else if (max === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
-    h /= 6;
-  }
-  return { h: h * 360, s: s * 100, l: l * 100 };
-}
-
-function hueBlend(baseHex, tintHueDeg) {
-  const base = hexToHsl(baseHex);
-  return `hsl(${tintHueDeg}, ${base.s}%, ${base.l}%)`;
-}
-
 // 선수 카드 등급 색(2026-11-18 사용자 요청 - "카드색깔도 처음에는 갈색, 70넘어가면 주황색, 80넘어가면
 // 은색, 90넘어가면 금색, 100넘어가면 무지개색으로"). OVR 상한이 99라 "100 이상"은 실제로 안 나와서
 // 98 이상으로 기준을 살짝 낮춰 무지개 등급도 실제로 볼 수 있게 했다.
-function cardTierHue(ovr) {
+// 처음엔 캔버스 globalCompositeOperation="hue"로 템플릿 질감을 살리려 했는데, 실제로 띄워보니 기대한
+// 색과 다르게(탁한 적갈색 느낌) 나왔다(2026-11-18 사용자 제보, 환경별 비표준 합성모드 지원 차이로
+// 추정) - 어느 환경에서나 확실하게 같은 색이 나오는 단순 반투명 오버레이(일반 알파 합성) 방식으로 바꿨다.
+function cardTier(ovr) {
   if (ovr == null || ovr < 70) return null; // 템플릿 원본(갈색) 그대로
-  if (ovr < 80) return 28; // 주황
-  if (ovr < 90) return 205; // 은색(채도는 원본 탄색의 낮은 채도를 그대로 써서 차분한 은빛이 됨)
-  if (ovr < 98) return 45; // 금색
+  if (ovr < 80) return "orange";
+  if (ovr < 90) return "silver";
+  if (ovr < 98) return "gold";
   return "rainbow";
 }
 
-// 사진창을 뺀 카드 전체(배경+테두리+홀로그램 패턴)에 등급 색을 입힌다 - 템플릿 자체의 음영/패턴을
-// 그대로 살리는 캔버스 "hue" 합성모드를 쓴다(평평하게 덮어씌우면 질감이 사라짐).
+const CARD_TIER_COLORS = {
+  orange: { solid: "#d9772e", rgba: "rgba(217, 119, 46, 0.42)" },
+  silver: { solid: "#aab4ba", rgba: "rgba(170, 180, 186, 0.42)" },
+  gold: { solid: "#e3b23c", rgba: "rgba(227, 178, 60, 0.42)" },
+};
+
+// 사진창을 뺀 카드 전체(배경+테두리+홀로그램 패턴)에 등급 색을 반투명하게 덧입힌다 - 완전 불투명으로
+// 덮으면 템플릿의 음영/패턴이 사라져서 평평해 보이므로 알파를 남겨 질감이 비치게 한다.
 function applyCardTierTint(ctx, ovr) {
-  const hue = cardTierHue(ovr);
-  if (hue == null) return;
+  const tier = cardTier(ovr);
+  if (!tier) return;
   const pw = CARD_REGIONS.photoWindow;
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, CARD_W, CARD_H);
   ctx.rect(pw.x, pw.y, pw.w, pw.h);
   ctx.clip("evenodd");
-  ctx.globalCompositeOperation = "hue";
-  if (hue === "rainbow") {
+  if (tier === "rainbow") {
     const grad = ctx.createLinearGradient(0, 0, CARD_W, CARD_H);
     ["#ff4d4d", "#ff9d4d", "#ffe14d", "#4dff88", "#4dc8ff", "#7a4dff", "#ff4dd2"].forEach((c, i, arr) =>
       grad.addColorStop(i / (arr.length - 1), c)
     );
+    ctx.globalAlpha = 0.38;
     ctx.fillStyle = grad;
   } else {
-    ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
+    ctx.fillStyle = CARD_TIER_COLORS[tier].rgba;
   }
   ctx.fillRect(0, 0, CARD_W, CARD_H);
   ctx.restore();
 }
 
-// 등급 패치(레이팅/포지션/별점 바탕, 이름 리본)도 카드 전체 틴트와 같은 색조로 맞춘다 - rainbow는
-// 패치 하나하나까지 무지개로 그라데이션 넣으면 지저분해 보여서 금색 톤 하나로 대표한다.
-function tierPatchColor(baseHex, ovr) {
-  const hue = cardTierHue(ovr);
-  if (hue == null) return baseHex;
-  return hueBlend(baseHex, hue === "rainbow" ? 45 : hue);
+// 등급 패치(레이팅/포지션/별점 바탕, 이름 리본)는 반투명이 아니라 불투명 단색으로 칠한다(그 아래
+// 텍스트를 새로 쓰기 전에 기존 글자를 완전히 지워야 하므로) - 전체 틴트와 같은 계열 색을 쓴다.
+function tierPatchColor(ovr, fallback) {
+  const tier = cardTier(ovr);
+  if (!tier) return fallback;
+  return tier === "rainbow" ? CARD_TIER_COLORS.gold.solid : CARD_TIER_COLORS[tier].solid;
 }
 
 // 유니폼 색 - 실제 소속팀 킷 컬러 데이터가 없어서(API-Football이 안 줌) 구단 id를 해시해 그 팀
@@ -232,37 +215,43 @@ async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
   ctx.drawImage(template, 0, 0, CARD_W, CARD_H);
 
   // 카드 전체(사진창 제외) 등급 색 입히기 + 유니폼(소속팀 색) 입히기 - 패치/텍스트를 그리기 전에
-  // 먼저 해야 패치 바탕색이 새로 입힌 색과 맞는다.
+  // 먼저 해야 패치 바탕색이 새로 입힌 색과 맞는다. 유니폼도 등급 틴트와 같은 "반투명 오버레이"
+  // 방식으로 바꿔서(예전 hue 합성모드가 환경별로 다르게 보이던 문제 수정) 원단 질감은 비치게 둔다.
   applyCardTierTint(ctx, ovr);
   const jerseyHue = clubJerseyHue(club);
   if (jerseyHue != null) {
     const js = CARD_REGIONS.jerseyShirt;
     ctx.save();
-    ctx.globalCompositeOperation = "hue";
-    ctx.fillStyle = `hsl(${jerseyHue}, 65%, 42%)`;
+    ctx.fillStyle = `hsla(${jerseyHue}, 65%, 42%, 0.55)`;
     ctx.fillRect(js.x, js.y, js.w, js.h);
     ctx.restore();
   }
-  ctx.globalCompositeOperation = "source-over";
   ctx.textBaseline = "alphabetic";
 
-  const ratingBg = tierPatchColor(CARD_BG_COLOR, ovr);
+  const ratingBg = tierPatchColor(ovr, CARD_BG_COLOR);
   const inkColor = "#1c150c";
+
+  // OVR/포지션 숫자가 잘 안 보인다는 피드백(2026-11-18 - "능력치도 좀 잘보이게 해줘")으로 흰색
+  // 외곽선(stroke)을 먼저 깔아서 바탕색이 뭐든 또렷하게 읽히게 한다.
+  function outlinedText(text, x, y, font) {
+    ctx.font = font;
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = "#ffffff";
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = inkColor;
+    ctx.fillText(text, x, y);
+  }
 
   const r = CARD_REGIONS.rating;
   ctx.fillStyle = ratingBg;
   ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.fillStyle = inkColor;
-  ctx.font = "900 92px sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText(ovr != null ? String(ovr) : "?", r.x, r.y + r.h - 18);
+  outlinedText(ovr != null ? String(ovr) : "?", r.x, r.y + r.h - 18, "900 96px sans-serif");
 
   const p = CARD_REGIONS.position;
   ctx.fillStyle = ratingBg;
   ctx.fillRect(p.x, p.y, p.w, p.h);
-  ctx.fillStyle = inkColor;
-  ctx.font = "800 36px sans-serif";
-  ctx.fillText(identity?.position || "", p.x, p.y + p.h - 18);
+  outlinedText(identity?.position || "", p.x, p.y + p.h - 18, "800 38px sans-serif");
 
   const s = CARD_REGIONS.stars;
   ctx.fillStyle = ratingBg;
@@ -271,13 +260,13 @@ async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
     const count = clampNum(Math.round(ovr / 20), 1, 5);
     ctx.font = "34px sans-serif";
     for (let i = 0; i < 5; i++) {
-      ctx.fillStyle = i < count ? "#d8a33c" : "#b89a79";
+      ctx.fillStyle = i < count ? "#ffd23f" : "rgba(28, 21, 12, 0.35)";
       ctx.fillText("★", s.x + i * 42, s.y + s.h - 14);
     }
   }
 
   const j = CARD_REGIONS.jerseyNumber;
-  ctx.fillStyle = jerseyHue != null ? `hsl(${jerseyHue}, 65%, 42%)` : CARD_JERSEY_COLOR;
+  ctx.fillStyle = jerseyHue != null ? `hsl(${jerseyHue}, 55%, 38%)` : CARD_JERSEY_COLOR;
   ctx.fillRect(j.x, j.y, j.w, j.h);
   ctx.fillStyle = "#ffffff";
   ctx.font = "900 96px sans-serif";
@@ -285,7 +274,7 @@ async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
   ctx.fillText(identity?.jerseyNumber != null ? String(identity.jerseyNumber) : "", j.x + j.w / 2, j.y + j.h - 26);
 
   const n = CARD_REGIONS.nameRibbon;
-  ctx.fillStyle = tierPatchColor(CARD_RIBBON_COLOR, ovr);
+  ctx.fillStyle = tierPatchColor(ovr, CARD_RIBBON_COLOR);
   ctx.fillRect(n.x, n.y, n.w, n.h);
   ctx.fillStyle = "#ffffff";
   ctx.font = "800 48px sans-serif";
@@ -749,7 +738,12 @@ function renderRetirement(save) {
     </div>
 
     <div class="career-retire-actions">
-      <button type="button" class="career-share-btn" id="career-share-btn">공유하기</button>
+      <div class="career-share-row">
+        <button type="button" class="career-share-btn" id="career-share-btn">📤 공유하기</button>
+        <button type="button" class="career-save-btn" id="career-save-btn">💾 저장</button>
+        <button type="button" class="career-fb-btn" id="career-fb-btn">📘 페이스북</button>
+      </div>
+      <p class="career-share-hint">"공유하기"를 누르면 기기에 설치된 카카오톡/인스타그램 등으로 바로 보낼 수 있어요(지원 안 하는 환경에선 자동으로 저장돼요).</p>
       <button type="button" class="career-start-btn" id="career-replay-btn">다시하기</button>
     </div>
   `;
@@ -757,14 +751,86 @@ function renderRetirement(save) {
   mountPlayerCard("career-retire-canvas", { identity: save.identity, club: save.club, ovr: r.finalOvr });
 
   fadeIn(el.root);
-  document.getElementById("career-share-btn").addEventListener("click", () => openShareImage());
+  const user = getCurrentUser();
+  document.getElementById("career-share-btn").addEventListener("click", (e) => shareCareerCard(user?.username, e.currentTarget));
+  document.getElementById("career-save-btn").addEventListener("click", (e) => saveCareerCard(user?.username, e.currentTarget));
+  document.getElementById("career-fb-btn").addEventListener("click", () => openFacebookShare(user?.username));
   document.getElementById("career-replay-btn").addEventListener("click", resetCareer);
 }
 
-function openShareImage() {
-  const user = getCurrentUser();
-  if (!user) return;
-  window.open(`https://soccer-live.skagh662.workers.dev/api/career/share/${encodeURIComponent(user.username)}.png`, "_blank");
+function careerShareImageUrl(username) {
+  return `${API}/career/share/${encodeURIComponent(username)}.png`;
+}
+
+async function fetchCareerShareBlob(username) {
+  const token = getToken();
+  const res = await fetch(careerShareImageUrl(username), { headers: token ? { authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new Error("아직 공유 이미지를 만들 수 없어요.");
+  return res.blob();
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// matches.js의 shareMatchCard와 같은 패턴 - 가능하면 OS 공유 시트(navigator.share)로 바로 카카오톡/
+// 인스타그램/메시지 등에 보낼 수 있게 하고(안드로이드/iOS는 설치된 앱이 자동으로 뜸 - 별도 SDK나
+// 앱별 키 없이도 됨), 지원 안 하는 환경(대부분의 데스크톱 브라우저)에서는 바로 다운로드한다.
+async function shareCareerCard(username, btn) {
+  if (!username) return;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "불러오는 중...";
+  try {
+    const blob = await fetchCareerShareBlob(username);
+    trackEvent("share_career_card");
+    const file = new File([blob], `pitchpro-career-${username}.png`, { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: "PITCH PRO 축구인생" });
+    } else {
+      downloadBlob(blob, file.name);
+    }
+  } catch (err) {
+    if (err?.name !== "AbortError") alert(err.message || "공유 이미지를 만들지 못했어요.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+// "공유하기 눌러도 저장하기 버튼이 없다"는 피드백(2026-11-18)으로 공유 시트를 거치지 않는 직접
+// 저장 버튼을 따로 둔다.
+async function saveCareerCard(username, btn) {
+  if (!username) return;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "저장 중...";
+  try {
+    const blob = await fetchCareerShareBlob(username);
+    downloadBlob(blob, `pitchpro-career-${username}.png`);
+  } catch (err) {
+    alert(err.message || "저장하지 못했어요.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+// 페이스북은 앱 키 없이도 쓸 수 있는 공식 공유 다이얼로그(sharer.php)가 있어 바로 연결한다 - 카카오톡
+// 전용 버튼/인스타그램 피드 업로드는 각각 카카오 디벨로퍼스 앱 키, 인스타그램 공식 API(비즈니스 심사)가
+// 있어야 해서 이 세션에선 만들 수 없다(둘 다 외부 등록이 필요) - 대신 위 "공유하기"의 OS 공유 시트가
+// 설치된 카카오톡/인스타그램 앱으로 바로 보내는 걸 지원한다.
+function openFacebookShare(username) {
+  if (!username) return;
+  const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(careerShareImageUrl(username))}`;
+  window.open(shareUrl, "_blank", "noopener,width=600,height=520");
 }
 
 async function resetCareer() {
