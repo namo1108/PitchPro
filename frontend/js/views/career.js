@@ -63,7 +63,6 @@ const CARD_H = 1064;
 // 좌표는 눈대중으로 잡은 값이라 다소 어긋나 보이면 조정 가능.
 const CARD_BG_COLOR = "#cca985";
 const CARD_RIBBON_COLOR = "#614631";
-const CARD_JERSEY_COLOR = "#3a8a55";
 
 const CARD_REGIONS = {
   rating: { x: 140, y: 150, w: 210, h: 118 },
@@ -96,9 +95,6 @@ function hashSeed(str) {
 // 선수 카드 등급 색(2026-11-18 사용자 요청 - "카드색깔도 처음에는 갈색, 70넘어가면 주황색, 80넘어가면
 // 은색, 90넘어가면 금색, 100넘어가면 무지개색으로"). OVR 상한이 99라 "100 이상"은 실제로 안 나와서
 // 98 이상으로 기준을 살짝 낮춰 무지개 등급도 실제로 볼 수 있게 했다.
-// 처음엔 캔버스 globalCompositeOperation="hue"로 템플릿 질감을 살리려 했는데, 실제로 띄워보니 기대한
-// 색과 다르게(탁한 적갈색 느낌) 나왔다(2026-11-18 사용자 제보, 환경별 비표준 합성모드 지원 차이로
-// 추정) - 어느 환경에서나 확실하게 같은 색이 나오는 단순 반투명 오버레이(일반 알파 합성) 방식으로 바꿨다.
 function cardTier(ovr) {
   if (ovr == null || ovr < 70) return null; // 템플릿 원본(갈색) 그대로
   if (ovr < 80) return "orange";
@@ -108,28 +104,51 @@ function cardTier(ovr) {
 }
 
 const CARD_TIER_COLORS = {
-  orange: { solid: "#d9772e", rgba: "rgba(217, 119, 46, 0.42)" },
-  silver: { solid: "#aab4ba", rgba: "rgba(170, 180, 186, 0.42)" },
-  gold: { solid: "#e3b23c", rgba: "rgba(227, 178, 60, 0.42)" },
+  orange: { solid: "#d9772e", rgba: "rgba(217, 119, 46, 0.55)" },
+  silver: { solid: "#aab4ba", rgba: "rgba(170, 180, 186, 0.55)" },
+  gold: { solid: "#e3b23c", rgba: "rgba(227, 178, 60, 0.55)" },
 };
 
-// 사진창을 뺀 카드 전체(배경+테두리+홀로그램 패턴)에 등급 색을 반투명하게 덧입힌다 - 완전 불투명으로
-// 덮으면 템플릿의 음영/패턴이 사라져서 평평해 보이므로 알파를 남겨 질감이 비치게 한다.
-function applyCardTierTint(ctx, ovr) {
+// 카드 배경/유니폼을 재색칠하는 핵심 트릭: 원본 템플릿이 이미 짙은 갈색(배경)·초록(유니폼)으로
+// 채색돼 있어서, 그 위에 바로 반투명 색을 올리면(2026-11-18 사용자 제보 - "색깔이 이상하게 나와")
+// 원래 색과 섞여 탁해진다(특히 초록 유니폼 위에 보라색을 올리면 탁한 녹갈색이 됨 - 색을 섞는 것과
+// 색을 "바꾸는" 건 다른 문제). 그래서 1) 그 부분을 먼저 무채색(흑백)으로 지운 다음 2) 그 위에
+// 목표 색을 올린다 - 무채색 바탕에 색을 올리면 질감(명암)은 살아있으면서 색만 깔끔하게 바뀐다.
+// 무채색 버전은 템플릿 이미지당 한 번만 만들어서(오프스크린 캔버스) 재사용한다.
+let desaturatedTemplatePromise = null;
+function loadDesaturatedTemplate() {
+  if (!desaturatedTemplatePromise) {
+    desaturatedTemplatePromise = loadCardTemplate().then((img) => {
+      const off = document.createElement("canvas");
+      off.width = CARD_W;
+      off.height = CARD_H;
+      const octx = off.getContext("2d");
+      octx.filter = "grayscale(1) brightness(1.15)";
+      octx.drawImage(img, 0, 0, CARD_W, CARD_H);
+      return off;
+    });
+  }
+  return desaturatedTemplatePromise;
+}
+
+// 사진창을 뺀 카드 전체(배경+테두리+홀로그램 패턴)를 무채색으로 지운 뒤 등급 색을 반투명하게 덧입힌다.
+async function applyCardTierTint(ctx, ovr) {
   const tier = cardTier(ovr);
   if (!tier) return;
+  const gray = await loadDesaturatedTemplate();
   const pw = CARD_REGIONS.photoWindow;
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, CARD_W, CARD_H);
   ctx.rect(pw.x, pw.y, pw.w, pw.h);
   ctx.clip("evenodd");
+  ctx.drawImage(gray, 0, 0);
   if (tier === "rainbow") {
     const grad = ctx.createLinearGradient(0, 0, CARD_W, CARD_H);
     ["#ff4d4d", "#ff9d4d", "#ffe14d", "#4dff88", "#4dc8ff", "#7a4dff", "#ff4dd2"].forEach((c, i, arr) =>
       grad.addColorStop(i / (arr.length - 1), c)
     );
-    ctx.globalAlpha = 0.38;
+    ctx.globalAlpha = 0.5;
     ctx.fillStyle = grad;
   } else {
     ctx.fillStyle = CARD_TIER_COLORS[tier].rgba;
@@ -149,9 +168,29 @@ function tierPatchColor(ovr, fallback) {
 // 유니폼 색 - 실제 소속팀 킷 컬러 데이터가 없어서(API-Football이 안 줌) 구단 id를 해시해 그 팀
 // 전용 색을 하나 고정 배정한다(2026-11-18 사용자 요청 - "선수도 팀 바뀌면 거기에 맞게 유니폼도
 // 바뀌고"). 같은 구단이면 항상 같은 색이 나오고, 이적하면 실제로 유니폼 색이 바뀐 것처럼 보인다.
+// 소속팀이 아직 없을 때(자유계약/생성 미리보기)도 기본 초록 톤으로 같은 파이프라인을 태운다 -
+// 그래야 템플릿에 박혀있던 등번호("10")가 소속팀 유무와 무관하게 항상 깔끔하게 지워진다.
+const DEFAULT_JERSEY_HUE = 140;
 function clubJerseyHue(club) {
-  if (!club) return null;
+  if (!club) return DEFAULT_JERSEY_HUE;
   return hashSeed(String(club.id)) % 360;
+}
+
+// 유니폼(셔츠) 영역도 카드 배경과 같은 "무채색으로 지운 뒤 색 올리기" 방식을 쓴다 - 원본이 진한
+// 초록이라 그냥 반투명을 올리면 탁한 카키색이 돼버린다. 기존에 박혀있던 등번호("10")도 이 과정에서
+// 함께 흐려져서, 그 위에 새 번호를 덧쓰면 자연스럽게 가려진다.
+async function tintJerseyShirt(ctx, club) {
+  const hue = clubJerseyHue(club);
+  const gray = await loadDesaturatedTemplate();
+  const js = CARD_REGIONS.jerseyShirt;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(js.x, js.y, js.w, js.h);
+  ctx.clip();
+  ctx.drawImage(gray, 0, 0);
+  ctx.fillStyle = `hsla(${hue}, 62%, 40%, 0.6)`;
+  ctx.fillRect(js.x, js.y, js.w, js.h);
+  ctx.restore();
 }
 
 let cardTemplateImgPromise = null;
@@ -215,17 +254,9 @@ async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
   ctx.drawImage(template, 0, 0, CARD_W, CARD_H);
 
   // 카드 전체(사진창 제외) 등급 색 입히기 + 유니폼(소속팀 색) 입히기 - 패치/텍스트를 그리기 전에
-  // 먼저 해야 패치 바탕색이 새로 입힌 색과 맞는다. 유니폼도 등급 틴트와 같은 "반투명 오버레이"
-  // 방식으로 바꿔서(예전 hue 합성모드가 환경별로 다르게 보이던 문제 수정) 원단 질감은 비치게 둔다.
-  applyCardTierTint(ctx, ovr);
-  const jerseyHue = clubJerseyHue(club);
-  if (jerseyHue != null) {
-    const js = CARD_REGIONS.jerseyShirt;
-    ctx.save();
-    ctx.fillStyle = `hsla(${jerseyHue}, 65%, 42%, 0.55)`;
-    ctx.fillRect(js.x, js.y, js.w, js.h);
-    ctx.restore();
-  }
+  // 먼저 해야 패치 바탕색이 새로 입힌 색과 맞는다.
+  await applyCardTierTint(ctx, ovr);
+  await tintJerseyShirt(ctx, club);
   ctx.textBaseline = "alphabetic";
 
   const ratingBg = tierPatchColor(ovr, CARD_BG_COLOR);
@@ -265,13 +296,17 @@ async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
     }
   }
 
+  // 등번호는 유니폼을 다시 칠하는 과정(tintJerseyShirt)에서 기존 "10"이 이미 흐려졌으니, 바로 그
+  // 위에 새 번호만 쓰면 된다(따로 사각형을 덧칠하지 않음 - 그러면 경계가 스티커처럼 떠 보였다).
   const j = CARD_REGIONS.jerseyNumber;
-  ctx.fillStyle = jerseyHue != null ? `hsl(${jerseyHue}, 55%, 38%)` : CARD_JERSEY_COLOR;
-  ctx.fillRect(j.x, j.y, j.w, j.h);
-  ctx.fillStyle = "#ffffff";
+  const jerseyNumberText = identity?.jerseyNumber != null ? String(identity.jerseyNumber) : "";
   ctx.font = "900 96px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText(identity?.jerseyNumber != null ? String(identity.jerseyNumber) : "", j.x + j.w / 2, j.y + j.h - 26);
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+  ctx.strokeText(jerseyNumberText, j.x + j.w / 2, j.y + j.h - 26);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(jerseyNumberText, j.x + j.w / 2, j.y + j.h - 26);
 
   const n = CARD_REGIONS.nameRibbon;
   ctx.fillStyle = tierPatchColor(ovr, CARD_RIBBON_COLOR);
