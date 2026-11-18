@@ -17,6 +17,11 @@ const POSITION_ROWS = [
 ];
 
 const DECISION_ICON = { stay: "🛡", move: "✈️", extend: "📝", loan: "🔁", overseas: "🌍" };
+// 이적 선택지가 2곳으로 늘면서(2026-11-18) 옵션 id가 move1/move2/overseas1/overseas2처럼 숫자가
+// 붙어서 나온다 - 아이콘은 끝자리 숫자를 떼고 찾는다.
+function decisionIconFor(optionId) {
+  return DECISION_ICON[String(optionId).replace(/\d+$/, "")] || "⚽";
+}
 
 const CAREER_CLUB_DISCLAIMER =
   "이 시뮬레이션에 등장하는 구단명과 엠블럼은 재미를 위한 식별 목적으로만 사용되며, 실제 구단과 제휴·후원·공식적인 관계가 없습니다.";
@@ -67,10 +72,103 @@ const CARD_REGIONS = {
   crestBadge: { x: 676, y: 238, w: 92, h: 106 },
   jerseyNumber: { x: 412, y: 712, w: 180, h: 125 },
   nameRibbon: { x: 182, y: 910, w: 625, h: 115 },
+  // 사진창(얼굴+유니폼) 전체 - 등급 색(아래 CARD_TIER_HUE)을 카드 전체에 입힐 때 이 영역만 구멍처럼
+  // 비워서 얼굴/유니폼 색은 그대로 둔다.
+  photoWindow: { x: 205, y: 405, w: 580, h: 500 },
+  // 유니폼(셔츠) 부분만 - 소속팀이 바뀌면 이 부분만 색을 덧입힌다(얼굴/목 부분은 건드리지 않음).
+  jerseyShirt: { x: 235, y: 598, w: 530, h: 302 },
 };
 
 function clampNum(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
+}
+
+function hashSeed(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h);
+}
+
+// 캔버스의 globalCompositeOperation="hue"와 수학적으로 같은 결과를 내는 순수 JS 버전 - 평평한 색
+// 패치(등번호/레이팅 바탕 등)는 굳이 캔버스 합성모드를 안 써도 미리 계산한 hex로 바로 채울 수 있다.
+function hexToHsl(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h /= 6;
+  }
+  return { h: h * 360, s: s * 100, l: l * 100 };
+}
+
+function hueBlend(baseHex, tintHueDeg) {
+  const base = hexToHsl(baseHex);
+  return `hsl(${tintHueDeg}, ${base.s}%, ${base.l}%)`;
+}
+
+// 선수 카드 등급 색(2026-11-18 사용자 요청 - "카드색깔도 처음에는 갈색, 70넘어가면 주황색, 80넘어가면
+// 은색, 90넘어가면 금색, 100넘어가면 무지개색으로"). OVR 상한이 99라 "100 이상"은 실제로 안 나와서
+// 98 이상으로 기준을 살짝 낮춰 무지개 등급도 실제로 볼 수 있게 했다.
+function cardTierHue(ovr) {
+  if (ovr == null || ovr < 70) return null; // 템플릿 원본(갈색) 그대로
+  if (ovr < 80) return 28; // 주황
+  if (ovr < 90) return 205; // 은색(채도는 원본 탄색의 낮은 채도를 그대로 써서 차분한 은빛이 됨)
+  if (ovr < 98) return 45; // 금색
+  return "rainbow";
+}
+
+// 사진창을 뺀 카드 전체(배경+테두리+홀로그램 패턴)에 등급 색을 입힌다 - 템플릿 자체의 음영/패턴을
+// 그대로 살리는 캔버스 "hue" 합성모드를 쓴다(평평하게 덮어씌우면 질감이 사라짐).
+function applyCardTierTint(ctx, ovr) {
+  const hue = cardTierHue(ovr);
+  if (hue == null) return;
+  const pw = CARD_REGIONS.photoWindow;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, CARD_W, CARD_H);
+  ctx.rect(pw.x, pw.y, pw.w, pw.h);
+  ctx.clip("evenodd");
+  ctx.globalCompositeOperation = "hue";
+  if (hue === "rainbow") {
+    const grad = ctx.createLinearGradient(0, 0, CARD_W, CARD_H);
+    ["#ff4d4d", "#ff9d4d", "#ffe14d", "#4dff88", "#4dc8ff", "#7a4dff", "#ff4dd2"].forEach((c, i, arr) =>
+      grad.addColorStop(i / (arr.length - 1), c)
+    );
+    ctx.fillStyle = grad;
+  } else {
+    ctx.fillStyle = `hsl(${hue}, 70%, 50%)`;
+  }
+  ctx.fillRect(0, 0, CARD_W, CARD_H);
+  ctx.restore();
+}
+
+// 등급 패치(레이팅/포지션/별점 바탕, 이름 리본)도 카드 전체 틴트와 같은 색조로 맞춘다 - rainbow는
+// 패치 하나하나까지 무지개로 그라데이션 넣으면 지저분해 보여서 금색 톤 하나로 대표한다.
+function tierPatchColor(baseHex, ovr) {
+  const hue = cardTierHue(ovr);
+  if (hue == null) return baseHex;
+  return hueBlend(baseHex, hue === "rainbow" ? 45 : hue);
+}
+
+// 유니폼 색 - 실제 소속팀 킷 컬러 데이터가 없어서(API-Football이 안 줌) 구단 id를 해시해 그 팀
+// 전용 색을 하나 고정 배정한다(2026-11-18 사용자 요청 - "선수도 팀 바뀌면 거기에 맞게 유니폼도
+// 바뀌고"). 같은 구단이면 항상 같은 색이 나오고, 이적하면 실제로 유니폼 색이 바뀐 것처럼 보인다.
+function clubJerseyHue(club) {
+  if (!club) return null;
+  return hashSeed(String(club.id)) % 360;
 }
 
 let cardTemplateImgPromise = null;
@@ -132,25 +230,42 @@ async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
   canvas.height = CARD_H;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(template, 0, 0, CARD_W, CARD_H);
+
+  // 카드 전체(사진창 제외) 등급 색 입히기 + 유니폼(소속팀 색) 입히기 - 패치/텍스트를 그리기 전에
+  // 먼저 해야 패치 바탕색이 새로 입힌 색과 맞는다.
+  applyCardTierTint(ctx, ovr);
+  const jerseyHue = clubJerseyHue(club);
+  if (jerseyHue != null) {
+    const js = CARD_REGIONS.jerseyShirt;
+    ctx.save();
+    ctx.globalCompositeOperation = "hue";
+    ctx.fillStyle = `hsl(${jerseyHue}, 65%, 42%)`;
+    ctx.fillRect(js.x, js.y, js.w, js.h);
+    ctx.restore();
+  }
+  ctx.globalCompositeOperation = "source-over";
   ctx.textBaseline = "alphabetic";
 
+  const ratingBg = tierPatchColor(CARD_BG_COLOR, ovr);
+  const inkColor = "#1c150c";
+
   const r = CARD_REGIONS.rating;
-  ctx.fillStyle = CARD_BG_COLOR;
+  ctx.fillStyle = ratingBg;
   ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.fillStyle = "#1c150c";
+  ctx.fillStyle = inkColor;
   ctx.font = "900 92px sans-serif";
   ctx.textAlign = "left";
   ctx.fillText(ovr != null ? String(ovr) : "?", r.x, r.y + r.h - 18);
 
   const p = CARD_REGIONS.position;
-  ctx.fillStyle = CARD_BG_COLOR;
+  ctx.fillStyle = ratingBg;
   ctx.fillRect(p.x, p.y, p.w, p.h);
-  ctx.fillStyle = "#1c150c";
+  ctx.fillStyle = inkColor;
   ctx.font = "800 36px sans-serif";
   ctx.fillText(identity?.position || "", p.x, p.y + p.h - 18);
 
   const s = CARD_REGIONS.stars;
-  ctx.fillStyle = CARD_BG_COLOR;
+  ctx.fillStyle = ratingBg;
   ctx.fillRect(s.x, s.y, s.w, s.h);
   if (ovr != null) {
     const count = clampNum(Math.round(ovr / 20), 1, 5);
@@ -162,7 +277,7 @@ async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
   }
 
   const j = CARD_REGIONS.jerseyNumber;
-  ctx.fillStyle = CARD_JERSEY_COLOR;
+  ctx.fillStyle = jerseyHue != null ? `hsl(${jerseyHue}, 65%, 42%)` : CARD_JERSEY_COLOR;
   ctx.fillRect(j.x, j.y, j.w, j.h);
   ctx.fillStyle = "#ffffff";
   ctx.font = "900 96px sans-serif";
@@ -170,7 +285,7 @@ async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
   ctx.fillText(identity?.jerseyNumber != null ? String(identity.jerseyNumber) : "", j.x + j.w / 2, j.y + j.h - 26);
 
   const n = CARD_REGIONS.nameRibbon;
-  ctx.fillStyle = CARD_RIBBON_COLOR;
+  ctx.fillStyle = tierPatchColor(CARD_RIBBON_COLOR, ovr);
   ctx.fillRect(n.x, n.y, n.w, n.h);
   ctx.fillStyle = "#ffffff";
   ctx.font = "800 48px sans-serif";
@@ -514,7 +629,7 @@ async function advanceSeason() {
 
 // ---------- 4. 결정 모달 ----------
 function decisionOptionHtml(option) {
-  const icon = DECISION_ICON[option.id] || "⚽";
+  const icon = decisionIconFor(option.id);
   return `
     <button type="button" class="career-decision-option" data-option-id="${escapeHtml(option.id)}">
       ${option.club?.crest ? `<img class="career-decision-club-crest" src="${option.club.crest}" alt="" />` : `<span class="career-decision-icon">${icon}</span>`}
@@ -568,16 +683,24 @@ function groupTrophies(trophies) {
 
 // "커리어 하이라이트" - 20시즌 넘게 쌓인 스토리를 전부 보여주면 지저분하니, 데뷔/수상 시즌/은퇴
 // 시즌만 골라 짧게 보여준다(2026-11-16 사용자 요청 - "약간 스토리도 넣어주고").
+// 2026-11-18 사용자 요청("커리어 하이라이트도 좀 다양하게 해주고") - 데뷔/트로피/은퇴 시즌만 보여주던
+// 걸 커리어 최고 OVR 찍은 시즌, 이적/임대 시즌, 생애 첫 국가대표 발탁 시즌까지 넓혀서 더 다채롭게 보여준다.
 function careerHighlights(save) {
   const hist = save.history;
   if (!hist.length) return [];
   const picks = new Map();
-  picks.set(hist[0].season, hist[0]);
+  picks.set(hist[0].season, hist[0]); // 데뷔 시즌
   hist
     .filter((h) => h.trophies?.length)
     .slice(-2)
     .forEach((h) => picks.set(h.season, h));
-  picks.set(hist[hist.length - 1].season, hist[hist.length - 1]);
+  const peak = hist.reduce((best, h) => (h.ovr > best.ovr ? h : best), hist[0]);
+  picks.set(peak.season, peak);
+  const firstTransfer = hist.find((h) => h.justTransferred);
+  if (firstTransfer) picks.set(firstTransfer.season, firstTransfer);
+  const callUpSeason = hist.find((h) => h.firstCallUp);
+  if (callUpSeason) picks.set(callUpSeason.season, callUpSeason);
+  picks.set(hist[hist.length - 1].season, hist[hist.length - 1]); // 은퇴 시즌
   return [...picks.values()].sort((a, b) => a.season - b.season);
 }
 

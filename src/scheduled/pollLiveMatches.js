@@ -51,6 +51,14 @@ const RATE_LIMIT_BACKOFF_MS = 5 * 1000;
 // 되돌림)이 도는 일이 없게 한다.
 const TRACKED_CODES = new Set(COMPETITIONS.filter((c) => c.realtime !== false).map((c) => c.code));
 
+// 라이브 경기가 하나도 없는 조용한 시간대 다음, "오늘의 첫 라이브 경기"는 이 빠른 폴링 루프 자체가
+// 아직 안 돌고 있어서 평범한 1분짜리 Cron Trigger 틱에만 의존했다 - 최악의 경우 킥오프 후 최대 약
+// 60초까지 "라이브" 표시가 늦게 뜰 수 있었다(2026-11-18 사용자 제보 - "아침에 보니까 라이브 시작된
+// 경기들 표기가 좀 느린거 같더라고", 조사 결과 확인). 캐시가 아직 SCHEDULED/TIMED로 들고 있어도
+// 킥오프 시각이 이미 지났으면(너무 오래 전은 제외 - 연기된 경기가 영원히 이 루프를 돌리지 않도록)
+// 한 번은 빠른 폴링을 돌려서 live=all로 바로 확인하게 한다.
+const KICKOFF_DETECTION_WINDOW_MS = 10 * 60 * 1000;
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Cloudflare Cron Trigger는 1분보다 촘촘히는 못 돌리는데, 골/상태변화 알림을 그보다 훨씬 빠르게
@@ -101,7 +109,13 @@ export async function pollLiveMatches(env) {
       (m.status === "IN_PLAY" || m.status === "PAUSED") &&
       TRACKED_CODES.has(m.competition.code) &&
       now - new Date(m.utcDate).getTime() <= MATCH_DURATION_BUFFER_MS;
-    if (!cached.some(isTrulyLive)) return; // 우리 대회 중 (스테일하지 않은) 라이브 경기가 없으면 더 돌 필요 없음
+    const isPastKickoffNotYetLive = (m) =>
+      (m.status === "SCHEDULED" || m.status === "TIMED") &&
+      TRACKED_CODES.has(m.competition.code) &&
+      now - new Date(m.utcDate).getTime() >= 0 &&
+      now - new Date(m.utcDate).getTime() <= KICKOFF_DETECTION_WINDOW_MS;
+    // 우리 대회 중 (스테일하지 않은) 라이브 경기도 없고, 막 킥오프 시각이 지난 경기도 없으면 더 돌 필요 없음.
+    if (!cached.some(isTrulyLive) && !cached.some(isPastKickoffNotYetLive)) return;
 
     if (!markedActive) {
       markedActive = true;

@@ -40,24 +40,12 @@ async function buildDecisionOption(env, save, kind) {
   switch (kind) {
     case "stay_rotation":
       return { id: "stay", label: "주전 경쟁", description: "주전 50% / 로테이션 50%", effect: { type: "stay_rotation" } };
-    case "transfer": {
-      const [club] = await pickTransferCandidates(env, save, { count: 1 });
-      if (!club) return null;
-      const fee = estimateTransferFee(save.ovr, save.age, club.competitionCode);
-      return { id: "move", label: "이적 제안", description: `${club.name}로 이적 (이적료 ${fee}억원)`, club, effect: { type: "transfer", club, fee } };
-    }
     case "extend_contract":
       return { id: "extend", label: "재계약", description: "소속팀 잔류, 계약 연장", effect: { type: "extend_contract" } };
     case "loan": {
       const [club] = await pickTransferCandidates(env, save, { count: 1, preferLowerTier: true });
       if (!club) return null;
       return { id: "loan", label: "임대 이적", description: `${club.name}로 1시즌 임대 (임대료 없음)`, club, effect: { type: "loan", club } };
-    }
-    case "overseas_transfer": {
-      const [club] = await pickTransferCandidates(env, save, { count: 1, preferHigherTier: true, excludeDomestic: true });
-      if (!club) return null;
-      const fee = estimateTransferFee(save.ovr, save.age, club.competitionCode);
-      return { id: "overseas", label: "해외 진출", description: `${club.name}로 이적 (이적료 ${fee}억원)`, club, effect: { type: "overseas_transfer", club, fee } };
     }
     case "stay_domestic":
       return { id: "stay", label: "국내 잔류", description: "안정적인 환경 유지", effect: { type: "stay_domestic" } };
@@ -66,16 +54,42 @@ async function buildDecisionOption(env, save, kind) {
   }
 }
 
+function buildMoveOption(save, club, index, { overseas = false } = {}) {
+  const fee = estimateTransferFee(save.ovr, save.age, club.competitionCode);
+  const id = overseas ? `overseas${index + 1}` : `move${index + 1}`;
+  const label = overseas ? "해외 진출" : "이적 제안";
+  return { id, label, description: `${club.name}로 이적 (이적료 ${fee}억원)`, club, effect: { type: overseas ? "overseas_transfer" : "transfer", club, fee } };
+}
+
+// "팀 이적도 선택지좀 늘려주고"(2026-11-18 사용자 요청) - 이적/해외진출 결정은 후보를 1곳이 아니라
+// 2곳 보여준다(뒤에 다른 템플릿은 기존처럼 단일 후보 - 재계약/임대는 "한 곳 정도의 선택"이 자연스러움).
+async function buildTemplateOptions(env, save, template) {
+  if (template.id === "rotation_vs_transfer") {
+    const stay = await buildDecisionOption(env, save, "stay_rotation");
+    const clubs = await pickTransferCandidates(env, save, { count: 2 });
+    const moves = clubs.map((club, i) => buildMoveOption(save, club, i));
+    const options = [stay, ...moves].filter(Boolean);
+    return options.length >= 2 ? options : null; // 최소 "주전 경쟁" + 이적 제안 1개는 있어야 의미있는 선택
+  }
+  if (template.id === "overseas_vs_stay") {
+    const stay = await buildDecisionOption(env, save, "stay_domestic");
+    const clubs = await pickTransferCandidates(env, save, { count: 2, preferHigherTier: true, excludeDomestic: true });
+    const moves = clubs.map((club, i) => buildMoveOption(save, club, i, { overseas: true }));
+    const options = [...moves, stay].filter(Boolean);
+    return options.length >= 2 ? options : null;
+  }
+  const options = (await Promise.all(template.optionKinds.map((kind) => buildDecisionOption(env, save, kind)))).filter(Boolean);
+  return options.length === template.optionKinds.length ? options : null;
+}
+
 async function generateDecisionEvent(env, save) {
   const templates = [...DECISION_TEMPLATES];
   while (templates.length) {
     const idx = randInt(0, templates.length - 1);
     const [template] = templates.splice(idx, 1);
-    const options = (await Promise.all(template.optionKinds.map((kind) => buildDecisionOption(env, save, kind)))).filter(Boolean);
+    const options = await buildTemplateOptions(env, save, template);
     // 후보 구단을 못 찾은 템플릿(캐시가 비었거나 등급 풀이 너무 좁음)은 건너뛰고 다른 템플릿을 시도한다.
-    if (options.length === template.optionKinds.length) {
-      return { kind: "decision", id: crypto.randomUUID(), templateId: template.id, text: template.text(save), options };
-    }
+    if (options) return { kind: "decision", id: crypto.randomUUID(), templateId: template.id, text: template.text(save), options };
   }
   return null;
 }
@@ -127,7 +141,7 @@ export async function handleCareerStart(request, env) {
   if (!nationality?.name) return json({ detail: "국적을 선택해주세요." }, 400);
 
   const ovr = startingOvr();
-  const candidates = await pickYouthAcademyOffers(env);
+  const candidates = await pickYouthAcademyOffers(env, nationality.name);
   if (!candidates.length) return json({ detail: "유스팀 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요." }, 503);
 
   const save = {
@@ -203,7 +217,17 @@ export async function handleCareerAdvanceSeason(request, env) {
   const stats = statsForSeason(save);
   const { apps, goals, assists } = stats;
   const trophies = [...rollTrophies(save.ovr, save.club), ...rollPersonalAwards(save, stats)];
-  const story = buildSeasonStory(save, stats, trophies);
+
+  // 이번 시즌에 "방금 이적/임대" 혹은 "생애 첫 국가대표 발탁"이 있었는지를 스토리 생성에 넘긴다
+  // (2026-11-18 사용자 요청 - "커리어 하이라이트도 좀 다양하게 해주고"). 국가대표 발탁 여부는 스토리를
+  // 짓기 전에 먼저 굴려야 그 결과를 문구에 반영할 수 있어 순서를 앞으로 당겼다.
+  const wasAlreadyCalledUp = save.nationalTeam.called;
+  const calledUp = rollNationalCallUp(save);
+  const justTransferred = !!save.justMoved;
+  save.justMoved = false;
+  const firstCallUp = calledUp && !wasAlreadyCalledUp;
+  const story = buildSeasonStory(save, stats, trophies, { justTransferred, justCalledUp: firstCallUp });
+
   save.career.seasonIndex += 1;
   save.seasonsAtClub += 1;
   save.nextSeasonModifier = null;
@@ -221,9 +245,9 @@ export async function handleCareerAdvanceSeason(request, env) {
     onLoan: save.contractStatus === "임대중",
     trophies,
     story,
+    justTransferred,
+    firstCallUp,
   });
-
-  const calledUp = rollNationalCallUp(save);
 
   let retired = false;
   if (shouldRetire(save)) {

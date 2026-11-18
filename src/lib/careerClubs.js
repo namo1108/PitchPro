@@ -39,10 +39,14 @@ export function trophyNamesForClub(club) {
 export const CAREER_CLUB_DISCLAIMER =
   "이 시뮬레이션에 등장하는 구단명과 엠블럼은 재미를 위한 식별 목적으로만 사용되며, 실제 구단과 제휴·후원·공식적인 관계가 없습니다.";
 
+// 예전엔 OVR 85는 돼야 5대리그(1등급) 이적 후보가 나왔는데, 성장 밸런스를 올린 뒤(careerEngine.js
+// 참고)에도 체감상 top5 노출이 적다는 피드백(2026-11-18 - "프리미어리그, 라리가... 비중을 좀더
+// 늘려줘")이 있어 기준선을 낮춘다 - tier 1(PL/PD/BL1/SA/FL1)은 여전히 이 다섯 리그뿐이라, 기준을
+// 낮출수록 이 다섯 리그로 가는 이적 제안이 더 자주 뜬다.
 function tierForOvr(ovr) {
-  if (ovr >= 85) return 1;
-  if (ovr >= 72) return 2;
-  if (ovr >= 58) return 3;
+  if (ovr >= 82) return 1;
+  if (ovr >= 68) return 2;
+  if (ovr >= 55) return 3;
   return 4;
 }
 
@@ -53,28 +57,61 @@ function shuffle(arr) {
     .map(([, v]) => v);
 }
 
-async function clubPoolForTier(env, tier) {
+async function clubPoolForCode(env, code) {
   const standingsBlob = await getJSON(env, KV_KEYS.standings);
+  const groups = standingsBlob?.byCode?.[code]?.standings || [];
+  const clubs = [];
+  for (const group of groups) {
+    for (const row of group.table || []) {
+      clubs.push({ id: row.team.id, name: row.team.shortName || row.team.name, crest: row.team.crest, competitionCode: code });
+    }
+  }
+  return clubs;
+}
+
+async function clubPoolForTier(env, tier) {
   const codes = Object.entries(CLUB_TIER_BY_CODE)
     .filter(([, t]) => t === tier)
     .map(([code]) => code);
-
-  const clubs = [];
-  for (const code of codes) {
-    const groups = standingsBlob?.byCode?.[code]?.standings || [];
-    for (const group of groups) {
-      for (const row of group.table || []) {
-        clubs.push({ id: row.team.id, name: row.team.shortName || row.team.name, crest: row.team.crest, competitionCode: code });
-      }
-    }
-  }
+  const pools = await Promise.all(codes.map((code) => clubPoolForCode(env, code)));
   // 같은 팀이 여러 대회(예: K리그1 + ACL)에 중복으로 안 잡히게 id 기준으로 한 번씩만.
-  return [...new Map(clubs.map((c) => [c.id, c])).values()];
+  return [...new Map(pools.flat().map((c) => [c.id, c])).values()];
 }
 
-// 16세 유스팀 오퍼는 항상 최하위 등급(K3/K4)에서만 3곳을 뽑는다 - "좋지 않은 팀에서 시작"하는
-// 서사를 보장한다.
-export async function pickYouthAcademyOffers(env) {
+// 국적 선택에 따라 시작 리그를 다르게 한다(2026-11-18 사용자 요청 - "팀이 처음에는 무조건 K4인데
+// 나라 선택하면 그 리그에서 시작할 수 있게 해줘"). 우리가 실제로 추적하는 리그가 있는 나라만
+// 매핑하고(국가별로 여러 디비전을 가진 데이터는 한국(K3/K4)뿐이라, 다른 나라는 우리가 가진 유일한
+// 리그에서 시작한다 - 없는 하부리그를 지어내지 않는다), 나머지 대다수 나라는 데이터가 없어 기존처럼
+// K4(우리가 가진 유일한 "유스팀다운" 최하위 데이터)로 시작한다. 국적 데이터(KV_KEYS.nationalTeams)는
+// 이름이 영문이라 소문자로 매칭한다.
+const STARTING_LEAGUE_BY_NATIONALITY = {
+  "south korea": "K4",
+  "korea republic": "K4",
+  england: "ELC",
+  spain: "PD",
+  germany: "BL1",
+  italy: "SA",
+  france: "FL1",
+  netherlands: "DED",
+  portugal: "PPL",
+  brazil: "BSA",
+  usa: "MLS",
+  japan: "J3",
+  china: "CHN",
+  australia: "AUS",
+  "saudi arabia": "KSA",
+  norway: "NOR",
+  denmark: "DEN",
+  scotland: "SCO",
+};
+
+export async function pickYouthAcademyOffers(env, nationalityName) {
+  const code = STARTING_LEAGUE_BY_NATIONALITY[String(nationalityName || "").toLowerCase()];
+  if (code) {
+    const pool = shuffle(await clubPoolForCode(env, code));
+    if (pool.length >= 3) return pool.slice(0, 3);
+  }
+  // 매핑이 없거나(대부분의 나라) 그 리그 캐시가 아직 비어있으면 기존처럼 K3/K4(4등급)에서 뽑는다.
   const pool = shuffle(await clubPoolForTier(env, 4));
   return pool.slice(0, 3);
 }

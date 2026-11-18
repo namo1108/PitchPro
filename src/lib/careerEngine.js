@@ -33,12 +33,15 @@ function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-// 나이대별 OVR 성장/하락 폭 - 20대 초반까지 급성장, 전성기(20대 후반)엔 완만, 33세부턴 급격히 하락.
+// 나이대별 OVR 성장/하락 폭 - 20대 초반까지 급성장, 전성기(20대 후반~30대 초)엔 완만, 33세부턴
+// 급격히 하락. 예전엔 평균적으로 80 안팎에서 성장이 멈춰서(2026-11-18 사용자 피드백 - "성장도
+// 밸런스 조정좀 해줘 최대가 80정도 까지 밖에 안가는거 같아") 구간별 성장폭과 potential 상한을
+// 같이 올렸다 - 이제 평균적으로 80대 중반, 잘 풀리면 90대까지 노려볼 수 있다.
 function growthBracket(nextAge) {
-  if (nextAge <= 20) return { min: 2, max: 5 };
-  if (nextAge <= 23) return { min: 1, max: 3 };
-  if (nextAge <= 29) return { min: -1, max: 2 };
-  if (nextAge <= 32) return { min: -3, max: 0 };
+  if (nextAge <= 20) return { min: 3, max: 6 };
+  if (nextAge <= 23) return { min: 2, max: 4 };
+  if (nextAge <= 29) return { min: 0, max: 3 };
+  if (nextAge <= 32) return { min: -2, max: 1 };
   return { min: -6, max: -2 };
 }
 
@@ -49,7 +52,7 @@ export function startingOvr() {
 // potential(숨김 성장 상한)과 retirementAge(숨김 은퇴 나이)는 커리어 시작 시 한 번만 굴려서
 // 세이브에 고정해둔다 - 화면엔 안 보여줘서, 매 시즌 "이번엔 얼마나 성장할까" 하는 긴장감을 유지한다.
 export function rollPotential(startOvr) {
-  return clamp(startOvr + randInt(20, 38), 65, 96);
+  return clamp(startOvr + randInt(28, 50), 65, 99);
 }
 export function rollRetirementAge() {
   return randInt(36, 40);
@@ -60,8 +63,8 @@ export function advanceOvr(save, nextAge) {
   let delta = randInt(min, max);
   if (save.nextSeasonModifier?.ovrDelta) delta += save.nextSeasonModifier.ovrDelta;
   const raw = save.ovr + delta;
-  // 29세 이하일 때만 potential을 성장 상한으로 쓴다 - 하락기엔 potential과 무관하게 떨어진다.
-  const next = nextAge <= 29 ? Math.min(raw, save.potential) : raw;
+  // 31세 이하일 때만 potential을 성장 상한으로 쓴다 - 하락기엔 potential과 무관하게 떨어진다.
+  const next = nextAge <= 31 ? Math.min(raw, save.potential) : raw;
   return clamp(next, 40, 99);
 }
 
@@ -149,35 +152,58 @@ function pick(templates, ...args) {
   return templates[randInt(0, templates.length - 1)](...args);
 }
 
-const STORY_TROPHY = [(n, s, t) => `${n}와(과) 동료들은 집중력을 잃지 않고 시즌 내내 달려, 마침내 ${t[0]}을(를) 들어올렸습니다.`];
+const STORY_TROPHY = [
+  (n, s, t) => `${n}와(과) 동료들은 집중력을 잃지 않고 시즌 내내 달려, 마침내 ${t[0]}을(를) 들어올렸습니다.`,
+  (n, s, t) => `우승이 걸린 중요한 순간마다 ${n}가 있었고, 팀은 결국 ${t[0]}의 주인공이 됐습니다.`,
+  (n, s, t) => `시즌 내내 흔들리지 않았던 ${n}의 팀은 ${t[0]}이라는 결실을 맺었습니다.`,
+];
 const STORY_BREAKOUT = [
   (n, s) => `${n}, 이번 시즌 ${s.goals}골을 몰아넣으며 팀의 떠오르는 샛별로 주목받았습니다.`,
   (n, s) => `어린 나이에도 ${s.apps}경기를 소화한 ${n}, 구단의 미래로 평가받기 시작했습니다.`,
+  (n, s) => `또래보다 한 발 빨랐던 ${n}, 주전 자리를 빠르게 꿰차며 팬들 사이에서 화제가 됐습니다.`,
 ];
 const STORY_MVP = [
   (n, s) => `${n}의 완벽한 활약(${s.goals}골 ${s.assists}도움) 속에 팀은 최고의 시즌을 보냈습니다.`,
   (n) => `리그를 지배한 ${n}, 상대 팀 감독들의 최우선 경계 대상이 됐습니다.`,
+  (n, s) => `${n}가 보여준 안정적인 기복 없는 활약은 팀의 가장 큰 무기였습니다.`,
 ];
 const STORY_DECLINE = [
   (n) => `노장이 된 ${n}, 체력 저하를 경험했지만 여전히 후배들에게 모범이 되고 있습니다.`,
   (n) => `전성기는 지났지만 ${n}의 경기 운영 능력만큼은 녹슬지 않았습니다.`,
+  (n) => `한때의 폭발력은 줄었어도, ${n}는 경험에서 나오는 노련함으로 제 몫을 다했습니다.`,
 ];
 const STORY_STRUGGLE = [
   (n) => `좀처럼 출전 기회를 잡지 못한 ${n}, 반등의 기회를 노리고 있습니다.`,
   (n) => `벤치를 지키는 날이 많았던 ${n}에게는 인내가 필요한 시즌이었습니다.`,
+  (n) => `새 감독의 전술에 좀처럼 녹아들지 못한 ${n}, 다음 시즌을 기약해야 했습니다.`,
 ];
 const STORY_INJURY = [
   (n) => `${n}, 시즌 중 잔부상에 시달렸지만 꾸준히 그라운드를 지켰습니다.`,
   (n) => `크고 작은 부상이 있었지만 ${n}는 묵묵히 버텨냈습니다.`,
+  (n) => `몸 상태가 완전치 않았던 시즌이었지만, ${n}는 끝까지 포기하지 않았습니다.`,
+];
+const STORY_TRANSFER = [
+  (n) => `이적시장이 끝나고 새 유니폼을 입은 ${n}, 새로운 도전이 시작됐습니다.`,
+  (n) => `${n}의 이적 소식은 팬들 사이에서 큰 화제가 됐습니다.`,
+];
+const STORY_CALLUP = [
+  (n) => `${n}, 생애 처음으로 국가대표팀 유니폼을 입는 영광을 안았습니다.`,
+  (n) => `꾸준한 클럽 활약 끝에 ${n}에게도 드디어 태극마크(대표팀 발탁)의 기회가 찾아왔습니다.`,
 ];
 const STORY_AVERAGE = [
   (n, s) => `${n}는 ${s.apps}경기에 나서며 묵묵히 제 몫을 다했습니다.`,
   (n, s) => `특별한 반전은 없었지만, ${n}는 꾸준히 팀에 보탬이 됐습니다.`,
+  (n, s) => `${n}에게는 화려하진 않아도 담담히 쌓아간 한 시즌이었습니다.`,
 ];
 
-export function buildSeasonStory(save, stats, trophies) {
+// 다양성을 위해(2026-11-18 사용자 요청 - "커리어 하이라이트도 좀 다양하게") 이적/국가대표 발탁처럼
+// 세이브 상태 변화가 있었던 시즌엔 전용 문구를 우선 고려한다 - justTransferred/justCalledUp은
+// handleCareerAdvanceSeason이 이번 시즌에 실제로 그 일이 있었는지 넘겨준다.
+export function buildSeasonStory(save, stats, trophies, { justTransferred = false, justCalledUp = false } = {}) {
   const name = save.identity.name || "선수";
   if (trophies.length && Math.random() < 0.6) return pick(STORY_TROPHY, name, stats, trophies);
+  if (justCalledUp && Math.random() < 0.7) return pick(STORY_CALLUP, name);
+  if (justTransferred && Math.random() < 0.5) return pick(STORY_TRANSFER, name);
   if (save.age <= 20 && stats.goals + stats.apps > 0 && Math.random() < 0.5) return pick(STORY_BREAKOUT, name, stats);
   if (save.ovr >= 85 && Math.random() < 0.4) return pick(STORY_MVP, name, stats);
   if (save.age >= 33) return pick(STORY_DECLINE, name, stats);
@@ -278,6 +304,7 @@ export function applyDecisionEffect(save, effect) {
       save.contractStatus = "계약중";
       save.seasonsAtClub = 0;
       save.loanParentClubId = null;
+      save.justMoved = true; // buildSeasonStory가 "이적 시즌" 전용 문구를 고를 때 참고(아래에서 소비 후 해제)
       if (effect.type === "overseas_transfer") {
         save.ovr = clamp(save.ovr + randInt(1, 3), 40, 99);
       }
@@ -288,6 +315,7 @@ export function applyDecisionEffect(save, effect) {
       save.loanParentClubId = save.club?.id || null;
       save.club = effect.club;
       save.contractStatus = "임대중";
+      save.justMoved = true;
       break;
     }
     case "extend_contract": {
