@@ -697,7 +697,8 @@ function renderActive(save) {
       </table>
     </div>
 
-    <button type="button" class="career-start-btn" id="career-advance-btn">다음 시즌 ▶</button>
+    <div class="career-advance-spacer"></div>
+    <button type="button" class="career-start-btn career-advance-bar" id="career-advance-btn">다음 시즌 ▶</button>
   `;
 
   mountPlayerCard("career-active-canvas", { identity, club: save.club, ovr: peak });

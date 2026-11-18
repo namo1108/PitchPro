@@ -5180,6 +5180,30 @@ table.standings-table {
   opacity: 0.6;
 }
 
+/* "다음 시즌" 버튼이 히스토리 표가 길어지면 화면 아래로 밀려 내려가 안 보인다는 피드백(2026-11-18) -
+   하단 탭바 바로 위에 고정해서 스크롤해도 항상 보이게 한다. 탭바 높이만큼은 .content의 기존
+   padding-bottom(78px) 계산과 맞춰서 탭바와 안 겹치게 했다. 버튼이 fixed라 문서 흐름에서 빠지므로,
+   버튼 자리에 .career-advance-spacer로 그만큼 높이를 비워둬서 표의 마지막 줄이 버튼에 가려지지
+   않게 한다. */
+.career-advance-bar {
+  position: fixed;
+  left: 20px;
+  right: 20px;
+  bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  max-width: calc(900px - 40px);
+  margin: 0 auto;
+  z-index: 25;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+
+html[data-toss-app] .career-advance-bar {
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
+.career-advance-spacer {
+  height: 72px;
+}
+
 .career-academy-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
