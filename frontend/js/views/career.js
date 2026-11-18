@@ -48,40 +48,17 @@ function randomLookSeed() {
   return Math.floor(Math.random() * 1e9);
 }
 
-// ---------- 선수 카드(사용자가 준 레퍼런스 이미지를 그대로 사용) ----------
-// 처음엔 코드로 그린 도형(SVG)으로 비슷하게 흉내냈는데 "이게 아니야, player card 그대로 가져와"라는
-// 피드백을 받았다(2026-11-16) - frontend/img/career-card-template.png(사용자가 올려준 원본을 그대로
-// 복사한 파일, 원본은 "player card.png")를 실제 배경으로 쓰고, 그 위에 캔버스로 실제 데이터(OVR/
-// 포지션/별점/국적/구단/등번호/이름)를 덮어 그린다. 얼굴 그림과 기본 유니폼 색(초록)은 이 한 장의
-// 그림에 고정된 그림이라 선수마다 다르게 바꿀 수는 없다(이미지 생성·편집 도구가 없어 얼굴만 따로
-// 다시 그릴 수 없음) - 그 부분만은 모든 선수가 같은 "기본 얼굴"을 공유하는 셈이다.
-const CARD_TEMPLATE_SRC = "/img/career-card-template.png";
-const CARD_W = 992;
-const CARD_H = 1064;
-
-// 템플릿 이미지에서 실측한 배경색(겹쳐 그릴 때 밑에 있던 숫자/별 등을 지우는 용도) - 정확한
-// 좌표는 눈대중으로 잡은 값이라 다소 어긋나 보이면 조정 가능.
-const CARD_BG_COLOR = "#cca985";
-const CARD_RIBBON_COLOR = "#614631";
-
-const CARD_REGIONS = {
-  rating: { x: 140, y: 150, w: 210, h: 118 },
-  position: { x: 155, y: 258, w: 170, h: 75 },
-  stars: { x: 138, y: 358, w: 275, h: 58 },
-  flagBadge: { x: 672, y: 156, w: 108, h: 86 },
-  crestBadge: { x: 676, y: 238, w: 92, h: 106 },
-  jerseyNumber: { x: 412, y: 712, w: 180, h: 125 },
-  nameRibbon: { x: 182, y: 910, w: 625, h: 115 },
-  // 사진창(얼굴+유니폼) 전체 - 등급 색(아래 CARD_TIER_HUE)을 카드 전체에 입힐 때 이 영역만 구멍처럼
-  // 비워서 얼굴/유니폼 색은 그대로 둔다.
-  // 실측 결과 머리카락이 둥근 사진창 박스보다 훨씬 위(y≈205)부터 시작해서 카드 배경 쪽까지
-  // 삐져나와 있었다 - 구멍(hole)을 사진창 박스 높이에 맞춰 잡았더니 머리카락 윗부분이 등급 틴트에
-  // 휩쓸려 회색으로 지워지는 버그가 났다(2026-11-18 사용자 제보 - "이거 완전 아니야"). 머리카락
-  // 전체를 넉넉히 덮도록 위쪽으로 크게 넓혔다.
-  photoWindow: { x: 195, y: 185, w: 600, h: 720 },
-  // 유니폼(셔츠) 부분만 - 소속팀이 바뀌면 이 부분만 색을 덧입힌다(얼굴/목 부분은 건드리지 않음).
-  jerseyShirt: { x: 235, y: 598, w: 530, h: 302 },
-};
+// ---------- 선수 카드(전부 코드로 그리는 벡터 카드) ----------
+// 네 번 연속으로 사용자가 준 레퍼런스 이미지(player card.png)를 "재색칠"하려다 버그가 났다(숨은
+// 흰 배지가 밝게 남음, 머리카락이 사진창 밖으로 삐져나가 회색으로 지워짐, 색이 섞여 탁해짐 등,
+// 2026-11-16~18) - 그림 한 장에 이미 칠해진 색을 실시간으로 "다른 색"으로 바꾸는 접근 자체가
+// 한계였다. 결국 "그냥 니가 새로 한번 만들어줘 fc온라인 카드 참고해서"라는 요청을 받고(2026-11-18),
+// 레퍼런스 이미지의 구도(FC 온라인/FIFA 얼티밋팀과 같은 계열 - 좌상단 레이팅+포지션+별점, 우상단
+// 국적+소속팀 배지, 가운데 인물, 하단 이름 리본, 등급별 배경색)는 유지하되 전부 캔버스로 새로
+// 그린다. "재색칠"이 아니라 "그릴 때부터 원하는 색으로" 그리므로 색이 섞이거나 숨은 디테일에
+// 걸릴 일이 구조적으로 없다.
+const CARD_W = 700;
+const CARD_H = 980;
 
 function clampNum(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
@@ -96,119 +73,37 @@ function hashSeed(str) {
   return Math.abs(h);
 }
 
-// 선수 카드 등급 색(2026-11-18 사용자 요청 - "카드색깔도 처음에는 갈색, 70넘어가면 주황색, 80넘어가면
+// 카드 등급(2026-11-18 사용자 요청 - "카드색깔도 처음에는 갈색, 70넘어가면 주황색, 80넘어가면
 // 은색, 90넘어가면 금색, 100넘어가면 무지개색으로"). OVR 상한이 99라 "100 이상"은 실제로 안 나와서
 // 98 이상으로 기준을 살짝 낮춰 무지개 등급도 실제로 볼 수 있게 했다.
 function cardTier(ovr) {
-  if (ovr == null || ovr < 70) return null; // 템플릿 원본(갈색) 그대로
+  if (ovr == null || ovr < 70) return "bronze";
   if (ovr < 80) return "orange";
   if (ovr < 90) return "silver";
   if (ovr < 98) return "gold";
   return "rainbow";
 }
 
-const CARD_TIER_COLORS = {
-  orange: { solid: "#d9772e", rgba: "rgba(217, 119, 46, 0.55)" },
-  silver: { solid: "#aab4ba", rgba: "rgba(170, 180, 186, 0.55)" },
-  gold: { solid: "#e3b23c", rgba: "rgba(227, 178, 60, 0.55)" },
+const CARD_TIER_THEME = {
+  bronze: { from: "#8a5a35", to: "#4a2f1a", border: "#c98a52", ink: "#2a1a0d" },
+  orange: { from: "#e08a3c", to: "#a3531a", border: "#ffb366", ink: "#2a1405" },
+  silver: { from: "#cfd6da", to: "#8e969c", border: "#f2f6f8", ink: "#1c2024" },
+  gold: { from: "#f6d978", to: "#b4811f", border: "#ffeeb0", ink: "#3a2905" },
+  rainbow: { from: null, to: null, border: "#ffffff", ink: "#1a1a1a" },
 };
-
-// 카드 배경/유니폼을 재색칠하는 핵심 트릭: 원본 템플릿이 이미 짙은 갈색(배경)·초록(유니폼)으로
-// 채색돼 있어서, 그 위에 바로 반투명 색을 올리면(2026-11-18 사용자 제보 - "색깔이 이상하게 나와")
-// 원래 색과 섞여 탁해진다(특히 초록 유니폼 위에 보라색을 올리면 탁한 녹갈색이 됨 - 색을 섞는 것과
-// 색을 "바꾸는" 건 다른 문제). 그래서 1) 그 부분을 먼저 무채색(흑백)으로 지운 다음 2) 그 위에
-// 목표 색을 올린다 - 무채색 바탕에 색을 올리면 질감(명암)은 살아있으면서 색만 깔끔하게 바뀐다.
-// 무채색 버전은 템플릿 이미지당 한 번만 만들어서(오프스크린 캔버스) 재사용한다.
-let desaturatedTemplatePromise = null;
-function loadDesaturatedTemplate() {
-  if (!desaturatedTemplatePromise) {
-    desaturatedTemplatePromise = loadCardTemplate().then((img) => {
-      const off = document.createElement("canvas");
-      off.width = CARD_W;
-      off.height = CARD_H;
-      const octx = off.getContext("2d");
-      octx.filter = "grayscale(1) brightness(1.15)";
-      octx.drawImage(img, 0, 0, CARD_W, CARD_H);
-      return off;
-    });
-  }
-  return desaturatedTemplatePromise;
-}
-
-// 사진창을 뺀 카드 전체(배경+테두리+홀로그램 패턴)를 무채색으로 지운 뒤 등급 색을 반투명하게 덧입힌다.
-async function applyCardTierTint(ctx, ovr) {
-  const tier = cardTier(ovr);
-  if (!tier) return;
-  const gray = await loadDesaturatedTemplate();
-  const pw = CARD_REGIONS.photoWindow;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, CARD_W, CARD_H);
-  ctx.rect(pw.x, pw.y, pw.w, pw.h);
-  ctx.clip("evenodd");
-  ctx.drawImage(gray, 0, 0);
-  if (tier === "rainbow") {
-    const grad = ctx.createLinearGradient(0, 0, CARD_W, CARD_H);
-    ["#ff4d4d", "#ff9d4d", "#ffe14d", "#4dff88", "#4dc8ff", "#7a4dff", "#ff4dd2"].forEach((c, i, arr) =>
-      grad.addColorStop(i / (arr.length - 1), c)
-    );
-    ctx.globalAlpha = 0.5;
-    ctx.fillStyle = grad;
-  } else {
-    ctx.fillStyle = CARD_TIER_COLORS[tier].rgba;
-  }
-  ctx.fillRect(0, 0, CARD_W, CARD_H);
-  ctx.restore();
-}
-
-// 등급 패치(레이팅/포지션/별점 바탕, 이름 리본)는 반투명이 아니라 불투명 단색으로 칠한다(그 아래
-// 텍스트를 새로 쓰기 전에 기존 글자를 완전히 지워야 하므로) - 전체 틴트와 같은 계열 색을 쓴다.
-function tierPatchColor(ovr, fallback) {
-  const tier = cardTier(ovr);
-  if (!tier) return fallback;
-  return tier === "rainbow" ? CARD_TIER_COLORS.gold.solid : CARD_TIER_COLORS[tier].solid;
-}
+const RAINBOW_STOPS = ["#ff4d4d", "#ff9d4d", "#ffe14d", "#4dff88", "#4dc8ff", "#7a4dff", "#ff4dd2"];
 
 // 유니폼 색 - 실제 소속팀 킷 컬러 데이터가 없어서(API-Football이 안 줌) 구단 id를 해시해 그 팀
 // 전용 색을 하나 고정 배정한다(2026-11-18 사용자 요청 - "선수도 팀 바뀌면 거기에 맞게 유니폼도
 // 바뀌고"). 같은 구단이면 항상 같은 색이 나오고, 이적하면 실제로 유니폼 색이 바뀐 것처럼 보인다.
-// 소속팀이 아직 없을 때(자유계약/생성 미리보기)도 기본 초록 톤으로 같은 파이프라인을 태운다 -
-// 그래야 템플릿에 박혀있던 등번호("10")가 소속팀 유무와 무관하게 항상 깔끔하게 지워진다.
-const DEFAULT_JERSEY_HUE = 140;
+const DEFAULT_JERSEY_HUE = 140; // 소속팀 없을 때(자유계약/미리보기) 기본 초록
 function clubJerseyHue(club) {
   if (!club) return DEFAULT_JERSEY_HUE;
   return hashSeed(String(club.id)) % 360;
 }
 
-// 유니폼(셔츠) 영역도 카드 배경과 같은 "무채색으로 지운 뒤 색 올리기" 방식을 쓴다 - 원본이 진한
-// 초록이라 그냥 반투명을 올리면 탁한 카키색이 돼버린다. 기존에 박혀있던 등번호("10")도 이 과정에서
-// 함께 흐려져서, 그 위에 새 번호를 덧쓰면 자연스럽게 가려진다.
-async function tintJerseyShirt(ctx, club) {
-  const hue = clubJerseyHue(club);
-  const gray = await loadDesaturatedTemplate();
-  const js = CARD_REGIONS.jerseyShirt;
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(js.x, js.y, js.w, js.h);
-  ctx.clip();
-  ctx.drawImage(gray, 0, 0);
-  ctx.fillStyle = `hsla(${hue}, 62%, 40%, 0.6)`;
-  ctx.fillRect(js.x, js.y, js.w, js.h);
-  ctx.restore();
-}
-
-let cardTemplateImgPromise = null;
-function loadCardTemplate() {
-  if (!cardTemplateImgPromise) {
-    cardTemplateImgPromise = new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = CARD_TEMPLATE_SRC;
-    });
-  }
-  return cardTemplateImgPromise;
-}
+const SKIN_TONES = ["#ffdbac", "#f1c27d", "#e0ac69", "#c68642", "#8d5524", "#5a3825"];
+const HAIR_COLORS = ["#1b1b1b", "#3b2414", "#6b4423", "#2c2c2c", "#4a3728"];
 
 function loadExternalImage(src) {
   return new Promise((resolve, reject) => {
@@ -229,15 +124,15 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// 국기/구단 배지 자리에 흰 스티커를 그리고 그 위에 실제 이미지를 올린다(템플릿엔 샘플 국기/구단이
-// 박혀있어 지우고 다시 그려야 함). crest가 없으면 스티커만 비워둔다(없는 이미지로 깨지지 않게).
+// 국기/구단 배지 - 흰 스티커를 깔고 그 위에 실제 이미지를 올린다. crest가 없으면 스티커만 비워둔다
+// (없는 이미지로 깨지지 않게).
 async function drawBadge(ctx, src, rect, { square = false } = {}) {
   if (!src) return;
   try {
     const img = await loadExternalImage(src);
     const cx = rect.x + rect.w / 2;
     const cy = rect.y + rect.h / 2;
-    const size = Math.min(rect.w, rect.h) * 0.82;
+    const size = Math.min(rect.w, rect.h) * 0.8;
     ctx.save();
     ctx.fillStyle = "#ffffff";
     if (square) roundRectPath(ctx, cx - size / 2 - 5, cy - size / 2 - 5, size + 10, size + 10, 8);
@@ -246,84 +141,234 @@ async function drawBadge(ctx, src, rect, { square = false } = {}) {
     ctx.drawImage(img, cx - size / 2, cy - size / 2, size, size);
     ctx.restore();
   } catch {
-    // 외부 이미지 로드 실패 시 조용히 스킵(빈 스티커도 안 남기면 템플릿 원본 그대로 보임 - 괜찮음)
+    // 외부 이미지 로드 실패 시 조용히 스킵
   }
 }
 
+function tierBackgroundFill(ctx, tier) {
+  const theme = CARD_TIER_THEME[tier];
+  if (tier === "rainbow") {
+    const grad = ctx.createLinearGradient(0, 0, CARD_W, CARD_H);
+    RAINBOW_STOPS.forEach((c, i, arr) => grad.addColorStop(i / (arr.length - 1), c));
+    return grad;
+  }
+  const grad = ctx.createLinearGradient(0, 0, CARD_W, CARD_H);
+  grad.addColorStop(0, theme.from);
+  grad.addColorStop(1, theme.to);
+  return grad;
+}
+
+// 카드 테두리 안쪽에 옅은 대각선 홀로그램 느낌의 결을 몇 줄 그어 FC 온라인/FIFA 카드 특유의
+// "반짝이는 재질" 느낌을 낸다 - 과하지 않게 아주 옅게.
+function drawHoloSheen(ctx) {
+  ctx.save();
+  roundRectPath(ctx, 14, 14, CARD_W - 28, CARD_H - 28, 26);
+  ctx.clip();
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 10;
+  for (let x = -CARD_H; x < CARD_W + CARD_H; x += 38) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x + CARD_H, CARD_H);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function starRow(ctx, x, y, ovr) {
+  if (ovr == null) return;
+  const count = clampNum(Math.round(ovr / 20), 1, 5);
+  ctx.font = "22px sans-serif";
+  ctx.textAlign = "left";
+  for (let i = 0; i < 5; i++) {
+    ctx.fillStyle = i < count ? "#ffd23f" : "rgba(255,255,255,0.3)";
+    ctx.fillText("★", x + i * 25, y);
+  }
+}
+
+function outlinedText(ctx, text, x, y, font, fillColor, strokeColor = "#ffffff", lineWidth = 5) {
+  ctx.font = font;
+  ctx.lineWidth = lineWidth;
+  ctx.strokeStyle = strokeColor;
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fillColor;
+  ctx.fillText(text, x, y);
+}
+
+// 인물(머리+유니폼) - 사람 전체를 로컬 좌표계(0~140 x, 0~190 y)에 그려두고 카드 중앙에 맞게 확대/
+// 이동한다(이전 SVG 버전의 도형을 그대로 재사용 - 모양 자체는 문제된 적 없고 "재색칠"만 문제였다).
+function drawFigure(ctx, { identity, club, cx, topY, scale }) {
+  const seed = identity?.lookSeed || 1;
+  const skin = SKIN_TONES[seed % SKIN_TONES.length];
+  const hair = HAIR_COLORS[Math.floor(seed / 7) % HAIR_COLORS.length];
+  const hairStyle = Math.floor(seed / 31) % 3;
+  const hue = clubJerseyHue(club);
+  const jerseyLight = `hsl(${hue}, 60%, 46%)`;
+  const jerseyDark = `hsl(${hue}, 60%, 30%)`;
+  const sleeveColor = `hsl(${hue}, 55%, 24%)`;
+
+  ctx.save();
+  ctx.translate(cx - 70 * scale, topY);
+  ctx.scale(scale, scale);
+
+  // 은은한 그림자(스포트라이트 느낌) - 인물 뒤에 한 번만.
+  const shadow = ctx.createRadialGradient(70, 150, 10, 70, 150, 90);
+  shadow.addColorStop(0, "rgba(0,0,0,0.28)");
+  shadow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = shadow;
+  ctx.beginPath();
+  ctx.ellipse(70, 150, 85, 55, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 유니폼(그라디언트로 입체감)
+  const jerseyGrad = ctx.createLinearGradient(20, 82, 120, 190);
+  jerseyGrad.addColorStop(0, jerseyLight);
+  jerseyGrad.addColorStop(1, jerseyDark);
+  ctx.fillStyle = jerseyGrad;
+  ctx.beginPath();
+  ctx.moveTo(20, 190);
+  ctx.lineTo(20, 122);
+  ctx.quadraticCurveTo(20, 97, 44, 90);
+  ctx.lineTo(58, 82);
+  ctx.quadraticCurveTo(70, 94, 82, 82);
+  ctx.lineTo(96, 90);
+  ctx.quadraticCurveTo(120, 97, 120, 122);
+  ctx.lineTo(120, 190);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = sleeveColor;
+  ctx.beginPath();
+  ctx.moveTo(20, 122);
+  ctx.lineTo(7, 137);
+  ctx.lineTo(20, 152);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(120, 122);
+  ctx.lineTo(133, 137);
+  ctx.lineTo(120, 152);
+  ctx.closePath();
+  ctx.fill();
+
+  // 옷깃 하이라이트
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  ctx.beginPath();
+  ctx.moveTo(58, 82);
+  ctx.quadraticCurveTo(70, 100, 82, 82);
+  ctx.lineTo(78, 88);
+  ctx.quadraticCurveTo(70, 96, 62, 88);
+  ctx.closePath();
+  ctx.fill();
+
+  // 등번호
+  const numberText = identity?.jerseyNumber != null ? String(identity.jerseyNumber) : "";
+  ctx.textAlign = "center";
+  ctx.font = "900 32px sans-serif";
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "rgba(0,0,0,0.3)";
+  ctx.strokeText(numberText, 70, 156);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(numberText, 70, 156);
+
+  // 머리(헤어스타일 3종)
+  const capHairPath = () => {
+    ctx.beginPath();
+    if (hairStyle === 0) {
+      ctx.moveTo(40, 44);
+      ctx.arc(70, 44, 30, Math.PI, 0, false); // 윗머리 반원
+      ctx.lineTo(100, 48);
+      ctx.arc(70, 48, 30, 0, Math.PI, true);
+      ctx.closePath();
+    } else {
+      ctx.moveTo(38, 42);
+      ctx.quadraticCurveTo(70, 8, 102, 42);
+      ctx.lineTo(99, 48);
+      ctx.quadraticCurveTo(70, 20, 41, 48);
+      ctx.closePath();
+    }
+  };
+
+  if (hairStyle === 2) {
+    ctx.fillStyle = hair;
+    ctx.beginPath();
+    ctx.arc(70, 42, 34, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = skin;
+  ctx.beginPath();
+  ctx.arc(70, 44, 29, 0, Math.PI * 2);
+  ctx.fill();
+  if (hairStyle !== 2) {
+    ctx.fillStyle = hair;
+    capHairPath();
+    ctx.fill();
+  }
+  ctx.fillStyle = "#2b2b2b";
+  ctx.beginPath();
+  ctx.arc(60, 46, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(80, 46, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#8a5a3c";
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(61, 58);
+  ctx.quadraticCurveTo(70, 63, 79, 58);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 async function drawPlayerCard(canvas, { identity, club, ovr = null }) {
-  const template = await loadCardTemplate();
   canvas.width = CARD_W;
   canvas.height = CARD_H;
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(template, 0, 0, CARD_W, CARD_H);
+  const tier = cardTier(ovr);
+  const theme = CARD_TIER_THEME[tier];
 
-  // 카드 전체(사진창 제외) 등급 색 입히기 + 유니폼(소속팀 색) 입히기 - 패치/텍스트를 그리기 전에
-  // 먼저 해야 패치 바탕색이 새로 입힌 색과 맞는다.
-  await applyCardTierTint(ctx, ovr);
-  await tintJerseyShirt(ctx, club);
+  // 1) 카드 바탕(테두리+배경 그라디언트)
+  roundRectPath(ctx, 10, 10, CARD_W - 20, CARD_H - 20, 30);
+  ctx.fillStyle = tierBackgroundFill(ctx, tier);
+  ctx.fill();
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = theme.border;
+  ctx.stroke();
+  drawHoloSheen(ctx);
+
   ctx.textBaseline = "alphabetic";
 
-  const ratingBg = tierPatchColor(ovr, CARD_BG_COLOR);
-  const inkColor = "#1c150c";
+  // 2) 좌상단: 레이팅 + 포지션 + 별점
+  outlinedText(ctx, ovr != null ? String(ovr) : "?", 38, 108, "900 72px sans-serif", theme.ink, "#ffffff", 5);
+  outlinedText(ctx, identity?.position || "", 38, 148, "800 28px sans-serif", theme.ink, "#ffffff", 4);
+  starRow(ctx, 38, 182, ovr);
 
-  // OVR/포지션 숫자가 잘 안 보인다는 피드백(2026-11-18 - "능력치도 좀 잘보이게 해줘")으로 흰색
-  // 외곽선(stroke)을 먼저 깔아서 바탕색이 뭐든 또렷하게 읽히게 한다.
-  function outlinedText(text, x, y, font) {
-    ctx.font = font;
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = "#ffffff";
-    ctx.strokeText(text, x, y);
-    ctx.fillStyle = inkColor;
-    ctx.fillText(text, x, y);
-  }
+  // 3) 인물(얼굴+유니폼) - 사진창 테두리 없이 카드 배경 위에 바로 올라간다(레퍼런스처럼 머리가
+  // 위쪽 배경과 자연스럽게 이어지는 느낌).
+  drawFigure(ctx, { identity, club, cx: CARD_W / 2, topY: 230, scale: 3.1 });
 
-  const r = CARD_REGIONS.rating;
-  ctx.fillStyle = ratingBg;
-  ctx.fillRect(r.x, r.y, r.w, r.h);
-  ctx.textAlign = "left";
-  outlinedText(ovr != null ? String(ovr) : "?", r.x, r.y + r.h - 18, "900 96px sans-serif");
-
-  const p = CARD_REGIONS.position;
-  ctx.fillStyle = ratingBg;
-  ctx.fillRect(p.x, p.y, p.w, p.h);
-  outlinedText(identity?.position || "", p.x, p.y + p.h - 18, "800 38px sans-serif");
-
-  const s = CARD_REGIONS.stars;
-  ctx.fillStyle = ratingBg;
-  ctx.fillRect(s.x, s.y, s.w, s.h);
-  if (ovr != null) {
-    const count = clampNum(Math.round(ovr / 20), 1, 5);
-    ctx.font = "34px sans-serif";
-    for (let i = 0; i < 5; i++) {
-      ctx.fillStyle = i < count ? "#ffd23f" : "rgba(28, 21, 12, 0.35)";
-      ctx.fillText("★", s.x + i * 42, s.y + s.h - 14);
-    }
-  }
-
-  // 등번호는 유니폼을 다시 칠하는 과정(tintJerseyShirt)에서 기존 "10"이 이미 흐려졌으니, 바로 그
-  // 위에 새 번호만 쓰면 된다(따로 사각형을 덧칠하지 않음 - 그러면 경계가 스티커처럼 떠 보였다).
-  const j = CARD_REGIONS.jerseyNumber;
-  const jerseyNumberText = identity?.jerseyNumber != null ? String(identity.jerseyNumber) : "";
-  ctx.font = "900 96px sans-serif";
+  // 4) 하단 이름 리본
+  const ribbonX = 40;
+  const ribbonY = CARD_H - 92;
+  const ribbonW = CARD_W - 80;
+  const ribbonH = 58;
+  roundRectPath(ctx, ribbonX, ribbonY, ribbonW, ribbonH, 16);
+  ctx.fillStyle = "rgba(0,0,0,0.42)";
+  ctx.fill();
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = theme.border;
+  ctx.stroke();
   ctx.textAlign = "center";
-  ctx.lineWidth = 8;
-  ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
-  ctx.strokeText(jerseyNumberText, j.x + j.w / 2, j.y + j.h - 26);
+  ctx.font = "800 30px sans-serif";
   ctx.fillStyle = "#ffffff";
-  ctx.fillText(jerseyNumberText, j.x + j.w / 2, j.y + j.h - 26);
-
-  const n = CARD_REGIONS.nameRibbon;
-  ctx.fillStyle = tierPatchColor(ovr, CARD_RIBBON_COLOR);
-  ctx.fillRect(n.x, n.y, n.w, n.h);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "800 48px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(identity?.name || "", n.x + n.w / 2, n.y + n.h - 34);
+  ctx.fillText(identity?.name || "", ribbonX + ribbonW / 2, ribbonY + ribbonH / 2 + 10);
   ctx.textAlign = "left";
 
+  // 5) 우상단: 국적 + 소속팀 배지
   await Promise.all([
-    drawBadge(ctx, identity?.nationality?.crest, CARD_REGIONS.flagBadge),
-    drawBadge(ctx, club?.crest, CARD_REGIONS.crestBadge, { square: true }),
+    drawBadge(ctx, identity?.nationality?.crest, { x: CARD_W - 110, y: 32, w: 72, h: 50 }),
+    drawBadge(ctx, club?.crest, { x: CARD_W - 104, y: 92, w: 60, h: 60 }, { square: true }),
   ]);
 }
 
