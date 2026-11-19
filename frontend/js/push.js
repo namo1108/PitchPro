@@ -11,9 +11,20 @@ function urlBase64ToUint8Array(base64String) {
 
 let swRegistration = null;
 
+// navigator.serviceWorker.register가 거부되는 환경(구글봇 크롤러 등 - Search Console URL 검사로
+// 확인됨, 2026-11-19)이 있는데, 예전엔 이 reject를 안 잡아서 initPushButton의 .then() 체인까지
+// 그대로 터져 처리 안 된 Promise 거부가 됐다 - 그게 index.html의 진단용 에러 배너를 띄워서 화면
+// 전체를 가리는 바람에 애드센스 "콘텐츠 없는 화면" 반려로 이어졌다. 등록 자체가 안 되는 것도
+// "미지원"과 똑같이 null로 취급해 조용히 넘어가게 한다.
 async function getRegistration() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) return null;
-  if (!swRegistration) swRegistration = await navigator.serviceWorker.register("/sw.js");
+  if (!swRegistration) {
+    try {
+      swRegistration = await navigator.serviceWorker.register("/sw.js");
+    } catch {
+      return null;
+    }
+  }
   return swRegistration;
 }
 
@@ -91,6 +102,10 @@ export function initPushButton() {
   }
 
   getRegistration().then(async (reg) => {
+    if (!reg) {
+      btn.disabled = true;
+      return;
+    }
     const existing = await reg.pushManager.getSubscription();
     if (!existing) {
       syncNotifyButton(false);
@@ -105,6 +120,7 @@ export function initPushButton() {
 
   btn.addEventListener("click", async () => {
     const reg = await getRegistration();
+    if (!reg) return;
     const existing = await reg.pushManager.getSubscription();
 
     if (existing) {
