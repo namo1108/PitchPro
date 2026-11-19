@@ -5276,15 +5276,20 @@ html[data-toss-app] .career-advance-bar {
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
 }
 
+/* 카드(230px 고정폭 - 안의 OVR/스탯 글자가 읽히려면 이 정도는 필요하다, career-player-card-fix 참고)를
+   옆에 두고 정보 칸을 flex:1로 욱여넣었더니, 좁은 폰 화면(360~400px)에서 정보 칸이 90px도 안 남아
+   이름/소속팀/국적이 다 줄바꿈되고 카드가 화면 대부분을 차지하는 것처럼 보인다는 피드백(2026-11-19)을
+   받았다. 카드는 세로로 위에, 정보는 그 아래 전체 폭으로 펼치는 레이아웃으로 바꿔서 둘 다 숨 쉴
+   공간을 준다. */
 .career-id-card-body {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
 }
 
 .career-id-info {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
 }
 
 .career-fee-badge {
