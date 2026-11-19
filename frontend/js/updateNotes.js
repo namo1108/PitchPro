@@ -185,13 +185,18 @@ function hide() {
 // 전체화면 모달이 실제 콘텐츠를 가린 채로 크롤링되는 바람에 애드센스 "게시자 콘텐츠가 없는 화면"
 // 반려로 이어졌다(Search Console 실시간 테스트 스크린샷으로 확인, 2026-11-19). 실제 콘텐츠는
 // 사람/봇 모두에게 완전히 동일하고 이 일회성 팝업 하나만 봇에게 생략하는 거라 클로킹이 아니다.
-const BOT_UA_PATTERN = /googlebot|mediapartners-google|adsbot-google|bingbot|yandexbot|duckduckbot|baiduspider|slurp/i;
+// Search Console "실시간 테스트"는 Googlebot이 아니라 Google-InspectionTool이라는 별도 UA를 쓴다
+// (2026-11-19 확인 - 처음엔 이 토큰이 빠져있어서 봇 분기를 타지 못했다).
+const BOT_UA_PATTERN =
+  /googlebot|google-inspectiontool|googleother|mediapartners-google|adsbot-google|storebot-google|bingbot|yandexbot|duckduckbot|baiduspider|slurp/i;
 
 export function initUpdateNotes() {
   document.getElementById("update-notes-close")?.addEventListener("click", hide);
   document.querySelector("#update-notes-modal .points-info-backdrop")?.addEventListener("click", hide);
 
-  if (BOT_UA_PATTERN.test(navigator.userAgent)) return;
+  // UA 문자열 목록은 언제든 또 빠질 수 있어서(방금 Google-InspectionTool이 그랬듯), 헤드리스
+  // 자동화 브라우저가 공통으로 노출하는 navigator.webdriver도 같이 봐서 이중으로 걸러낸다.
+  if (BOT_UA_PATTERN.test(navigator.userAgent) || navigator.webdriver) return;
   if (localStorage.getItem(SEEN_KEY_PREFIX + UPDATE_NOTES_VERSION)) return;
   setTimeout(show, 600);
 }

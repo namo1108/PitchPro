@@ -7,10 +7,15 @@ const AUTO_DISMISS_MS = 8000;
 // 검색엔진/애드센스 크롤러는 localStorage가 매번 비어 있어 "이미 봤음"이 절대 기록 안 되다 보니
 // 이 안내 말풍선도 크롤링할 때마다 뜬다 - updateNotes.js와 같은 이유로(2026-11-19) 크롤러에게는
 // 생략한다. 실제 콘텐츠는 그대로이고 이 일회성 안내 하나만 빠지는 거라 클로킹이 아니다.
-const BOT_UA_PATTERN = /googlebot|mediapartners-google|adsbot-google|bingbot|yandexbot|duckduckbot|baiduspider|slurp/i;
+// Search Console "실시간 테스트"는 Googlebot이 아니라 Google-InspectionTool이라는 별도 UA를 쓴다
+// (2026-11-19 확인 - 처음엔 이 토큰이 빠져있어서 봇 분기를 타지 못했다).
+const BOT_UA_PATTERN =
+  /googlebot|google-inspectiontool|googleother|mediapartners-google|adsbot-google|storebot-google|bingbot|yandexbot|duckduckbot|baiduspider|slurp/i;
 
 function showTip() {
-  if (BOT_UA_PATTERN.test(navigator.userAgent)) return;
+  // UA 문자열 목록은 언제든 또 빠질 수 있어서(방금 Google-InspectionTool이 그랬듯), 헤드리스
+  // 자동화 브라우저가 공통으로 노출하는 navigator.webdriver도 같이 봐서 이중으로 걸러낸다.
+  if (BOT_UA_PATTERN.test(navigator.userAgent) || navigator.webdriver) return;
   if (localStorage.getItem(STORAGE_KEY)) return;
   const target = document.querySelector('.nav-btn[data-view="myteam"]');
   if (!target) return;
