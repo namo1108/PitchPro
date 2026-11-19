@@ -4,7 +4,13 @@
 const STORAGE_KEY = "onboarding-tip-seen-v1";
 const AUTO_DISMISS_MS = 8000;
 
+// 검색엔진/애드센스 크롤러는 localStorage가 매번 비어 있어 "이미 봤음"이 절대 기록 안 되다 보니
+// 이 안내 말풍선도 크롤링할 때마다 뜬다 - updateNotes.js와 같은 이유로(2026-11-19) 크롤러에게는
+// 생략한다. 실제 콘텐츠는 그대로이고 이 일회성 안내 하나만 빠지는 거라 클로킹이 아니다.
+const BOT_UA_PATTERN = /googlebot|mediapartners-google|adsbot-google|bingbot|yandexbot|duckduckbot|baiduspider|slurp/i;
+
 function showTip() {
+  if (BOT_UA_PATTERN.test(navigator.userAgent)) return;
   if (localStorage.getItem(STORAGE_KEY)) return;
   const target = document.querySelector('.nav-btn[data-view="myteam"]');
   if (!target) return;

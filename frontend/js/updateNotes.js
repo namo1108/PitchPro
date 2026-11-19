@@ -180,10 +180,18 @@ function hide() {
   if (modal) modal.style.display = "none";
 }
 
+// 검색엔진/애드센스 크롤러는 localStorage가 매번 비어있는 상태로 방문하다 보니(사람과 달리 "이미
+// 봤음" 기록이 절대 안 남는다) 이 팝업이 뜨는 화면을 거의 항상 보게 된다 - 그게 "업데이트 소식"
+// 전체화면 모달이 실제 콘텐츠를 가린 채로 크롤링되는 바람에 애드센스 "게시자 콘텐츠가 없는 화면"
+// 반려로 이어졌다(Search Console 실시간 테스트 스크린샷으로 확인, 2026-11-19). 실제 콘텐츠는
+// 사람/봇 모두에게 완전히 동일하고 이 일회성 팝업 하나만 봇에게 생략하는 거라 클로킹이 아니다.
+const BOT_UA_PATTERN = /googlebot|mediapartners-google|adsbot-google|bingbot|yandexbot|duckduckbot|baiduspider|slurp/i;
+
 export function initUpdateNotes() {
   document.getElementById("update-notes-close")?.addEventListener("click", hide);
   document.querySelector("#update-notes-modal .points-info-backdrop")?.addEventListener("click", hide);
 
+  if (BOT_UA_PATTERN.test(navigator.userAgent)) return;
   if (localStorage.getItem(SEEN_KEY_PREFIX + UPDATE_NOTES_VERSION)) return;
   setTimeout(show, 600);
 }
