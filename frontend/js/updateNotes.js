@@ -8,6 +8,10 @@ const SEEN_KEY_PREFIX = "update-notes-seen-";
 
 const UPDATE_NOTES = [
   {
+    date: "2026-11-24",
+    notes: ["⚽ 골 알림 아이콘을 새 디자인으로 교체했어요", "🏟 집관인증 버튼에 킥오프 +30분까지 가능하다는 안내를 추가했어요"],
+  },
+  {
     date: "2026-11-18-v2",
     notes: [
       "🎴 축구인생 선수 카드를 FC 온라인 느낌의 방패형 카드로 새로 디자인했어요 - PAC/SHO/PAS/DRI/DEF/PHY 세부 능력치와 이름 아래 국기+소속팀 엠블럼이 추가됐어요",
