@@ -1,6 +1,16 @@
 import { fetchJSON } from "../api.js";
 import { onTabChange, pushSubView, setLeagueStandingsOpener } from "../router.js";
-import { crestImg, emblemImg, playerAvatarImg, fadeIn, skeletonList, teamHintFromElement, playerHintFromElement, standingsTablesHtml } from "../format.js";
+import {
+  crestImg,
+  emblemImg,
+  playerAvatarImg,
+  fadeIn,
+  skeletonList,
+  teamHintFromElement,
+  playerHintFromElement,
+  standingsTablesHtml,
+  formatMatchDateTime,
+} from "../format.js";
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
 import { loadMatchDetail } from "./matches.js";
@@ -53,6 +63,9 @@ const state = {
   remainingFixtures: [],
   lastTables: [],
   lastComp: null,
+  // 남은 일정(2026-11-24 요청 - "각 리그 플레이오프 대진표, 경기 일정 등") 펼침 상태 - 리그를
+  // 다시 열 때까지만 기억한다.
+  scheduleOpen: false,
 };
 
 const el = {
@@ -290,6 +303,7 @@ function openLeague(code) {
   // 다른 리그로 넘어가면 이전 리그에서 찍어본 가상 스코어는 의미가 없으니 꺼둔다.
   state.simMode = false;
   state.simGuesses = new Map();
+  state.scheduleOpen = false;
   // 득점왕/도움왕이 순위표 밑에 있어서(전체 20팀 표라면 한참 스크롤해야 보임) 눈에 잘 안 띈다는
   // 이유로, 헤더에 바로 그 위치로 스크롤해주는 바로가기를 추가한다(2026-09-30 사용자 요청).
   el.detailHeader.innerHTML = `${emblemImg(comp, "league-detail-emblem")}<span>${comp.name}</span><button class="top-players-jump-btn" id="top-players-jump-btn">🏆 득점왕</button>`;
@@ -459,6 +473,52 @@ function bulkNotifyBtnHtml(tables) {
   return `<button type="button" class="sim-toggle-btn league-bulk-notify-btn" id="league-bulk-notify-btn">🔔 알림 설정</button>`;
 }
 
+// 남은 일정 - 라운드(매치데이)별로 묶어서 보여준다. API-Football이 주는 라운드 이름(matchday)을
+// 그대로 소제목으로 쓰는데, K리그 승강 플레이오프/파이널 라운드처럼 "Regular Season"이 아닌 특수
+// 라운드도 API가 이름 붙인 그대로 자연스럽게 제 소제목으로 묶여 나온다 - 없는 대진표 구조를 따로
+// 지어내지 않고, 이미 있는 일정 데이터를 라운드별로 정리해서 보여주는 것만으로 "플레이오프
+// 대진표/일정이 안 보인다"는 요청(2026-11-24)을 충족한다.
+function roundLabel(matchday) {
+  if (!matchday) return "일정";
+  const m = /Regular Season\s*-\s*(\d+)/i.exec(matchday);
+  return m ? `${m[1]}라운드` : matchday;
+}
+
+function renderFixturesList(fixtures) {
+  if (!fixtures.length) return '<div class="empty-state">남은 일정이 없습니다.</div>';
+  const groups = new Map();
+  for (const fx of fixtures) {
+    const label = roundLabel(fx.matchday);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(fx);
+  }
+  return `
+    <div class="league-fixtures-list">
+      ${[...groups.entries()]
+        .map(
+          ([label, rows]) => `
+        <div class="league-fixtures-round">
+          <div class="league-fixtures-round-title">${label}</div>
+          ${rows
+            .map(
+              (fx) => `
+            <div class="league-fixture-row" data-match-id="${fx.id}">
+              <span class="league-fixture-date">${formatMatchDateTime(fx.utcDate)}</span>
+              <span class="league-fixture-team">${crestImg(fx.homeTeam, "team-crest")}${fx.homeTeam.shortName || fx.homeTeam.name}</span>
+              <span class="league-fixture-vs">vs</span>
+              <span class="league-fixture-team">${crestImg(fx.awayTeam, "team-crest")}${fx.awayTeam.shortName || fx.awayTeam.name}</span>
+            </div>
+          `
+            )
+            .join("")}
+        </div>
+      `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 // 표 자체(그룹 나누기, 행 렌더링)는 format.js의 standingsTablesHtml 공용 함수가 만들어준다(경기 상세의
 // "순위" 탭과 공유, 2026-09-14) - 여기서는 이 화면 전용인 승강 규정 안내와 DOM 반영/이벤트만 처리한다.
 function renderTables(tables, silent, comp) {
@@ -475,12 +535,18 @@ function renderTables(tables, silent, comp) {
   const simToggleHtml = state.remainingFixtures.length
     ? `<button type="button" class="sim-toggle-btn" id="sim-toggle-btn">🎮 ${state.simMode ? "시뮬레이터 끄기" : "순위 시뮬레이터"}</button>`
     : "";
+  // 플레이오프/파이널 라운드를 포함한 남은 일정(2026-11-24 요청) - renderFixturesList 참고.
+  const scheduleToggleHtml = state.remainingFixtures.length
+    ? `<button type="button" class="sim-toggle-btn" id="schedule-toggle-btn">📅 ${state.scheduleOpen ? "일정 접기" : "남은 일정"}</button>`
+    : "";
 
   el.standingsWrap.innerHTML =
     bulkNotifyBtnHtml(tables) +
     simToggleHtml +
+    scheduleToggleHtml +
     (ruleNote ? `<div class="promotion-rule-note">${ruleNote}</div>` : "") +
-    (state.simMode ? renderSimulatorPanel(state.remainingFixtures) + `<div id="sim-tables-output"></div>` : tablesHtml);
+    (state.simMode ? renderSimulatorPanel(state.remainingFixtures) + `<div id="sim-tables-output"></div>` : tablesHtml) +
+    (state.scheduleOpen ? `<div class="league-schedule-section">${renderFixturesList(state.remainingFixtures)}</div>` : "");
 
   if (!silent) fadeIn(el.standingsWrap);
 
@@ -489,8 +555,17 @@ function renderTables(tables, silent, comp) {
     renderTables(state.lastTables, true, state.lastComp);
   });
 
+  document.getElementById("schedule-toggle-btn")?.addEventListener("click", () => {
+    state.scheduleOpen = !state.scheduleOpen;
+    renderTables(state.lastTables, true, state.lastComp);
+  });
+
   document.getElementById("league-bulk-notify-btn")?.addEventListener("click", () => {
     openNotifyTeamsPicker(state.lastComp?.name || "이 리그", teamsFromTables(state.lastTables));
+  });
+
+  el.standingsWrap.querySelectorAll(".league-fixture-row").forEach((row) => {
+    row.addEventListener("click", () => loadMatchDetail(row.dataset.matchId));
   });
 
   if (state.simMode) {

@@ -2140,6 +2140,70 @@ table.standings-table {
   margin-bottom: 8px;
 }
 
+/* 리그 상세의 "남은 일정" 패널(2026-11-24) - 라운드(매치데이)별로 묶어서 보여준다. */
+.league-schedule-section {
+  margin-top: 4px;
+  margin-bottom: 14px;
+}
+
+.league-fixtures-round {
+  margin-bottom: 14px;
+}
+
+.league-fixtures-round-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.league-fixture-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 12.5px;
+}
+
+.league-fixture-row:last-child {
+  border-bottom: none;
+}
+
+.league-fixture-date {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  width: 92px;
+}
+
+.league-fixture-team {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.league-fixture-team .team-crest {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.league-fixture-vs {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 10.5px;
+}
+
 .promotion-rule-note {
   font-size: 12px;
   color: var(--text-muted);
