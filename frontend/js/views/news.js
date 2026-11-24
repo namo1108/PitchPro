@@ -110,6 +110,9 @@ const CATEGORY_DEFS = [
   { id: "cl", label: "챔피언스리그", codes: ["CL"] },
   { id: "el", label: "유로파리그", codes: ["EL"] },
   { id: "ecl", label: "컨퍼런스리그", codes: ["ECL"] },
+  // 아시아챔피언스리그가 카테고리 자체에 없어서 하이라이트에 아예 안 뜬다는 제보(2026-11-24) -
+  // config.js COMPETITIONS엔 이미 있고 정기적으로 수집도 되고 있어서, 탭만 추가하면 된다.
+  { id: "acl", label: "AFC챔피언스리그", codes: ["ACL", "ACL2"] },
 ];
 const HIGHLIGHT_CODES = new Set(CATEGORY_DEFS.flatMap((c) => c.codes));
 const CODE_TO_CATEGORY = new Map(CATEGORY_DEFS.flatMap((c) => c.codes.map((code) => [code, c.id])));
@@ -143,8 +146,10 @@ function isNotableNationalMatch(m) {
 }
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 // 하루치만 보면 대부분의 탭이 비어 보여서(그날 경기가 몰린 2~3개 대회 외엔 전부 0경기), 최근
-// 며칠을 모아 날짜별로 묶어서 보여준다. 너무 길게 가면 오히려 지저분해지니 3일로 제한.
-const HIGHLIGHT_LOOKBACK_DAYS = 3;
+// 며칠을 모아 날짜별로 묶어서 보여준다. 챔피언스리그/유로파/컨퍼런스/AFC챔피언스리그는 주로 주중
+// (화~목)에만 열려서, 주말에 들어오면 3일 안에 아예 안 잡혀 탭 자체가 숨어버린다는 제보(2026-11-24)
+// 를 받아 5일로 늘렸다 - 너무 길면 지저분해지니 그 이상은 늘리지 않는다.
+const HIGHLIGHT_LOOKBACK_DAYS = 5;
 
 let allHighlights = [];
 let activeHighlightTab = "all";
@@ -161,6 +166,11 @@ function youtubeHighlightUrl(home, away) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${home} ${away} 하이라이트`)}`;
 }
 
+// 탭을 다시 열 때마다 3~5일치 날짜별 /matches를 전부 병렬로 재요청해서 매번 체감 딜레이가 있었다
+// (2026-11-24 제보 - "탭 전환 전반이 느리다"). 뉴스 목록처럼 이미 그려본 뒤로는 화면을 비우지 않고
+// 조용히 새로고침만 하게 한다 - 첫 진입 때만 로딩 상태가 보인다.
+let highlightsLoadedOnce = false;
+
 async function loadHighlights() {
   if (!el.highlights) return;
   try {
@@ -175,8 +185,11 @@ async function loadHighlights() {
       .filter((m) => m.status === "FINISHED" && HIGHLIGHT_CODES.has(m.competition.code))
       .filter((m) => !FRIENDLY_LIKE_CODES.has(m.competition.code) || isNotableNationalMatch(m));
     renderHighlights();
+    highlightsLoadedOnce = true;
   } catch {
-    el.highlights.innerHTML = "";
+    // 이미 한 번 잘 떠 있던 하이라이트를, 탭을 다시 열었을 때 일시적인 네트워크 오류 때문에
+    // 통째로 비워버리면 안 된다 - 첫 로딩에 실패했을 때만 빈 화면으로 보여준다.
+    if (!highlightsLoadedOnce) el.highlights.innerHTML = "";
   }
 }
 
