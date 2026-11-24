@@ -82,8 +82,15 @@ export async function notifyLineups(env) {
           image,
         };
         for (const sub of interested) {
+          // 라인업은 양 팀이 함께 발표되니 "이 알림이 어느 팀 때문인지"는 구독자별로 다르다 - 즐겨찾는
+          // 쪽 팀 id로 팀별 알림 종류 override를 확인한다(둘 다 즐겨찾기했으면 홈팀 기준).
+          const teamId = sub.teamIds?.includes(match.homeTeam.id)
+            ? match.homeTeam.id
+            : sub.teamIds?.includes(match.awayTeam.id)
+              ? match.awayTeam.id
+              : null;
           try {
-            await sendToSubscriber(env, sub, payload);
+            await sendToSubscriber(env, sub, payload, teamId);
           } catch (err) {
             console.error("lineup push send failed:", err);
           }

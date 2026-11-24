@@ -114,7 +114,39 @@ export async function handleGetPreferences(request, env, url) {
   const id = await hashEndpoint(endpoint);
   const raw = await env.CACHE.get(`${KV_KEYS.pushSubscriptionPrefix}${id}`);
   const record = raw ? JSON.parse(raw) : null;
-  return json({ prefs: mergePrefs(record?.prefs, null) });
+  // teamTypePrefs(2026-11-24 - 팀마다 알림 종류를 다르게 설정하는 기능)도 같이 내려줘서, 프론트의
+  // 팀 선택 모달이 이 팀에 이미 override가 있는지 바로 알 수 있게 한다.
+  return json({ prefs: mergePrefs(record?.prefs, null), teamTypePrefs: record?.teamTypePrefs || {} });
+}
+
+// 팀마다 알림 종류를 다르게 설정한다(2026-11-24 요청 - "팀마다 알림 종류를 다르게"). types에 넣은
+// 항목만 그 팀 전용으로 덮어쓰고(sparse - 명시한 종류만 저장), 나머지 종류는 전체 설정(설정 탭의
+// prefs.types)을 그대로 따른다. types를 빈 객체로 보내면 그 팀의 override를 전부 지워서 다시 전체
+// 설정을 따르게 한다("이 팀은 전체 설정대로" 되돌리기).
+export async function handleSetTeamPreferences(request, env) {
+  const body = await request.json();
+  if (!body?.endpoint || !body?.teamId) return json({ detail: "endpoint, teamId가 필요합니다." }, 400);
+
+  const id = await hashEndpoint(body.endpoint);
+  const key = `${KV_KEYS.pushSubscriptionPrefix}${id}`;
+  const raw = await env.CACHE.get(key);
+  if (!raw) return json({ detail: "구독 정보가 없습니다." }, 404);
+
+  const record = JSON.parse(raw);
+  const teamTypePrefs = record.teamTypePrefs || {};
+  const types = body.types || {};
+  if (Object.keys(types).length) teamTypePrefs[body.teamId] = types;
+  else delete teamTypePrefs[body.teamId];
+  record.teamTypePrefs = teamTypePrefs;
+  record.updatedAt = new Date().toISOString();
+
+  try {
+    await env.CACHE.put(key, JSON.stringify(record));
+  } catch (err) {
+    console.error("team push preferences write failed:", err);
+    return json({ detail: "일시적으로 알림 설정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요." }, 503);
+  }
+  return json({ status: "ok", teamTypePrefs: record.teamTypePrefs });
 }
 
 export async function handleSetPreferences(request, env) {

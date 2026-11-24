@@ -18,13 +18,17 @@ async function getTeamGoalEvents(env, matchId, teamId) {
 
 // 경기에 관심있는 구독자 각각에게, buildPayload(sub)가 만들어준 알림을 보낸다 - 골/실점처럼
 // "응원하는 팀이 넣었는지 먹혔는지"에 따라 구독자별로 문구가 달라져야 하는 경우를 위해 콜백으로 뺐다.
+// buildPayload(sub)가 payload 필드와 함께 teamId를 같이 돌려주면(팀마다 알림 종류를 다르게 설정하는
+// 기능, 2026-11-24), "이 알림이 어느 팀 때문에 가는지"를 sendToSubscriber에 넘겨서 팀별 override를
+// 확인하게 한다 - teamId를 안 주면(undefined) 예전처럼 전체 설정만 본다.
 async function sendToInterested(env, subscriptions, match, buildPayload) {
   const interested = filterInterested(subscriptions, match);
   for (const sub of interested) {
-    const payload = buildPayload(sub);
-    if (!payload) continue;
+    const built = buildPayload(sub);
+    if (!built) continue;
+    const { teamId, ...payload } = built;
     try {
-      const res = await sendToSubscriber(env, sub, payload);
+      const res = await sendToSubscriber(env, sub, payload, teamId ?? null);
       if (res && (res.status === 404 || res.status === 410)) {
         await cleanupDeadSubscription(env, sub);
       }
@@ -193,10 +197,11 @@ export async function detectGoalsAndNotify(env) {
         // 🔔로만 지켜보는 경기(matchIds)는 중립적으로 항상 "골!"로 보낸다.
         const cheersScoringTeam = sub.teamIds?.includes(scoringTeamId);
         const cheersOtherTeam = sub.teamIds?.includes(otherTeamId);
+        const teamId = cheersScoringTeam ? scoringTeamId : cheersOtherTeam ? otherTeamId : null;
         if (cheersOtherTeam && !cheersScoringTeam) {
-          return { type: "concede", title: g.scorer ? `😢 실점... ${g.scorer}` : "😢 실점...", body: scoreLine, matchId: match.id, image };
+          return { type: "concede", title: g.scorer ? `😢 실점... ${g.scorer}` : "😢 실점...", body: scoreLine, matchId: match.id, image, teamId };
         }
-        return { type: "goal", title: g.scorer ? `⚽ 골! ${g.scorer}` : "⚽ 골!", body: scoreLine, matchId: match.id, image };
+        return { type: "goal", title: g.scorer ? `⚽ 골! ${g.scorer}` : "⚽ 골!", body: scoreLine, matchId: match.id, image, teamId };
       });
     }
   }
@@ -231,10 +236,11 @@ export async function detectGoalsAndNotify(env) {
     await sendToInterested(env, subscriptions, match, (sub) => {
       const cheersScoringTeam = sub.teamIds?.includes(scoringTeamId);
       const cheersOtherTeam = sub.teamIds?.includes(otherTeamId);
+      const teamId = cheersScoringTeam ? scoringTeamId : cheersOtherTeam ? otherTeamId : null;
       if (cheersOtherTeam && !cheersScoringTeam) {
-        return { type: "shootout", title: "😢 승부차기 실점...", body: scoreLine, matchId: match.id };
+        return { type: "shootout", title: "😢 승부차기 실점...", body: scoreLine, matchId: match.id, teamId };
       }
-      return { type: "shootout", title: "⚽ 승부차기 성공!", body: scoreLine, matchId: match.id };
+      return { type: "shootout", title: "⚽ 승부차기 성공!", body: scoreLine, matchId: match.id, teamId };
     });
   }
 }

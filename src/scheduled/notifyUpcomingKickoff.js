@@ -47,8 +47,13 @@ export async function notifyUpcomingKickoff(env) {
         image,
       };
       for (const sub of interested) {
+        const teamId = sub.teamIds?.includes(match.homeTeam.id)
+          ? match.homeTeam.id
+          : sub.teamIds?.includes(match.awayTeam.id)
+            ? match.awayTeam.id
+            : null;
         try {
-          const res = await sendToSubscriber(env, sub, payload);
+          const res = await sendToSubscriber(env, sub, payload, teamId);
           if (res && (res.status === 404 || res.status === 410)) {
             await cleanupDeadSubscription(env, sub);
           }

@@ -77,8 +77,9 @@ async function notifyTransfer(env, subscriptions, { playerId, playerName, transf
   };
 
   for (const sub of interested) {
+    const teamId = inId && sub.teamIds?.includes(inId) ? inId : outId && sub.teamIds?.includes(outId) ? outId : null;
     try {
-      await sendToSubscriber(env, sub, payload);
+      await sendToSubscriber(env, sub, payload, teamId);
     } catch (err) {
       console.error("transfer push send failed:", err);
     }

@@ -23,6 +23,7 @@ import {
   handleWatchMatch,
   handleGetPreferences,
   handleSetPreferences,
+  handleSetTeamPreferences,
   handleTestPush,
 } from "./routes/push.js";
 import { handleTossSubscribe, handleTossWatchMatch } from "./routes/toss.js";
@@ -197,6 +198,9 @@ export async function routeApiRequest(request, env, ctx) {
   }
   if (segments[1] === "push" && segments[2] === "preferences" && request.method === "POST") {
     return handleSetPreferences(request, env);
+  }
+  if (segments[1] === "push" && segments[2] === "team-preferences" && request.method === "POST") {
+    return handleSetTeamPreferences(request, env);
   }
   if (segments[1] === "admin" && segments[2] === "test-push" && request.method === "POST") {
     return handleTestPush(request, env);

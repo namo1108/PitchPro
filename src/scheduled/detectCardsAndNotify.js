@@ -82,7 +82,7 @@ async function notifyCards(env, match, subscriptions, cards, kind) {
         image,
       };
       try {
-        const res = await sendToSubscriber(env, sub, payload);
+        const res = await sendToSubscriber(env, sub, payload, card.teamId);
         if (res && (res.status === 404 || res.status === 410)) {
           await cleanupDeadSubscription(env, sub);
         }

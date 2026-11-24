@@ -92,8 +92,15 @@ export async function notifyMatchEvents(env) {
     const payload = { type: copy.type, title: copy.title, body: copy.body(match), matchId: match.id, image: copy.image(match) };
 
     for (const sub of interested) {
+      // 킥오프/HT/FT는 양 팀 공통 알림이라 "이 알림이 어느 팀 때문인지"는 구독자별로 다르다 -
+      // 즐겨찾는 쪽 팀 id로 팀별 알림 종류 override를 확인한다(둘 다 즐겨찾기했으면 홈팀 기준).
+      const teamId = sub.teamIds?.includes(match.homeTeam.id)
+        ? match.homeTeam.id
+        : sub.teamIds?.includes(match.awayTeam.id)
+          ? match.awayTeam.id
+          : null;
       try {
-        const res = await sendToSubscriber(env, sub, payload);
+        const res = await sendToSubscriber(env, sub, payload, teamId);
         if (res && (res.status === 404 || res.status === 410)) {
           await cleanupDeadSubscription(env, sub);
         }

@@ -71,12 +71,28 @@ export function isTypeEnabled(sub, type) {
   return sub.prefs?.types?.[type] !== false;
 }
 
+// 팀마다 알림 종류를 다르게 설정하는 기능(2026-11-24 요청 - "팀마다 알림 종류를 다르게") - teamTypePrefs는
+// 그 팀에 대해서만 전체 설정(prefs.types)을 덮어쓰는 "차이점만" 담은 sparse map이다
+// ({ [teamId]: { [type]: boolean } }, 명시적으로 넣은 종류만 들어있고 나머지는 전체 설정을 그대로 따름).
+// teamId를 모르거나(예: 이적 소식처럼 두 팀 다 관련되거나 애매한 경우, 또는 호출부가 아직 안 넘겨준
+// 경우) teamTypePrefs에 그 팀 override가 없으면 그냥 isTypeEnabled(전체 설정)로 떨어진다 - 기존
+// 구독은 teamTypePrefs 자체가 없으니 100% 이전과 동일하게 동작한다.
+export function isTypeEnabledForTeam(sub, type, teamId) {
+  if (teamId != null) {
+    const override = sub.teamTypePrefs?.[teamId]?.[type];
+    if (override !== undefined) return override;
+  }
+  return isTypeEnabled(sub, type);
+}
+
 // 크론들이 흩어져서 각자 sendGoalPush를 직접 부르던 걸 한 곳으로 모았다 - 종류별 on/off와 소리
 // on/off(설정 탭) 둘 다 여기서 한 번에 처리해서, 새 알림 종류가 생겨도 이 체크를 깜빡할 일이 없다.
 // 토스 구독(kind: "toss")은 소리/종류별 세부 설정이 아직 없어(콘솔 템플릿이 하나뿐) sound 옵션은
 // 무시하고 그대로 보낸다 - image처럼 웹 푸시 전용 필드는 tossPush.js가 알아서 title/body만 쓴다.
-export async function sendToSubscriber(env, sub, payload) {
-  if (!isTypeEnabled(sub, payload.type)) return null;
+// teamId: 이 알림이 어느 팀 때문에 가는 건지(호출부가 알면 넘겨준다) - 팀별 알림 종류 override를
+// 확인하는 데만 쓰인다. 안 넘기면(null) 예전처럼 전체 설정만 본다.
+export async function sendToSubscriber(env, sub, payload, teamId = null) {
+  if (!isTypeEnabledForTeam(sub, payload.type, teamId)) return null;
   if (sub.kind === "toss") {
     const result = await sendTossPush(env, sub, payload);
     return { status: result.ok ? 200 : 500 };

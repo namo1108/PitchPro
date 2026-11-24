@@ -62,7 +62,7 @@ async function notifyNewTransfers(env, subscriptions, teamId, freshTransfers) {
 
     for (const sub of interested) {
       try {
-        const res = await sendToSubscriber(env, sub, payload);
+        const res = await sendToSubscriber(env, sub, payload, String(teamId));
         if (res && (res.status === 404 || res.status === 410)) {
           await cleanupDeadSubscription(env, sub);
         }
