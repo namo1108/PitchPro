@@ -27,6 +27,7 @@ import { saveViewState } from "../viewState.js";
 import { getTheme } from "../theme.js";
 import { isLoggedIn, authFetch, getToken } from "../auth.js";
 import { trackEvent } from "../analytics.js";
+import { openNotifyTeamsPicker } from "../notifyTeamsPicker.js";
 
 const state = {
   dayOffset: 0,
@@ -593,6 +594,18 @@ function pickFeaturedMatch(matches) {
     })[0];
 }
 
+// 대회 헤더의 알림 설정 버튼용 - 오늘 그 대회 그룹에 실제로 떠 있는 경기들에서 홈/원정팀만 중복
+//없이 추려낸다(전체 시즌 참가팀이 아니라 "지금 이 목록에 보이는 팀들" 기준이라 추가 API 호출이
+// 필요 없다 - 경기 탭에서 바로 쓰기엔 이걸로 충분하다).
+function teamsFromMatchGroup(matches) {
+  const seen = new Map();
+  for (const m of matches) {
+    if (m.homeTeam?.id != null) seen.set(m.homeTeam.id, m.homeTeam);
+    if (m.awayTeam?.id != null) seen.set(m.awayTeam.id, m.awayTeam);
+  }
+  return [...seen.values()];
+}
+
 function renderMatches(matches) {
   if (!matches.length) {
     el.matchesList.innerHTML = '<div class="empty-state">해당 날짜에 예정된 경기가 없습니다.</div>';
@@ -679,8 +692,10 @@ function renderMatches(matches) {
     const header = document.createElement("div");
     header.className = "competition-header";
     // 헤더 대부분(엠블럼+이름)을 누르면 그 리그 순위로 넘어가고, 화살표만 따로 눌러야 목록을
-    // 접었다 펼 수 있게 나눴다(둘 다 같은 영역이면 "순위 보기"와 "접기"가 서로 충돌함).
-    header.innerHTML = `<span class="competition-header-link">${emblemImg(group.info, "competition-emblem")}<span class="competition-header-name">${group.info.name}</span></span><span class="competition-header-count">${group.matches.length}</span><span class="competition-header-arrow">▾</span>`;
+    // 접었다 펼 수 있게 나눴다(둘 다 같은 영역이면 "순위 보기"와 "접기"가 서로 충돌함). 알림 종
+    // 버튼도 같은 이유로 따로 뗀다 - 누르면 이 대회에서 오늘 뛰는 팀들 중 원하는 팀만 골라 알림을
+    // 켤 수 있다(2026-11-24 요청 - 리그 전체를 통째로 구독시키지 말고 고를 수 있게 해달라는 피드백).
+    header.innerHTML = `<span class="competition-header-link">${emblemImg(group.info, "competition-emblem")}<span class="competition-header-name">${group.info.name}</span></span><span class="competition-header-count">${group.matches.length}</span><button type="button" class="competition-header-notify-btn" aria-label="알림 설정">🔔</button><span class="competition-header-arrow">▾</span>`;
     groupEl.appendChild(header);
 
     const body = document.createElement("div");
@@ -691,6 +706,11 @@ function renderMatches(matches) {
     groupEl.appendChild(body);
 
     header.querySelector(".competition-header-link").addEventListener("click", () => openLeagueStandings(group.info.code));
+
+    header.querySelector(".competition-header-notify-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      openNotifyTeamsPicker(group.info.name, teamsFromMatchGroup(group.matches));
+    });
 
     // 화살표를 눌러서 그 안의 경기 목록을 접었다 펼 수 있게(리그 많은 날 스크롤 부담을 줄임).
     header.querySelector(".competition-header-arrow").addEventListener("click", (e) => {
