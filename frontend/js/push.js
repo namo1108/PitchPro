@@ -1,6 +1,14 @@
 import { fetchJSON, API } from "./api.js";
 import { listFavorites } from "./favorites.js";
+import { listNotifyTeams } from "./notifyTeams.js";
 import { getToken } from "./auth.js";
+
+// 구독 대상 팀 id 목록 - "나의 팀" 즐겨찾기(최대 2개, 집관인증 등 포함)와 리그 일괄 알림 구독
+// (2026-11-24, 개수 제한 없음)을 합친다. 서버 입장에선 둘 다 그냥 "이 팀 경기 알림을 원하는 구독"
+// 이라 구분할 필요가 없다 - teamIds 배열 하나로만 받는다.
+function allWatchedTeamIds() {
+  return [...new Set([...listFavorites().map((t) => t.id), ...listNotifyTeams().map((t) => t.id)])];
+}
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -32,7 +40,7 @@ async function getRegistration() {
 // 열린 탭에 즐겨찾기 팀 id 목록을 물어본다 - 여기서 응답해준다.
 navigator.serviceWorker?.addEventListener("message", (event) => {
   if (event.data?.type === "request-favorite-team-ids") {
-    event.ports[0]?.postMessage({ teamIds: listFavorites().map((t) => t.id) });
+    event.ports[0]?.postMessage({ teamIds: allWatchedTeamIds() });
   }
 });
 
@@ -77,7 +85,7 @@ async function doEnsureSubscribed() {
     }
   }
 
-  const teamIds = listFavorites().map((t) => t.id);
+  const teamIds = allWatchedTeamIds();
   const ok = await postSubscribe(subscription, teamIds);
   syncNotifyButton(ok);
   return ok ? subscription : null;
@@ -137,7 +145,7 @@ export function initPushButton() {
     }
     // 브라우저 구독은 남아 있어도 서버 KV 레코드가 지워졌을 수 있어(만료 구독 자동 정리 등),
     // 페이지를 열 때마다 조용히 재등록해서 버튼 표시와 실제 수신 가능 여부가 어긋나지 않게 한다.
-    const teamIds = listFavorites().map((t) => t.id);
+    const teamIds = allWatchedTeamIds();
     const ok = await postSubscribe(existing, teamIds);
     syncNotifyButton(ok);
   });
@@ -177,7 +185,7 @@ window.addEventListener("favorites-changed", async () => {
     return;
   }
 
-  const teamIds = listFavorites().map((t) => t.id);
+  const teamIds = allWatchedTeamIds();
   await fetchJSONPost("/push/subscribe", { subscription: existing.toJSON(), teamIds }).catch(() => {});
 });
 
@@ -189,7 +197,7 @@ window.addEventListener("auth-changed", async () => {
   const existing = await reg.pushManager.getSubscription();
   if (!existing) return;
 
-  const teamIds = listFavorites().map((t) => t.id);
+  const teamIds = allWatchedTeamIds();
   await fetchJSONPost("/push/subscribe", { subscription: existing.toJSON(), teamIds }).catch(() => {});
 });
 

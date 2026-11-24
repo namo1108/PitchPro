@@ -4,6 +4,7 @@ import { crestImg, emblemImg, playerAvatarImg, fadeIn, skeletonList, teamHintFro
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
 import { loadMatchDetail } from "./matches.js";
+import { addNotifyTeams, removeNotifyTeams, isNotifyTeam } from "../notifyTeams.js";
 
 // 대회 27개를 한 줄짜리 긴 리스트로 두면 원하는 리그를 찾기 힘들어서, 지역/성격별로 묶어
 // 트리(아코디언)로 접었다 펼치게 한다. 코드에 없는 대회는 자동으로 "기타"에 담긴다.
@@ -438,6 +439,28 @@ const PROMOTION_RULE_NOTE = {
   K4: "⬆ 우승 시 자동 승격, 2위는 K3리그 최하위팀과 승격 플레이오프를 치러요.",
 };
 
+// 리그 하나를 고르면 그 리그 소속 팀 전부를 한 번에 알림 구독(2026-11-24 요청) - "나의 팀"
+// 즐겨찾기(최대 2개, 집관인증 등 포함)와는 별개로 notifyTeams.js에 쌓는다. 순위표에 실제로 나온
+// 팀만 대상이라 토너먼트 단계뿐인 대회(순위표 자체가 없음)에선 이 버튼이 아예 안 뜬다.
+function teamsFromTables(tables) {
+  const seen = new Map();
+  for (const group of tables || []) {
+    for (const row of group.table || []) {
+      if (row.team?.id != null) seen.set(row.team.id, row.team);
+    }
+  }
+  return [...seen.values()];
+}
+
+function bulkNotifyBtnHtml(tables) {
+  const teams = teamsFromTables(tables);
+  if (!teams.length) return "";
+  const subscribed = teams.every((t) => isNotifyTeam(t.id));
+  return `<button type="button" class="sim-toggle-btn league-bulk-notify-btn" id="league-bulk-notify-btn">${
+    subscribed ? "🔕 전체 알림 해제" : `🔔 전체 알림 구독(${teams.length}팀)`
+  }</button>`;
+}
+
 // 표 자체(그룹 나누기, 행 렌더링)는 format.js의 standingsTablesHtml 공용 함수가 만들어준다(경기 상세의
 // "순위" 탭과 공유, 2026-09-14) - 여기서는 이 화면 전용인 승강 규정 안내와 DOM 반영/이벤트만 처리한다.
 function renderTables(tables, silent, comp) {
@@ -456,6 +479,7 @@ function renderTables(tables, silent, comp) {
     : "";
 
   el.standingsWrap.innerHTML =
+    bulkNotifyBtnHtml(tables) +
     simToggleHtml +
     (ruleNote ? `<div class="promotion-rule-note">${ruleNote}</div>` : "") +
     (state.simMode ? renderSimulatorPanel(state.remainingFixtures) + `<div id="sim-tables-output"></div>` : tablesHtml);
@@ -464,6 +488,23 @@ function renderTables(tables, silent, comp) {
 
   document.getElementById("sim-toggle-btn")?.addEventListener("click", () => {
     state.simMode = !state.simMode;
+    renderTables(state.lastTables, true, state.lastComp);
+  });
+
+  document.getElementById("league-bulk-notify-btn")?.addEventListener("click", () => {
+    const teams = teamsFromTables(state.lastTables);
+    const alreadySubscribed = teams.every((t) => isNotifyTeam(t.id));
+    const compName = state.lastComp?.name || "이 리그";
+    if (alreadySubscribed) {
+      removeNotifyTeams(teams.map((t) => t.id));
+      alert(`${compName} 전체 알림 구독을 해제했어요.`);
+    } else {
+      const added = addNotifyTeams(teams.map((t) => ({ id: t.id, name: t.name, shortName: t.shortName, crest: t.crest })));
+      alert(
+        `${compName} 소속 ${teams.length}팀 알림을 구독했어요${added < teams.length ? ` (이미 ${teams.length - added}팀은 구독 중이었어요)` : ""}.\n` +
+          "골/카드 등 알림 종류는 설정 탭에서 조정할 수 있어요."
+      );
+    }
     renderTables(state.lastTables, true, state.lastComp);
   });
 
