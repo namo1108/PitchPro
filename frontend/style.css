@@ -5381,6 +5381,19 @@ html[data-toss-app] .career-advance-bar {
   color: var(--gold);
 }
 
+/* 경기 상세 "정보" 탭 맨 위에 뜨는 경기 종료 후 요약 문장(2026-11-24) - career-story-box와 같은
+   스타일로 통일한다. */
+.match-summary-box {
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border-strong);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
 .career-story-box {
   background: var(--bg-elevated);
   border: 1px dashed var(--border-strong);

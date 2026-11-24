@@ -1367,6 +1367,41 @@ function renderDominance(m, statsHome, statsAway) {
   `;
 }
 
+// 경기 종료 후 "정보" 탭을 열자마자 바로 보이는 2~3문장 요약(2026-11-24 요청 - "경기 종료 후 분석").
+// 통계 탭까지 직접 넘어가서 표를 읽어야 알 수 있던 결과/지배력/슈팅 수를 맨 위에서 바로 알려준다.
+// 실제 스탯 수치만 그대로 문장으로 바꿔 보여줄 뿐, 전술 평가처럼 없는 데이터를 지어내지는 않는다.
+function matchSummaryText(m) {
+  if (m.status !== "FINISHED" || !m.statistics || m.statistics.length < 2) return "";
+  const statsHome = m.statistics.find((s) => s.teamId === m.homeTeam.id)?.stats || {};
+  const statsAway = m.statistics.find((s) => s.teamId === m.awayTeam.id)?.stats || {};
+  const dominance = computeDominance(statsHome, statsAway);
+  if (!dominance) return "";
+
+  const homeName = m.homeTeam.shortName || m.homeTeam.name;
+  const awayName = m.awayTeam.shortName || m.awayTeam.name;
+  const home = m.score.fullTime.home;
+  const away = m.score.fullTime.away;
+  if (home == null || away == null) return "";
+
+  const resultLine =
+    home > away
+      ? `${homeName}이(가) ${home}-${away}로 승리했어요.`
+      : away > home
+        ? `${awayName}이(가) ${away}-${home}로 승리했어요.`
+        : `${home}-${away} 무승부로 끝났어요.`;
+
+  const leadSide = dominance.home >= 55 ? homeName : dominance.away >= 55 ? awayName : null;
+  const dominanceLine = leadSide
+    ? `${leadSide}이(가) 경기 지배력(점유율·슈팅·xG 종합) ${Math.max(dominance.home, dominance.away)}%로 경기를 주도했어요.`
+    : `지배력 수치는 ${dominance.home}% : ${dominance.away}%로 팽팽했어요.`;
+
+  const shotsHome = parseFloat(statsHome.shotsTotal) || 0;
+  const shotsAway = parseFloat(statsAway.shotsTotal) || 0;
+  const shotsLine = shotsHome || shotsAway ? `슈팅은 ${homeName} ${shotsHome}회 : ${awayName} ${shotsAway}회였어요.` : "";
+
+  return [resultLine, dominanceLine, shotsLine].filter(Boolean).join(" ");
+}
+
 function renderStatistics(m) {
   if (!m.statistics || m.statistics.length < 2) return "";
   const statsHome = m.statistics.find((s) => s.teamId === m.homeTeam.id)?.stats || {};
@@ -1904,7 +1939,11 @@ function renderMatchDetail(m) {
       </div>`
     : "";
 
+  const summaryText = matchSummaryText(m);
+  const summaryHtml = summaryText ? `<div class="match-summary-box">📝 ${summaryText}</div>` : "";
+
   const infoHtml = `
+    ${summaryHtml}
     ${goalsHtml}
     ${subsHtml}
     <div class="detail-info-grid">
