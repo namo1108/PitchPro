@@ -2779,6 +2779,53 @@ table.standings-table {
   margin-top: 8px;
 }
 
+/* 경기 상세 "분석" 탭(2026-11-24) */
+.match-analysis-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0 0 8px;
+}
+
+.match-flow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.match-flow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+
+.match-flow-row:last-child {
+  border-bottom: none;
+}
+
+.match-flow-row.away .match-flow-text {
+  color: var(--text-secondary);
+}
+
+.match-flow-minute {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  width: 30px;
+}
+
+.match-flow-icon {
+  flex-shrink: 0;
+}
+
+.match-flow-text {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 .tactical-note {
   font-size: 13px;
   line-height: 1.6;

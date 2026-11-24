@@ -1434,6 +1434,166 @@ function renderStatistics(m) {
   return `<div class="team-section"><h3 class="team-section-title">경기 스탯</h3>${rows}${renderDominance(m, statsHome, statsAway)}</div>`;
 }
 
+// ---------- 경기 분석 탭 (2026-11-24 요청 - "경기 분석 탭 하나 만들고 전체적으로 꼼꼼하고
+// 상세하게 분석해줘") ----------
+// 여기 있는 모든 문장은 이미 실제로 받아온 값(통계/골·카드·교체 이벤트 분/전후반 스코어/포메이션/
+// 선수 평점)을 그대로 서술로 바꾼 것뿐이다 - API-Football이 안 주는 압박강도·점유 구역 등은
+// renderStatistics 위쪽 주석(STAT_KEY_MAP)에 이미 적어뒀듯 재현 불가라 지어내지 않는다. 특히
+// "전반에 어디가 점유율을 지배했는지"는 API가 전후반을 나눠서 점유율을 주지 않아 사실 그대로는 알
+// 수 없다 - 대신 실제로 전후반이 나뉘어 있는 유일한 데이터인 "전후반 스코어"로 득점 흐름만 사실대로
+// 보여준다(추측 섞인 점유율 숫자를 지어내지 않는다).
+
+function teamAverageRating(lineup) {
+  const ratings = (lineup?.startXI || []).map((p) => p.rating).filter((r) => typeof r === "number");
+  if (!ratings.length) return null;
+  return ratings.reduce((a, b) => a + b, 0) / ratings.length;
+}
+
+// 통계 탭의 "매치 도미넌스" 종합 지수 하나만으론 "슈팅은 어디가 많았는지" 같은 구체적인 질문에
+// 답이 안 된다 - 항목별로 누가 앞섰는지 한 줄씩 풀어서 보여준다.
+const STAT_COMPARE_DEFS = [
+  ["점유율", "possession", "%"],
+  ["슈팅", "shotsTotal", "회"],
+  ["유효 슈팅", "shotsOnGoal", "회"],
+  ["코너킥", "corners", "회"],
+  ["패스 성공률", "passAccuracy", "%"],
+  ["xG(기대득점)", "xg", ""],
+];
+
+function statComparisonNarrative(statsHome, statsAway, homeName, awayName) {
+  const lines = [];
+  for (const [label, key, unit] of STAT_COMPARE_DEFS) {
+    const h = parseFloat(statsHome[key]);
+    const a = parseFloat(statsAway[key]);
+    if (!Number.isFinite(h) && !Number.isFinite(a)) continue;
+    const hv = Number.isFinite(h) ? h : 0;
+    const av = Number.isFinite(a) ? a : 0;
+    if (hv === av) {
+      lines.push(`${label}은(는) ${hv}${unit}로 동일했어요.`);
+      continue;
+    }
+    const leaderName = hv > av ? homeName : awayName;
+    lines.push(`${label}: ${homeName} ${hv}${unit} : ${awayName} ${av}${unit} — ${leaderName}이(가) 앞섰어요.`);
+  }
+  return lines;
+}
+
+const MATCH_FLOW_ICON = { goal: "⚽", yellow: "🟨", red: "🟥", sub: "🔄" };
+
+// 골·카드·교체를 분 순서로 합쳐서 하나의 타임라인으로 보여준다 - "경기 전체 판도"를 추측성 문장
+// 없이도 실제로 일어난 순서 그대로 보여주는 방식.
+function matchFlowTimelineHtml(m) {
+  const homeId = m.homeTeam.id;
+  const teamTag = (teamId) => (teamId === homeId ? m.homeTeam.shortName || m.homeTeam.name : m.awayTeam.shortName || m.awayTeam.name);
+  const events = [
+    ...(m.goalEvents || []).map((g) => ({
+      minute: eventMinute(g),
+      teamId: g.teamId,
+      icon: MATCH_FLOW_ICON.goal,
+      text: `[${teamTag(g.teamId)}] ${g.scorer} 득점${g.penalty ? " (PK)" : ""}${g.ownGoal ? " (자책골)" : ""}${g.assist ? ` · 도움 ${g.assist}` : ""}`,
+    })),
+    ...(m.cardEvents || []).map((c) => ({
+      minute: eventMinute(c),
+      teamId: c.teamId,
+      icon: c.red ? MATCH_FLOW_ICON.red : MATCH_FLOW_ICON.yellow,
+      text: `[${teamTag(c.teamId)}] ${c.player} ${c.red ? "퇴장" : "경고"}`,
+    })),
+    ...(m.substitutions || []).map((s) => ({
+      minute: eventMinute(s),
+      teamId: s.teamId,
+      icon: MATCH_FLOW_ICON.sub,
+      text: `[${teamTag(s.teamId)}] ${s.playerOut} → ${s.playerIn} 교체`,
+    })),
+  ].sort((a, b) => a.minute - b.minute);
+
+  if (!events.length) return "";
+  return `
+    <div class="match-flow-list">
+      ${events
+        .map(
+          (ev) => `
+        <div class="match-flow-row ${ev.teamId === homeId ? "home" : "away"}">
+          <span class="match-flow-minute">${ev.minute}'</span>
+          <span class="match-flow-icon">${ev.icon}</span>
+          <span class="match-flow-text">${ev.text}</span>
+        </div>
+      `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderMatchAnalysis(m) {
+  if (m.status !== "FINISHED") {
+    return '<div class="empty-state">경기가 끝난 뒤에 상세 분석을 볼 수 있어요.</div>';
+  }
+
+  const homeName = m.homeTeam.shortName || m.homeTeam.name;
+  const awayName = m.awayTeam.shortName || m.awayTeam.name;
+  const sections = [];
+
+  // 1) 전술 운영 - 포메이션(tacticalNote), 교체 횟수, 선발 평균 평점. 전부 실제로 받아온 값이고,
+  // "왜" 그런 교체를 했는지 같은 의도 해석은 하지 않는다(API에 없는 정보).
+  const homeLineup = m.lineups?.find((l) => l.teamId === m.homeTeam.id);
+  const awayLineup = m.lineups?.find((l) => l.teamId === m.awayTeam.id);
+  const homeSubs = (m.substitutions || []).filter((s) => s.teamId === m.homeTeam.id).length;
+  const awaySubs = (m.substitutions || []).filter((s) => s.teamId === m.awayTeam.id).length;
+  const homeAvgRating = teamAverageRating(homeLineup);
+  const awayAvgRating = teamAverageRating(awayLineup);
+
+  const tacticsLines = [];
+  if (m.tacticalNote) tacticsLines.push(m.tacticalNote);
+  if (homeSubs || awaySubs) tacticsLines.push(`선수 교체는 ${homeName} ${homeSubs}회, ${awayName} ${awaySubs}회 있었어요.`);
+  if (homeAvgRating != null && awayAvgRating != null) {
+    tacticsLines.push(`선발 평균 평점은 ${homeName} ${homeAvgRating.toFixed(1)} : ${awayName} ${awayAvgRating.toFixed(1)}이었어요.`);
+  }
+  if (tacticsLines.length) {
+    sections.push(
+      `<div class="team-section"><h3 class="team-section-title">🧩 전술 운영</h3><p class="match-analysis-text">${tacticsLines.join(" ")}</p></div>`
+    );
+  }
+
+  // 2) 전후반 득점 흐름 - API가 전후반 점유율/슈팅을 따로 안 줘서, 실제로 전후반이 나뉘어 있는
+  // 유일한 수치인 스코어로만 흐름을 짚는다.
+  const ht = m.score.halfTime;
+  const ft = m.score.fullTime;
+  if (ht && ht.home != null && ft.home != null) {
+    const homeSecond = ft.home - ht.home;
+    const awaySecond = ft.away - ht.away;
+    sections.push(`
+      <div class="team-section">
+        <h3 class="team-section-title">⏱ 전후반 득점 흐름</h3>
+        <p class="match-analysis-text">전반 ${ht.home}-${ht.away}, 후반 ${homeSecond}-${awaySecond}로 마무리됐어요(최종 ${ft.home}-${ft.away}).</p>
+      </div>
+    `);
+  }
+
+  // 3) 경기 지배력 - 항목별 비교 문장 + 기존 "매치 도미넌스" 종합 지수/시간대 그래프(renderDominance)
+  // 를 그대로 재사용한다(중복 구현 안 함).
+  if (m.statistics && m.statistics.length >= 2) {
+    const statsHome = m.statistics.find((s) => s.teamId === m.homeTeam.id)?.stats || {};
+    const statsAway = m.statistics.find((s) => s.teamId === m.awayTeam.id)?.stats || {};
+    const narrative = statComparisonNarrative(statsHome, statsAway, homeName, awayName);
+    sections.push(`
+      <div class="team-section">
+        <h3 class="team-section-title">📊 경기 지배력</h3>
+        ${narrative.map((l) => `<p class="match-analysis-text">${l}</p>`).join("")}
+        ${renderDominance(m, statsHome, statsAway)}
+      </div>
+    `);
+  }
+
+  // 4) 경기 흐름 타임라인
+  const timelineHtml = matchFlowTimelineHtml(m);
+  if (timelineHtml) {
+    sections.push(`<div class="team-section"><h3 class="team-section-title">📈 경기 흐름</h3>${timelineHtml}</div>`);
+  }
+
+  if (!sections.length) return '<div class="empty-state">분석할 데이터가 없습니다.</div>';
+  return sections.join("");
+}
+
 // grid는 API-Football이 주는 "row:col" 좌표. 팀별로 자기 진영 골라인 쪽에서 하프라인 쪽으로
 // row가 커지도록 배치하고, 같은 row 안에서는 col 순서대로 좌우 균등 배치한다.
 function layoutSide(startXI) {
@@ -2000,6 +2160,7 @@ function renderMatchDetail(m) {
       <button class="team-tab-btn active" data-detail-tab="info">정보</button>
       <button class="team-tab-btn" data-detail-tab="lineup">라인업</button>
       <button class="team-tab-btn" data-detail-tab="stats">통계</button>
+      <button class="team-tab-btn" data-detail-tab="analysis">분석</button>
       <button class="team-tab-btn" data-detail-tab="h2h">상대전적</button>
       <button class="team-tab-btn" data-detail-tab="standings">순위</button>
     </div>
@@ -2008,6 +2169,7 @@ function renderMatchDetail(m) {
       <div class="detail-tab-panel" data-detail-panel="info">${infoHtml}</div>
       <div class="detail-tab-panel" data-detail-panel="lineup" style="display: none;">${safeRender(() => renderLineups(m), '<div class="empty-state">라인업 정보를 표시할 수 없습니다.</div>')}</div>
       <div class="detail-tab-panel" data-detail-panel="stats" style="display: none;">${safeRender(() => renderStatistics(m), "") || '<div class="empty-state">스탯 정보가 없습니다.</div>'}</div>
+      <div class="detail-tab-panel" data-detail-panel="analysis" style="display: none;">${safeRender(() => renderMatchAnalysis(m), '<div class="empty-state">분석 정보를 표시할 수 없습니다.</div>')}</div>
       <div class="detail-tab-panel" data-detail-panel="h2h" style="display: none;">
         <div class="team-section" id="h2h-section">
           <div class="loading">상대전적 불러오는 중...</div>
