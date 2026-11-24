@@ -779,7 +779,9 @@ function attachWatchBells(root) {
       bellEl.classList.toggle("active", nowWatched);
       bellEl.textContent = nowWatched ? "🔔" : "🔕";
 
-      const ok = await setMatchWatch(matchId, nowWatched);
+      // setMatchWatch 내부에서 네트워크 에러 등으로 예외가 던져져도(예: 오프라인) 벨 상태는 반드시
+      // 되돌려야 한다 - 그냥 await만 하면 못 잡은 예외가 벨을 "켜짐" 상태로 어긋난 채 남겨둔다.
+      const ok = await setMatchWatch(matchId, nowWatched).catch(() => false);
       if (!ok) {
         const reverted = toggleWatch(matchId);
         bellEl.classList.toggle("active", reverted);

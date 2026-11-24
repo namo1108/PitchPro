@@ -44,32 +44,56 @@ async function postSubscribe(subscription, teamIds) {
   return ok;
 }
 
-// 아직 구독 중이 아니면 권한 요청 + 구독까지 처리하고, 브라우저 구독이 있든 새로 만들었든
-// 항상 서버 등록을 (재)시도해서 실제로 저장됐는지 확인한 뒤 구독 객체를 돌려준다.
-// 권한 거부/미지원/서버 등록 실패면 null.
-export async function ensureSubscribed() {
+let permissionPromptedThisSession = false;
+
+async function doEnsureSubscribed() {
   const reg = await getRegistration();
   if (!reg) return null;
 
   let subscription = await reg.pushManager.getSubscription();
 
   if (!subscription) {
+    // 사용자가 네이티브 팝업을 그냥 닫아버리면(허용/차단 둘 다 안 고르면) 권한 상태가 "거부"가
+    // 아니라 여전히 "default"로 남는다 - 그 상태에서 다른 경기의 알림 벨을 누르면 매번
+    // requestPermission()이 다시 호출돼 팝업이 계속 뜨는 문제가 있었다(2026-11-24 제보 - "여러
+    // 경기 누르면 알림 브라우저 팝업 계속 나옴"). 한 세션에 한 번만 물어보고, 그래도 안 정해졌으면
+    // 조용히 실패 처리한다(벨은 원래 상태로 되돌아가고 안내 문구만 뜬다).
+    if (permissionPromptedThisSession && Notification.permission === "default") return null;
+    permissionPromptedThisSession = true;
+
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return null;
 
     const { publicKey } = await fetchJSON("/push/vapid-public-key");
     if (!publicKey) return null;
 
-    subscription = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(publicKey),
-    });
+    try {
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    } catch {
+      return null;
+    }
   }
 
   const teamIds = listFavorites().map((t) => t.id);
   const ok = await postSubscribe(subscription, teamIds);
   syncNotifyButton(ok);
   return ok ? subscription : null;
+}
+
+// 경기 알림 벨을 여러 개 빠르게 연달아 누르면 ensureSubscribed가 동시에 여러 번 호출되는데, 첫
+// 구독이 아직 안 끝난 사이에 또 getSubscription()이 null을 돌려줘서 권한 요청이 중복으로 나가는
+// 레이스 컨디션이 있었다 - 진행 중인 요청을 공유해서 한 번만 실행되게 한다.
+let subscribingPromise = null;
+export function ensureSubscribed() {
+  if (!subscribingPromise) {
+    subscribingPromise = doEnsureSubscribed().finally(() => {
+      subscribingPromise = null;
+    });
+  }
+  return subscribingPromise;
 }
 
 // 설정 탭이 "지금 이 기기가 알림을 받고 있는지"만 조용히 확인할 때 쓴다 - ensureSubscribed와 달리
