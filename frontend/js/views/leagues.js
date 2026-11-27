@@ -16,7 +16,7 @@ import {
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
 import { loadMatchDetail } from "./matches.js";
-import { openNotifyTeamsPicker } from "../notifyTeamsPicker.js";
+import { openNotifyMatchesPicker } from "../notifyTeamsPicker.js";
 
 // 대회 27개를 한 줄짜리 긴 리스트로 두면 원하는 리그를 찾기 힘들어서, 지역/성격별로 묶어
 // 트리(아코디언)로 접었다 펼치게 한다. 코드에 없는 대회는 자동으로 "기타"에 담긴다.
@@ -476,19 +476,14 @@ function bulkNotifyBtnHtml(tables) {
 }
 
 // 리그 전체 로스터(18~20팀)를 다 띄우면 오늘 경기도 없는 팀까지 고르게 되니 번거롭다는 피드백
-// (2026-11-27 - "리그를 누르면 그날 그 리그 경기를 선택하게 해야지 팀을 다 선택하게 하면 어떻게") -
-// 전체 순위표 대신 오늘 이 대회에서 실제로 열리는 경기의 팀만 추려서 picker에 넘긴다.
-async function teamsPlayingToday(code) {
+// (2026-11-27 - "리그를 누르면 그날 그 리그 경기를 선택하게 해야지 팀을 다 선택하게 하면 어떻게",
+// 이어서 "팀말고 경기만 보여줘") - 전체 순위표 대신 오늘 이 대회에서 실제로 열리는 경기 목록
+// 자체를 picker에 넘긴다(팀으로 쪼개지 않음 - 경기 탭 대회 헤더와 동일한 방식).
+async function matchesPlayingToday(code) {
   try {
     const todayStr = toISODate(dateWithOffset(0));
     const data = await fetchJSON(`/matches?date=${todayStr}`);
-    const seen = new Map();
-    for (const m of data.matches || []) {
-      if (m.competition.code !== code) continue;
-      if (m.homeTeam?.id != null) seen.set(m.homeTeam.id, m.homeTeam);
-      if (m.awayTeam?.id != null) seen.set(m.awayTeam.id, m.awayTeam);
-    }
-    return [...seen.values()];
+    return (data.matches || []).filter((m) => m.competition.code === code);
   } catch {
     return [];
   }
@@ -586,14 +581,10 @@ function renderTables(tables, silent, comp) {
     const prevText = btn.textContent;
     btn.disabled = true;
     btn.textContent = "불러오는 중...";
-    const teams = await teamsPlayingToday(state.openCode);
+    const matches = await matchesPlayingToday(state.openCode);
     btn.disabled = false;
     btn.textContent = prevText;
-    if (!teams.length) {
-      alert("오늘 열리는 경기가 없어요.");
-      return;
-    }
-    openNotifyTeamsPicker(state.lastComp?.name || "이 리그", teams);
+    openNotifyMatchesPicker(state.lastComp?.name || "이 리그", matches);
   });
 
   el.standingsWrap.querySelectorAll(".league-fixture-row").forEach((row) => {

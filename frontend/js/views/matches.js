@@ -28,7 +28,7 @@ import { saveViewState } from "../viewState.js";
 import { getTheme } from "../theme.js";
 import { isLoggedIn, authFetch, getToken } from "../auth.js";
 import { trackEvent } from "../analytics.js";
-import { openNotifyTeamsPicker } from "../notifyTeamsPicker.js";
+import { openNotifyMatchesPicker } from "../notifyTeamsPicker.js";
 
 const state = {
   dayOffset: 0,
@@ -595,18 +595,6 @@ function pickFeaturedMatch(matches) {
     })[0];
 }
 
-// 대회 헤더의 알림 설정 버튼용 - 오늘 그 대회 그룹에 실제로 떠 있는 경기들에서 홈/원정팀만 중복
-//없이 추려낸다(전체 시즌 참가팀이 아니라 "지금 이 목록에 보이는 팀들" 기준이라 추가 API 호출이
-// 필요 없다 - 경기 탭에서 바로 쓰기엔 이걸로 충분하다).
-function teamsFromMatchGroup(matches) {
-  const seen = new Map();
-  for (const m of matches) {
-    if (m.homeTeam?.id != null) seen.set(m.homeTeam.id, m.homeTeam);
-    if (m.awayTeam?.id != null) seen.set(m.awayTeam.id, m.awayTeam);
-  }
-  return [...seen.values()];
-}
-
 function renderMatches(matches) {
   if (!matches.length) {
     el.matchesList.innerHTML = '<div class="empty-state">해당 날짜에 예정된 경기가 없습니다.</div>';
@@ -710,7 +698,7 @@ function renderMatches(matches) {
 
     header.querySelector(".competition-header-notify-btn").addEventListener("click", (e) => {
       e.stopPropagation();
-      openNotifyTeamsPicker(group.info.name, teamsFromMatchGroup(group.matches));
+      openNotifyMatchesPicker(group.info.name, group.matches);
     });
 
     // 화살표를 눌러서 그 안의 경기 목록을 접었다 펼 수 있게(리그 많은 날 스크롤 부담을 줄임).

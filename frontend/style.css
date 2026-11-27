@@ -6754,122 +6754,60 @@ html[data-toss-app] .career-advance-bar {
   margin-bottom: 14px;
 }
 
-/* 팀 on/off 행 + (알림 켜져 있으면) 그 팀 전용 알림 종류 칩을 한 묶음으로 - 테두리는 묶음 단위로
-   그어서, 종류 칩이 있든 없든(알림 미설정 상태) 마지막 팀 아래 선이 항상 깔끔하게 없어진다. */
-.notify-picker-row-wrap {
-  border-bottom: 1px solid var(--border);
-  padding: 2px 0;
-}
-
-.notify-picker-row-wrap:last-child {
-  border-bottom: none;
-}
-
-.notify-picker-row {
+/* 경기 한 줄에 토글 하나(2026-11-27, "팀말고 경기만 보여줘") - 기존의 "팀 선택 + 팀별 알림 종류
+   설정" 2단계 방식 대신, 경기 탭의 개별 경기 벨(🔔)과 똑같은 matchIds 방식을 그대로 재사용해서
+   경기 목록 형태로 한 번에 여러 개 켤 수 있게 했다. */
+.notify-match-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 7px 4px;
-  cursor: pointer;
-}
-
-/* 팀이 많은 대회에서 체크한 팀마다 13개 아이콘 칩이 줄줄이 펼쳐져 하나하나 누르기 너무 번거롭다는
-   피드백(2026-11-27, "fotmob처럼 편하게") - 기본 목록엔 이 버튼 하나만 두고, 실제 종류별 설정은
-   누르면 뜨는 별도 시트(.notify-type-sheet)에서 그 팀 하나만 집중해서 고르게 바꿨다. */
-.notify-type-settings-btn {
-  display: block;
-  margin: 0 0 8px 36px;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 5px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-.notify-type-settings-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-/* 팀 하나만을 위한 알림 종류 설정 시트 - fotmob 레퍼런스처럼 단일 열, 큰 글씨, 넉넉한 탭 영역. */
-.notify-type-sheet .points-info-header {
-  justify-content: flex-start;
-  gap: 10px;
-}
-
-.notify-type-sheet .points-info-header .team-crest {
-  width: 26px;
-  height: 26px;
-  object-fit: contain;
-}
-
-.notify-type-sheet-list {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 14px;
-}
-
-.notify-type-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 4px;
+  gap: 8px;
+  padding: 10px 4px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
 }
 
-.notify-type-row:last-child {
+.notify-match-row:last-child {
   border-bottom: none;
 }
 
-.notify-type-row-icon {
-  font-size: 18px;
-  flex-shrink: 0;
-  width: 24px;
-  text-align: center;
-}
-
-.notify-type-row-label {
+.notify-match-team {
   flex: 1;
   min-width: 0;
-  font-size: 14.5px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.notify-type-row input[type="checkbox"] {
-  width: 22px;
-  height: 22px;
-  accent-color: var(--accent);
-  flex-shrink: 0;
-}
-
-.notify-picker-row .team-crest {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
-.notify-picker-name {
-  flex: 1;
-  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
-.notify-picker-row input[type="checkbox"] {
-  width: 19px;
-  height: 19px;
+.notify-match-team.away {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.notify-match-team .team-crest {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.notify-match-vs {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.notify-match-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
   accent-color: var(--accent);
   flex-shrink: 0;
+  margin-left: 4px;
 }
 
 .points-info-header {
