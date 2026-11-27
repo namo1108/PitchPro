@@ -6767,30 +6767,78 @@ html[data-toss-app] .career-advance-bar {
   cursor: pointer;
 }
 
-.notify-picker-types {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 4px 8px 36px;
-}
-
-.notify-type-chip {
-  background: var(--bg-elevated);
+/* 팀이 많은 대회에서 체크한 팀마다 13개 아이콘 칩이 줄줄이 펼쳐져 하나하나 누르기 너무 번거롭다는
+   피드백(2026-11-27, "fotmob처럼 편하게") - 기본 목록엔 이 버튼 하나만 두고, 실제 종류별 설정은
+   누르면 뜨는 별도 시트(.notify-type-sheet)에서 그 팀 하나만 집중해서 고르게 바꿨다. */
+.notify-type-settings-btn {
+  display: block;
+  margin: 0 0 8px 36px;
+  background: none;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 4px 7px;
-  font-size: 13px;
-  line-height: 1;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
   cursor: pointer;
-  opacity: 0.45;
-  filter: grayscale(1);
 }
 
-.notify-type-chip.on {
-  opacity: 1;
-  filter: none;
+.notify-type-settings-btn:hover {
   border-color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* 팀 하나만을 위한 알림 종류 설정 시트 - fotmob 레퍼런스처럼 단일 열, 큰 글씨, 넉넉한 탭 영역. */
+.notify-type-sheet .points-info-header {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.notify-type-sheet .points-info-header .team-crest {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.notify-type-sheet-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
+}
+
+.notify-type-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 4px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.notify-type-row:last-child {
+  border-bottom: none;
+}
+
+.notify-type-row-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+}
+
+.notify-type-row-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.notify-type-row input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
 }
 
 .notify-picker-row .team-crest {
