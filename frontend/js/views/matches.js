@@ -23,6 +23,7 @@ import { goToPlayer } from "./playerDetail.js";
 import { isWatched, toggleWatch } from "../watchlist.js";
 import { setMatchWatch } from "../push.js";
 import { isFavorite } from "../favorites.js";
+import { isNotifyTeam } from "../notifyTeams.js";
 import { saveViewState } from "../viewState.js";
 import { getTheme } from "../theme.js";
 import { isLoggedIn, authFetch, getToken } from "../auth.js";
@@ -780,20 +781,38 @@ function renderLeaguePicker(pickerCandidates) {
   return wrap;
 }
 
-// 경기별 알림 벨(★즐겨찾기와 무관하게 이 경기 하나만 골 알림)의 공용 마크업.
-function watchBellHtml(matchId) {
+// 경기별 알림 벨 - 이 경기 하나만 따로 지정한 건지(matchIds), 즐겨찾기/리그 알림 설정으로 이미
+// 그 팀 알림이 켜져있는 건지(teamIds) 둘 다 보고 "켜짐"으로 표시한다. 예전엔 전자만 봐서, 리그
+// 화면에서 팀 알림을 켜도 경기 목록의 벨은 그대로 🔕로 보여 "설정이 안 먹혔나" 혼란을 줬다
+// (2026-11-27 제보 - "팀별 알림 추가했는데 경기일정 종모양은 활성화가 안되어있어").
+function watchBellHtml(m) {
   // 토스 미니앱에서는 style.css의 html[data-toss-app] .watch-bell { display: none }로 숨긴다 -
   // push.js에서 isTossApp을 import하면 원인 불명의 이유로 토스 미니앱 전체가 먹통이 되는 게
   // 재현돼서(2026-08-29, 아주 긴 이등분 탐색으로 확인 - Notification/User SDK 때와는 별개 문제),
   // JS 조건부 렌더링 대신 순수 CSS로 처리한다. push.js는 절대 건드리지 않는다.
-  const watched = isWatched(matchId);
-  return `<button class="watch-bell ${watched ? "active" : ""}" data-watch-id="${matchId}" aria-label="경기 알림 설정" title="경기 알림 설정">${watched ? "🔔" : "🔕"}</button>`;
+  const matchWatched = isWatched(m.id);
+  const teamWatched =
+    isFavorite(m.homeTeam.id) || isFavorite(m.awayTeam.id) || isNotifyTeam(m.homeTeam.id) || isNotifyTeam(m.awayTeam.id);
+  const active = matchWatched || teamWatched;
+  // 팀 알림으로 이미 켜진 경우엔 이 벨만 눌러서는 끌 수 없다(팀 알림을 꺼야 함) - 눌러도 안 꺼지는
+  // 벨처럼 보이지 않도록 다른 스타일(team-watched)과 안내 문구를 둔다.
+  if (teamWatched && !matchWatched) {
+    return `<button class="watch-bell active team-watched" data-watch-id="${m.id}" aria-label="즐겨찾기/리그 알림 설정으로 이미 켜짐" title="즐겨찾기 또는 리그 알림 설정으로 이미 알림이 가요. 끄려면 나의 팀 또는 리그 알림 설정에서 꺼주세요.">🔔</button>`;
+  }
+  return `<button class="watch-bell ${active ? "active" : ""}" data-watch-id="${m.id}" aria-label="경기 알림 설정" title="경기 알림 설정">${active ? "🔔" : "🔕"}</button>`;
 }
 
 function attachWatchBells(root) {
   root.querySelectorAll("[data-watch-id]").forEach((bellEl) => {
     bellEl.addEventListener("click", async (e) => {
       e.stopPropagation();
+      // 팀 알림(즐겨찾기/리그 알림 설정)으로 이미 켜져있는 벨은 여기서 눌러도 끌 수 없다 - 눌렀다고
+      // matchIds에 추가해봤자 팀 알림이 그대로 살아있어 의미가 없고, 사용자가 "껐는데 안 꺼졌다"고
+      // 헷갈릴 수 있다. 어디서 끄면 되는지만 안내한다.
+      if (bellEl.classList.contains("team-watched")) {
+        alert("즐겨찾기 또는 리그 알림 설정으로 이미 알림이 가고 있어요.\n끄려면 나의 팀 즐겨찾기 해제 또는 리그/대회의 알림 설정에서 이 팀을 꺼주세요.");
+        return;
+      }
       const matchId = bellEl.dataset.watchId;
       const nowWatched = toggleWatch(matchId);
       bellEl.classList.toggle("active", nowWatched);
@@ -843,7 +862,7 @@ function renderHeroCard(m) {
         <span class="hero-match-comp-name">${m.competition.name}</span>
       </div>
       <div class="match-row-actions">
-        ${watchBellHtml(m.id)}
+        ${watchBellHtml(m)}
       </div>
     </div>
     <div class="hero-match-teams">
@@ -955,7 +974,7 @@ function renderMatchRow(m, opts = {}) {
       ${redCardBadgeHtml(m, m.awayTeam.id)}
     </div>
     <div class="match-row-actions">
-      ${watchBellHtml(m.id)}
+      ${watchBellHtml(m)}
     </div>
     ${goalSummaryHtml(m)}
   `;

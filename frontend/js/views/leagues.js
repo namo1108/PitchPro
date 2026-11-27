@@ -10,6 +10,8 @@ import {
   playerHintFromElement,
   standingsTablesHtml,
   formatMatchDateTime,
+  dateWithOffset,
+  toISODate,
 } from "../format.js";
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
@@ -473,6 +475,25 @@ function bulkNotifyBtnHtml(tables) {
   return `<button type="button" class="sim-toggle-btn league-bulk-notify-btn" id="league-bulk-notify-btn">🔔 알림 설정</button>`;
 }
 
+// 리그 전체 로스터(18~20팀)를 다 띄우면 오늘 경기도 없는 팀까지 고르게 되니 번거롭다는 피드백
+// (2026-11-27 - "리그를 누르면 그날 그 리그 경기를 선택하게 해야지 팀을 다 선택하게 하면 어떻게") -
+// 전체 순위표 대신 오늘 이 대회에서 실제로 열리는 경기의 팀만 추려서 picker에 넘긴다.
+async function teamsPlayingToday(code) {
+  try {
+    const todayStr = toISODate(dateWithOffset(0));
+    const data = await fetchJSON(`/matches?date=${todayStr}`);
+    const seen = new Map();
+    for (const m of data.matches || []) {
+      if (m.competition.code !== code) continue;
+      if (m.homeTeam?.id != null) seen.set(m.homeTeam.id, m.homeTeam);
+      if (m.awayTeam?.id != null) seen.set(m.awayTeam.id, m.awayTeam);
+    }
+    return [...seen.values()];
+  } catch {
+    return [];
+  }
+}
+
 // 남은 일정 - 라운드(매치데이)별로 묶어서 보여준다. API-Football이 주는 라운드 이름(matchday)을
 // 그대로 소제목으로 쓰는데, K리그 승강 플레이오프/파이널 라운드처럼 "Regular Season"이 아닌 특수
 // 라운드도 API가 이름 붙인 그대로 자연스럽게 제 소제목으로 묶여 나온다 - 없는 대진표 구조를 따로
@@ -560,8 +581,19 @@ function renderTables(tables, silent, comp) {
     renderTables(state.lastTables, true, state.lastComp);
   });
 
-  document.getElementById("league-bulk-notify-btn")?.addEventListener("click", () => {
-    openNotifyTeamsPicker(state.lastComp?.name || "이 리그", teamsFromTables(state.lastTables));
+  document.getElementById("league-bulk-notify-btn")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
+    const prevText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "불러오는 중...";
+    const teams = await teamsPlayingToday(state.openCode);
+    btn.disabled = false;
+    btn.textContent = prevText;
+    if (!teams.length) {
+      alert("오늘 열리는 경기가 없어요.");
+      return;
+    }
+    openNotifyTeamsPicker(state.lastComp?.name || "이 리그", teams);
   });
 
   el.standingsWrap.querySelectorAll(".league-fixture-row").forEach((row) => {

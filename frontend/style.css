@@ -795,6 +795,12 @@ html[data-toss-app] .content {
   opacity: 1;
 }
 
+/* 즐겨찾기/리그 알림 설정으로 이미 켜진 벨 - 이 벨만 눌러서는 못 끄니(나의 팀/리그 설정에서 꺼야
+   함) 살짝 다르게 보이게 한다(2026-11-27). */
+.watch-bell.team-watched {
+  filter: drop-shadow(0 0 3px rgba(36, 229, 131, 0.5));
+}
+
 .watch-bell-unsupported {
   opacity: 0.2;
 }
