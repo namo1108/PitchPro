@@ -17,6 +17,7 @@ import {
   teamHintFromElement,
   playerHintFromElement,
   standingsTablesHtml,
+  escapeHtml,
 } from "../format.js";
 import { goToTeam } from "./teamDetail.js";
 import { goToPlayer } from "./playerDetail.js";
@@ -63,6 +64,7 @@ const el = {
   detailContent: document.getElementById("match-detail-content"),
   detailView: document.getElementById("view-detail"),
   themeEmblem: document.getElementById("match-theme-emblem"),
+  scoreTicker: document.getElementById("score-ticker"),
 };
 
 const EXTRA_LEAGUES_KEY = "pitchpro.extraLeagues";
@@ -136,6 +138,7 @@ export async function loadMatches(opts = {}) {
     const matches = data.matches || [];
     state.lastMatches = matches;
     renderMatches(matches);
+    renderScoreTicker(matches);
     state.loadedOffsets.add(state.dayOffset);
     if (!opts.silent && !alreadyLoaded) fadeIn(el.matchesList);
     startAutoRefresh();
@@ -143,6 +146,63 @@ export async function loadMatches(opts = {}) {
     if (requestId !== matchesRequestId) return;
     if (!opts.silent && !alreadyLoaded) el.matchesList.innerHTML = `<div class="error-state">경기 정보를 불러오지 못했습니다.<br>${err.message}</div>`;
   }
+}
+
+// 경기 탭 하단 골/결과 소식 배너(2026-11-28 요청 - "리그별 주요 뉴스나 골 소식을 경기일정 하단에
+// 배너로"). 뉴스 기사는 리그 태그가 없어(소스가 BBC/동아 둘뿐) 리그별로 못 거르지만, 이미 갖고
+// 있는 실제 골 이벤트/최종 결과는 경기별로 어느 대회 소속인지 다 알고 있어서 이걸로 구성한다 -
+// 대회명을 각 항목 앞에 붙여서 "리그별" 소식처럼 보이게 한다.
+function tickerItemsFromMatches(matches) {
+  const items = [];
+  for (const m of matches) {
+    const compName = m.competition?.name || "";
+    const home = m.homeTeam.shortName || m.homeTeam.name;
+    const away = m.awayTeam.shortName || m.awayTeam.name;
+    const scoreLine = `${home} ${m.score.fullTime.home ?? 0}-${m.score.fullTime.away ?? 0} ${away}`;
+    for (const g of m.goalEvents || []) {
+      items.push({
+        minute: eventMinute(g),
+        matchId: m.id,
+        text: `[${compName}] ${g.scorer || "득점"} ${g.minute}' · ${scoreLine}`,
+      });
+    }
+    if (m.status === "FINISHED") {
+      items.push({ minute: 999, matchId: m.id, text: `[${compName}] 경기 종료 · ${scoreLine}` });
+    }
+  }
+  // 최근 골/결과가 앞쪽에 오도록 분 역순 정렬 - 너무 길어지지 않게 최근 20개만.
+  return items.sort((a, b) => b.minute - a.minute).slice(0, 20);
+}
+
+function renderScoreTicker(matches) {
+  if (!el.scoreTicker) return;
+  const items = tickerItemsFromMatches(matches);
+  if (!items.length) {
+    el.scoreTicker.style.display = "none";
+    el.scoreTicker.innerHTML = "";
+    el.matchesList.style.paddingBottom = "";
+    return;
+  }
+  const itemsHtml = items
+    .map((it) => `<span class="score-ticker-item" data-match-id="${it.matchId}">${escapeHtml(it.text)}</span>`)
+    .join('<span class="score-ticker-sep">•</span>');
+  // 끊김 없이 순환하도록 내용을 통째로 두 번 이어붙인다(한 바퀴 돌면 다음 바퀴로 자연스럽게 이어짐).
+  el.scoreTicker.innerHTML = `<div class="score-ticker-track">${itemsHtml}<span class="score-ticker-sep">•</span>${itemsHtml}</div>`;
+  el.scoreTicker.style.display = "block";
+  el.matchesList.style.paddingBottom = "48px"; // 배너에 마지막 경기 카드가 가려지지 않게
+
+  el.scoreTicker.querySelectorAll("[data-match-id]").forEach((span) => {
+    span.addEventListener("click", () => loadMatchDetail(span.dataset.matchId));
+  });
+
+  // 내용 길이와 무관하게 체감 속도가 일정하도록, 실제 너비(절반)를 재서 애니메이션 시간을 계산한다.
+  requestAnimationFrame(() => {
+    const track = el.scoreTicker.querySelector(".score-ticker-track");
+    if (!track) return;
+    const PX_PER_SEC = 55;
+    const duration = Math.max(12, track.scrollWidth / 2 / PX_PER_SEC);
+    track.style.animationDuration = `${duration}s`;
+  });
 }
 
 // 크론이 몇 분마다 도는 거라 elapsed 값 자체가 실시간은 아니다. 같은 값이 여러 번 반복되는 동안

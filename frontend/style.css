@@ -809,6 +809,58 @@ html[data-toss-app] .content {
   transform: none;
 }
 
+/* 경기 탭 하단 골/결과 소식 배너(2026-11-28) - BBC 스포츠류 스코어 티커 참고. 탭바 바로 위에
+   고정하고, 내용 없으면(오늘 골/종료 경기가 아예 없음) JS가 display:none으로 숨긴다. */
+.score-ticker {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  max-width: 900px;
+  margin: 0 auto;
+  z-index: 15;
+  overflow: hidden;
+  background: linear-gradient(90deg, rgba(10, 20, 16, 0.95), rgba(13, 28, 21, 0.95));
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.3);
+  padding: 9px 0;
+}
+
+html[data-toss-app] .score-ticker {
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
+.score-ticker-track {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  white-space: nowrap;
+  animation: score-ticker-scroll 30s linear infinite;
+}
+
+.score-ticker-item {
+  padding: 0 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.score-ticker-sep {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+@keyframes score-ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 .hero-match-card {
   position: relative;
   overflow: hidden;
