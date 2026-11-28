@@ -2,6 +2,7 @@ import { fetchAllNewsFeeds } from "../sources/newsRss.js";
 import { normalizeNewsItem } from "../adapters/newsAdapter.js";
 import { putJSON } from "../lib/kv.js";
 import { KV_KEYS } from "../lib/config.js";
+import { buildNewsClassifier } from "../lib/newsClassifier.js";
 
 // BBC 피드 자체가 같은 기사를 카테고리 중복 등의 이유로 두 번씩 내려줄 때가 있어(link 기준 실제 확인됨),
 // 링크 기준으로 한 번만 남긴다 - 안 그러면 목록에 똑같은 카드가 겹쳐 보인다.
@@ -15,11 +16,12 @@ function dedupeByLink(items) {
 }
 
 export async function refreshNews(env) {
-  const raw = await fetchAllNewsFeeds();
+  const [raw, classify] = await Promise.all([fetchAllNewsFeeds(), buildNewsClassifier(env)]);
   const news = dedupeByLink(
     raw
       .map(normalizeNewsItem)
       .filter((n) => n.title && n.link)
+      .map((n) => ({ ...n, ...classify(`${n.title} ${n.description}`) }))
       .sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0))
   ).slice(0, 40);
 

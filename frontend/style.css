@@ -3393,6 +3393,16 @@ table.standings-table {
   color: var(--accent);
 }
 
+/* 리그별 필터 탭(2026-11-28) - 리그 수가 많을 수 있어 줄바꿈을 허용한다. */
+.news-league-filter-tabs {
+  flex-wrap: wrap;
+}
+
+.news-league-filter-tabs .news-filter-tab {
+  padding: 5px 11px;
+  font-size: 11.5px;
+}
+
 .news-list {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -3464,8 +3474,9 @@ table.standings-table {
 .news-meta {
   margin-top: auto;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px 6px;
   font-size: 11px;
   color: var(--text-muted);
 }
@@ -3492,6 +3503,20 @@ table.standings-table {
 .news-source-badge.bbc {
   color: var(--gold);
   background: rgba(255, 209, 102, 0.1);
+}
+
+/* 기사가 어느 리그 소식인지(2026-11-28) - 제목/본문 키워드로 분류된 경우에만 붙는다. */
+.news-league-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 5px;
+  margin-left: 4px;
+  vertical-align: middle;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
 }
 
 /* ---------- AI analysis ---------- */

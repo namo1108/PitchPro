@@ -6,12 +6,15 @@ import { loadMatchDetail } from "./matches.js";
 const el = {
   list: document.getElementById("news-list"),
   filterTabs: document.getElementById("news-filter-tabs"),
+  leagueFilterTabs: document.getElementById("news-league-filter-tabs"),
   highlights: document.getElementById("highlights-section"),
 };
 
 // 전체 받아온 뉴스를 들고 있다가 필터 탭 클릭 시 다시 서버에 안 물어보고 바로 걸러서 다시 그린다.
 let allItems = [];
 let activeFilter = "all";
+// 리그 필터는 국내/해외 필터와 별개로 동시에 적용된다(둘 다 "그리고" 조건) - 예: 해외 + 프리미어리그.
+let activeLeagueFilter = "all";
 
 function formatPubDate(pubDate) {
   if (!pubDate) return "";
@@ -28,6 +31,7 @@ async function loadNews() {
   try {
     const data = await fetchJSON("/news");
     allItems = data.items || [];
+    renderLeagueFilterTabs();
     renderNews(filteredItems(), !loadedOnce);
     loadedOnce = true;
   } catch (err) {
@@ -36,7 +40,9 @@ async function loadNews() {
 }
 
 function filteredItems() {
-  return activeFilter === "all" ? allItems : allItems.filter((n) => n.source === activeFilter);
+  let items = activeFilter === "all" ? allItems : allItems.filter((n) => n.source === activeFilter);
+  if (activeLeagueFilter !== "all") items = items.filter((n) => n.leagueCode === activeLeagueFilter);
+  return items;
 }
 
 el.filterTabs?.addEventListener("click", (e) => {
@@ -44,6 +50,44 @@ el.filterTabs?.addEventListener("click", (e) => {
   if (!btn) return;
   activeFilter = btn.dataset.newsFilter;
   el.filterTabs.querySelectorAll(".news-filter-tab").forEach((t) => t.classList.toggle("active", t === btn));
+  renderNews(filteredItems(), false);
+});
+
+// 리그별 필터 탭(2026-11-28) - 실제로 분류된 리그만 탭으로 보여준다(없는 리그 탭을 미리 만들어두지
+// 않음 - 눌러도 빈 화면만 나오는 탭은 아예 안 보이는 게 낫다는 기존 하이라이트 탭과 같은 원칙).
+function leaguesPresentInItems() {
+  const seen = new Map();
+  for (const n of allItems) {
+    if (n.leagueCode && !seen.has(n.leagueCode)) seen.set(n.leagueCode, n.leagueLabel || n.leagueCode);
+  }
+  return [...seen.entries()];
+}
+
+function renderLeagueFilterTabs() {
+  if (!el.leagueFilterTabs) return;
+  const leagues = leaguesPresentInItems();
+  if (!leagues.length) {
+    el.leagueFilterTabs.style.display = "none";
+    el.leagueFilterTabs.innerHTML = "";
+    activeLeagueFilter = "all";
+    return;
+  }
+  el.leagueFilterTabs.style.display = "flex";
+  el.leagueFilterTabs.innerHTML =
+    `<button type="button" class="news-filter-tab ${activeLeagueFilter === "all" ? "active" : ""}" data-news-league-filter="all">전체 리그</button>` +
+    leagues
+      .map(
+        ([code, label]) =>
+          `<button type="button" class="news-filter-tab ${activeLeagueFilter === code ? "active" : ""}" data-news-league-filter="${code}">${label}</button>`
+      )
+      .join("");
+}
+
+el.leagueFilterTabs?.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-news-league-filter]");
+  if (!btn) return;
+  activeLeagueFilter = btn.dataset.newsLeagueFilter;
+  el.leagueFilterTabs.querySelectorAll(".news-filter-tab").forEach((t) => t.classList.toggle("active", t === btn));
   renderNews(filteredItems(), false);
 });
 
@@ -65,7 +109,9 @@ function renderNews(items, animate) {
       </div>
       <div class="news-body">
         <div class="news-title">${n.title}</div>
-        <div class="news-meta">${sourceLabel ? `<span class="news-source-badge ${n.source}">${sourceLabel}</span>` : ""}<span class="news-date">${formatPubDate(n.pubDate)}</span></div>
+        <div class="news-meta">${sourceLabel ? `<span class="news-source-badge ${n.source}">${sourceLabel}</span>` : ""}${
+        n.leagueLabel ? `<span class="news-league-badge">${n.leagueLabel}</span>` : ""
+      }<span class="news-date">${formatPubDate(n.pubDate)}</span></div>
       </div>
     </a>
   `;
