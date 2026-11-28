@@ -52,6 +52,12 @@ const BIG_CLUB_ALIASES = [
 
 const LEAGUE_LABEL_BY_CODE = Object.fromEntries(LEAGUE_KEYWORDS.map((l) => [l.code, l.label]));
 
+// newsLlmClassifier.js가 "이 코드 중에서만 골라" 프롬프트에 써야 해서 export한다 - LLM이 우리가
+// 모르는 코드를 지어내지 못하게 막는 용도.
+export function leagueCodeOptions() {
+  return LEAGUE_KEYWORDS.map(({ code, label }) => ({ code, label }));
+}
+
 // 리그 코드별로 팀 이름을 너무 짧게 주면(예: 2~3글자) 전혀 다른 문맥의 단어와 우연히 겹쳐서 엉뚱한
 // 리그로 분류될 위험이 커진다 - 일정 길이 이상인 이름만 동적 목록에 넣는다.
 const MIN_DYNAMIC_KEYWORD_LENGTH = 4;
